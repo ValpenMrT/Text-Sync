@@ -23,8 +23,25 @@ Ja, i listan:
 
 Allt finns också i högerklicksmenyn. Ingenting ändras i filen förrän du sparar.
 
-**Min film har ingen engelsk textundertext.**
-Bildbaserade undertexter (PGS/VobSub) kan inte läsas. Använd i stället en engelsk SRT-fil för samma version av filmen som referens.
+**Min film har ingen textundertext alls.**
+Synka mot filmens **ljud** i stället. Välj i listan **Referens** under fält 1:
+- **Ljud A – taldetektering:** snabbast, ungefär en minut. Den hittar var det pratas.
+- **Ljud B – Whisper:** taligenkänning som hör vad som sägs. Den är säkrare men tar längre tid, särskilt utan NVIDIA-grafikkort.
+- **Ljud A+B – kombinerat:** säkrast. Rekommenderas när verktygen finns.
+
+Första gången laddar Text Sync ner de gratisverktyg som behövs. Programmet frågar först och visar hur stort det är. Efter en Whisper-synk kan du också spara den igenkända texten som en egen undertext med **Spara igenkänd text…**. Den är automatisk och kan innehålla fel.
+
+**Kan Whisper kontrollera att filmens engelska textspår går i takt?**
+Ja. Välj "Spår N … + Whisper-kontroll" i listan **Referens**. Whisper lyssnar ord för ord, och delar av textspåret som ligger mer än ungefär 1 s fel rättas innan din svenska text synkas. I resultatet står hur mycket som kontrollerades och vad som rättades. Det tar ungefär 1 minut per avsnitt med NVIDIA-grafikkort. Välj grafikkort i listan bredvid.
+
+**Fungerar ljudsynk på korta klipp?**
+Bäst på hela filmer och avsnitt. På korta klipp, som 10 minuter, kan synken hamna fel, eftersom det pratas nästan hela tiden. Kontrollera resultatet i listan.
+
+**Skickas filmens ljud någonstans?**
+Nej. Allt körs på din egen dator. Internet behövs bara första gången, för att hämta verktygen.
+
+**Min film har bara bildbaserade undertexter (PGS/VobSub).**
+De kan inte läsas, men ljudsynken ovan fungerar. Du kan också använda en engelsk SRT-fil för samma version av filmen som referens.
 
 **Bokstäverna ser konstiga ut (t.ex. "Ã¥" i stället för "å", eller fel tecken på ryska och polska).**
 Välj rätt **Teckenkodning** i kort 2, under fältet för undertexten. Västeuropeisk passar svenska och engelska, Centraleuropeisk passar polska och tjeckiska, och Kyrillisk passar ryska.

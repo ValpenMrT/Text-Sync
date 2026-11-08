@@ -1,4 +1,4 @@
-# Bygger TextSync.exe med C#-kompilatorn som finns i Windows (.NET Framework 4.8)
+﻿# Bygger TextSync.exe med C#-kompilatorn som finns i Windows (.NET Framework 4.8)
 $ErrorActionPreference = 'Stop'
 $root = $PSScriptRoot
 $csc = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
@@ -48,6 +48,6 @@ if (-not (Test-Path $ico)) {
 
 $src = Get-ChildItem (Join-Path $root 'src') -Filter *.cs | ForEach-Object { $_.FullName }
 & $csc /nologo /optimize+ /target:winexe /codepage:65001 "/out:$(Join-Path $root 'TextSync.exe')" "/win32icon:$ico" `
-    /r:System.dll /r:System.Core.dll /r:System.Drawing.dll /r:System.Windows.Forms.dll $src
+    /r:System.dll /r:System.Core.dll /r:System.Drawing.dll /r:System.Windows.Forms.dll /r:System.IO.Compression.dll /r:System.IO.Compression.FileSystem.dll $src
 if ($LASTEXITCODE -ne 0) { throw "Bygget misslyckades" }
 Write-Host "Klart: $(Join-Path $root 'TextSync.exe')"

@@ -466,28 +466,52 @@ namespace TextSync
 
             double gScale = bestScale, gOff = bestOff;
             Func<double, double> gT = x => x * gScale + gOff;
-            Iv[] tgtG = ToIv(tgtCues, gT);
-            double[] tgtStG = tgtCues.Select(c => gT(c.Start)).OrderBy(x => x).ToArray();
-            double scoreGlobal = Fit(refIv, refSt, tgtCues, gT);
-
-            // 2) Lokala mätpunkter
-            progress(50, "Mäter lokala avvikelser…");
+            Iv[] tgtG = null; double[] tgtStG = null; double scoreGlobal = 0;
             double R = opt.LocalRangeSec * 1000;
             int K = (int)Math.Round(2 * R / LocalStep) + 1;
-            double gFrom = Math.Max(0, tgtG[0].S), gTo = tgtG[tgtG.Length - 1].E;
-            var grid = new List<double>();
-            for (double g = gFrom; g <= gTo + 1; g += GridStep) grid.Add(g);
-            var scores = new double[grid.Count][];
-            var speech = new double[grid.Count];
-            for (int i = 0; i < grid.Count; i++)
-            {
-                scores[i] = LocalScores(refIv, tgtG, refSt, tgtStG, grid[i], Window, R, LocalStep, K, out speech[i]);
-                if (i % 20 == 0) progress(50 + 30 * i / Math.Max(1, grid.Count), "Mäter lokala avvikelser…");
-            }
-
-            // 2a) Linjär driftkorrigering (enkel/smart)
+            List<double> grid = null; double[][] scores = null; double[] speech = null;
             double la_ = 0, lb_ = 0; int inl = 0, pts = 0;
-            FitLinear(grid, scores, speech, R, K, out la_, out lb_, out inl, out pts);
+
+            for (int pass = 0; pass < 2; pass++)
+            {
+                tgtG = ToIv(tgtCues, gT);
+                tgtStG = tgtCues.Select(c => gT(c.Start)).OrderBy(x => x).ToArray();
+                scoreGlobal = Fit(refIv, refSt, tgtCues, gT);
+
+                // 2) Lokala mätpunkter
+                progress(50, "Mäter lokala avvikelser…");
+                double gFrom = Math.Max(0, tgtG[0].S), gTo = tgtG[tgtG.Length - 1].E;
+                grid = new List<double>();
+                for (double g = gFrom; g <= gTo + 1; g += GridStep) grid.Add(g);
+                scores = new double[grid.Count][];
+                speech = new double[grid.Count];
+                for (int i = 0; i < grid.Count; i++)
+                {
+                    scores[i] = LocalScores(refIv, tgtG, refSt, tgtStG, grid[i], Window, R, LocalStep, K, out speech[i]);
+                    if (i % 20 == 0) progress(50 + 30 * i / Math.Max(1, grid.Count), "Mäter lokala avvikelser…");
+                }
+
+                // 2a) Linjär driftkorrigering (enkel/smart)
+                FitLinear(grid, scores, speech, R, K, out la_, out lb_, out inl, out pts);
+
+                // Motsvarar driften en känd bildfrekvensomräkning (t.ex. 4,3 % = 25 → 23,976) som den globala
+                // sökningen missade (vanligt med ljud som referens eller korta klipp)? Byt till exakt bildfrekvens och gör om.
+                if (pass > 0 || !opt.DetectFramerate || pts < 5 || Math.Abs(la_) < 0.0005) break;
+                double total = gScale * (1 + la_);
+                int snap = -1;
+                for (int si = 1; si < scales.Count; si++) if (Math.Abs(total - scales[si][0]) < 0.0025) snap = si;
+                if (snap < 0 || Math.Abs(scales[snap][0] - gScale) < 1e-6) break;
+                double newScale = scales[snap][0], guess = gOff * (1 + la_) + lb_, bestS = -1, bestO = guess;
+                for (double d = guess - 1500; d <= guess + 1500; d += 20)
+                {
+                    double dd = d;
+                    double s = Fit(refIv, refSt, tgtCues, x => x * newScale + dd);
+                    if (s > bestS) { bestS = s; bestO = d; }
+                }
+                gScale = newScale; gOff = bestO; bestIdx = snap;
+                res.Scale = gScale; res.OffsetMs = gOff;
+                res.FpsText = "Undertexten var gjord för " + Fmt(scales[snap][1]) + " fps – omräknad till " + Fmt(scales[snap][2]) + " fps";
+            }            if (Math.Abs(la_) > 0.02) { la_ = 0; lb_ = 0; pts = 0; } // större drift än 2 % utan känd bildfrekvens är orimlig
             List<Cue> outLinear = null; double scoreLinear = scoreGlobal;
             {
                 double a = la_, b = lb_;
@@ -662,7 +686,7 @@ namespace TextSync
                 inliers = n;
             }
             // orimlig drift (> 2 %) → ignorera lutning
-            if (Math.Abs(a) > 0.02) { a = 0; b = sorted[sorted.Count / 2]; }
+            if (Math.Abs(a) > 0.06) { a = 0; b = sorted[sorted.Count / 2]; }
         }
 
         static List<Cue> Piecewise(Iv[] refIv, double[] refSt, List<Cue> tgt, Func<double, double> gT, List<double> grid,

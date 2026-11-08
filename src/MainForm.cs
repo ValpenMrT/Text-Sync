@@ -33,6 +33,9 @@ namespace TextSync
         const double MatchThreshold = 0.95;   // andel rader som ska ha referenstext samtidigt
         bool[] rowMatched;
         LinkLabel undoLink;
+        Label gpuLabel; ComboBox gpuCombo; List<int> gpuDevices; bool gpuFilling;
+        List<Cue> transcript; string transcriptLang = ""; // Whisper-text från senaste ljudsynk
+        Button saveTextBtn;
 
         TextBox refBox, tgtBox, langBox;
         ComboBox trackCombo, modeCombo, encCombo;
@@ -106,13 +109,26 @@ namespace TextSync
             refBox = MakePathBox(); refBox.Leave += (s, e) => { if (!busy && refBox.Text != (mkvPath ?? refLoadedPath)) LoadReference(refBox.Text); };
             refBtn = MakeButton("Bläddra…", false);
             refBtn.Click += (s, e) => BrowseRef();
-            trackLabel = new Label { Text = "Spår:", AutoSize = true, Margin = new Padding(0, 7, 6, 0), Visible = false };
-            trackCombo = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 420, Visible = false, Margin = new Padding(0, 3, 12, 0) };
-            trackCombo.SelectedIndexChanged += (s, e) => { if (!busy) ClearResult(); };
+            trackLabel = new Label { Text = "Referens:", AutoSize = true, Margin = new Padding(0, 7, 6, 0), Visible = false };
+            trackCombo = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 460, Visible = false, Margin = new Padding(0, 3, 12, 0) };
+            trackCombo.SelectedIndexChanged += (s, e) => { if (!busy) ClearResult(); UpdateGpuVisibility(); };
             refInfo = new Label { AutoSize = true, ForeColor = Muted, Margin = new Padding(0, 7, 0, 0), Text = "Dra in en MKV- eller SRT-fil hit, eller klicka Bläddra." };
+            // grafikkort för Whisper (visas bara när en ljudmetod med Whisper är vald)
+            gpuLabel = new Label { Text = "&Grafikkort:", AutoSize = true, Margin = new Padding(0, 7, 6, 0), Visible = false };
+            gpuCombo = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 280, Margin = new Padding(0, 3, 12, 0), Visible = false, AccessibleName = "Grafikkort för taligenkänning" };
+            gpuCombo.SelectedIndexChanged += (s, e) =>
+            {
+                if (gpuFilling || gpuCombo.SelectedIndex < 0) return;
+                int dev = gpuDevices[gpuCombo.SelectedIndex];
+                Audio.WhisperDevice = dev;
+                Tools.SetSetting("gpu", dev < 0 ? "cpu" : dev.ToString());
+            };
             var trow = new FlowLayoutPanel { AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, WrapContents = false, Margin = new Padding(0, 4, 0, 0) };
-            trow.Controls.Add(trackLabel); trow.Controls.Add(trackCombo); trow.Controls.Add(refInfo);
-            root.Controls.Add(MakeCard("1.  Referens – undertext som redan är i synk (MKV-fil med textspår, eller SRT)", refBox, refBtn, trow), 0, 1);
+            trow.Controls.Add(trackLabel); trow.Controls.Add(trackCombo); trow.Controls.Add(gpuCombo);
+            refInfo.Margin = new Padding(0, 4, 0, 0);
+            var rinfo = new TableLayoutPanel { AutoSize = true, ColumnCount = 1, RowCount = 2, Dock = DockStyle.Fill, Margin = new Padding(0) };
+            rinfo.Controls.Add(trow, 0, 0); rinfo.Controls.Add(refInfo, 0, 1);
+            root.Controls.Add(MakeCard("1.  Referens – undertext i takt med filmen (textspår i MKV eller SRT) eller filmens ljud", refBox, refBtn, rinfo), 0, 1);
 
             // --- 2. mål
             tgtBox = MakePathBox(); tgtBox.Leave += (s, e) => { if (!busy && tgtBox.Text != tgtLoadedPath) LoadTarget(tgtBox.Text); };
@@ -147,6 +163,7 @@ namespace TextSync
             opts.Controls.Add(modeCombo);
             fpsCheck = new CheckBox { Text = "Upptäck bildfrekvensfel (25 ↔ 23,976 fps m.fl.)", Checked = true, AutoSize = true, Margin = new Padding(0, 8, 16, 0) };
             opts.Controls.Add(fpsCheck);
+
             syncBtn = MakeButton("&Synka", true);
             syncBtn.Width = 120; syncBtn.Height = 34; syncBtn.Margin = new Padding(0, 2, 12, 0);
             syncBtn.Click += async (s, e) => await DoSync();
@@ -243,6 +260,9 @@ namespace TextSync
             muxBtn = MakeButton("Lägg in i &MKV…", false); muxBtn.Enabled = false; muxBtn.Width = 140; muxBtn.Height = 34;
             muxBtn.Click += async (s, e) => await MuxIntoMkv();
             ctrls.Add(muxBtn);
+            saveTextBtn = MakeButton("Spara igenkänd &text…", false); saveTextBtn.Width = 190; saveTextBtn.Height = 34; saveTextBtn.Visible = false; saveTextBtn.Margin = new Padding(6, 0, 0, 0);
+            saveTextBtn.Click += (s, e) => SaveTranscript();
+            ctrls.Add(saveTextBtn);
             // tabell (FlowLayoutPanel placerar NumericUpDown fel vid hög DPI)
             var brow = new TableLayoutPanel { AutoSize = true, Dock = DockStyle.Top, ColumnCount = ctrls.Count + 2, RowCount = 1, Margin = new Padding(0, 8, 0, 0) };
             for (int i = 0; i < ctrls.Count; i++)
@@ -346,7 +366,7 @@ namespace TextSync
         public static void PlanRoute(string[] files, string wantLang, out string refFile, out string targetFile, out string note)
         {
             refFile = null; targetFile = null; note = null;
-            var mkvs = files.Where(IsMkv).ToList();
+            var mkvs = files.Where(f => IsMkv(f) || Audio.IsVideo(f)).ToList();
             var srts = files.Where(IsSrt).ToList();
             if (mkvs.Count == 0 && srts.Count == 0) { note = "Bara .mkv- och .srt-filer stöds."; return; }
             string want = Norm(wantLang) ?? "sv";
@@ -394,6 +414,8 @@ namespace TextSync
 
         static string Friendly(Exception ex)
         {
+            if (ex is UserMessageException) return ex.Message;
+            if (ex is AggregateException && ex.InnerException != null) return Friendly(ex.InnerException);
             if (ex is FileNotFoundException) return "Filen hittades inte.";
             if (ex is UnauthorizedAccessException) return "Text Sync har inte behörighet till filen eller mappen.";
             if (ex is IOException) return "Filen kunde inte läsas eller skrivas. Den kan vara öppen i ett annat program, eller så är disken full.";
@@ -424,7 +446,7 @@ namespace TextSync
         // ------------------------------------------------------------ inläsning
         void BrowseRef()
         {
-            using (var d = new OpenFileDialog { Title = "Välj referens (MKV eller SRT)", Filter = "Video/undertext (*.mkv;*.mks;*.srt)|*.mkv;*.mks;*.mka;*.srt|Alla filer (*.*)|*.*" })
+            using (var d = new OpenFileDialog { Title = "Välj referens (MKV eller SRT)", Filter = "Film eller undertext|*.mkv;*.mks;*.mka;*.mp4;*.m4v;*.mov;*.avi;*.ts;*.m2ts;*.wmv;*.webm;*.mpg;*.srt|Alla filer (*.*)|*.*" })
                 if (d.ShowDialog(this) == DialogResult.OK) LoadReference(d.FileName);
         }
 
@@ -450,7 +472,8 @@ namespace TextSync
             refInfo.ForeColor = Muted;
             try
             {
-                if (!IsMkv(path) && LooksLikeText(path)) // MKV börjar alltid med byte 0x1A
+                bool video = IsMkv(path) || Audio.IsVideo(path);
+                if (!video && LooksLikeText(path)) // MKV börjar alltid med byte 0x1A
                 {
                     refSrtCues = Srt.Load(path);
                     if (refSrtCues.Count == 0) { refSrtCues = null; throw new InvalidDataException("Hittade inga repliker – är det en SRT-fil?"); }
@@ -458,22 +481,34 @@ namespace TextSync
                 }
                 else
                 {
-                    List<MkvTrack> tracks;
-                    using (var f = new MkvFile(path)) tracks = f.Tracks; // stäng direkt så filmen inte låses
+                    var tracks = new List<MkvTrack>();
+                    if (IsMkv(path) || !Audio.IsVideo(path))
+                        using (var f = new MkvFile(path)) tracks = f.Tracks; // stäng direkt så filmen inte låses
                     mkvPath = path;
                     var subs = tracks.Where(t => t.IsSubtitle).ToList();
                     var text = subs.Where(t => t.IsText).ToList();
                     foreach (var t in text) trackCombo.Items.Add(t);
+                    // ljudsynk: alltid möjlig när ljud finns (för MKV: standardljudspåret)
+                    var audio = tracks.Where(t => t.Type == 2).ToList();
+                    int aIdx = Math.Max(0, audio.FindIndex(t => t.Default));
+                    string aDesc = audio.Count > 1 ? "ljudspår " + (aIdx + 1) + ", " + MkvTrack.LanguageName(audio[aIdx].Language) : "";
+                    foreach (var t in text.Where(x => !x.Forced))
+                        trackCombo.Items.Add(new TextCheckOption { Track = t, AudioIndex = aIdx });
+                    int firstAudio = trackCombo.Items.Count;
+                    foreach (AudioMode m in new[] { AudioMode.Speech, AudioMode.Whisper, AudioMode.Combined })
+                        trackCombo.Items.Add(new AudioRefOption { Mode = m, AudioIndex = aIdx, AudioDesc = aDesc });
+                    trackCombo.Visible = trackLabel.Visible = true;
                     if (text.Count == 0)
                     {
-                        refInfo.ForeColor = ErrColor;
+                        // ingen textundertext: synka mot ljudet. A+B om Whisper redan finns, annars A (snabbt, ingen stor nedladdning)
+                        bool whisperReady = Tools.IsInstalled(Tools.WhisperPackage) && Tools.IsInstalled(Tools.ModelPackage);
+                        trackCombo.SelectedIndex = firstAudio + (whisperReady ? 2 : 0);
                         refInfo.Text = subs.Count > 0
-                            ? "MKV-filen har bara bildbaserade undertexter (PGS/VobSub) som inte kan läsas. Använd en SRT-fil som referens."
-                            : "MKV-filen har inga undertextspår. Använd en SRT-fil som referens.";
+                            ? "Bara bildbaserade undertexter (PGS/VobSub) – synkar mot filmens ljud i stället."
+                            : "Ingen textundertext i filmen – synkar mot filmens ljud.";
                     }
                     else
                     {
-                        trackCombo.Visible = trackLabel.Visible = true;
                         // förval: engelska (eller okänt språk), inte "forced" och inte SDH/hörselskadade
                         Func<MkvTrack, bool> plain = t => !t.Forced && !Regex.IsMatch(t.Name, @"\b(SDH|CC|HI|forced)\b", RegexOptions.IgnoreCase);
                         int pick = text.FindIndex(t => plain(t) && t.Language.StartsWith("en"));
@@ -481,7 +516,7 @@ namespace TextSync
                         if (pick < 0) pick = text.FindIndex(t => t.Language.StartsWith("en") && !t.Forced);
                         if (pick < 0) pick = text.FindIndex(t => !t.Forced);
                         trackCombo.SelectedIndex = Math.Max(0, pick);
-                        refInfo.Text = text.Count + " textspår hittades";
+                        refInfo.Text = text.Count + " textspår hittades – eller välj synk mot ljudet i listan";
                     }
                 }
             }
@@ -510,7 +545,7 @@ namespace TextSync
             if (path.Length == 0) { tgtInfo.Text = ""; return; }
             try
             {
-                if (IsMkv(path)) throw new InvalidDataException("Här ska undertexten (SRT) som ska synkas ligga. Lägg MKV-filen i fält 1.");
+                if (IsMkv(path) || Audio.IsVideo(path)) throw new InvalidDataException("Här ska undertexten (SRT) som ska synkas ligga. Lägg filmen i fält 1.");
                 tgtCues = Srt.Load(path, (int)Srt.Encodings[encCombo.SelectedIndex][0]);
                 tgtInfo.ForeColor = Muted;
                 tgtInfo.Text = tgtCues.Count + " repliker, " + Duration(tgtCues);
@@ -547,7 +582,7 @@ namespace TextSync
             if (list != null) list.Items.Clear();
             if (resultLabel != null) resultLabel.Visible = false;
             if (openLink != null) openLink.Visible = false;
-            undo.Clear(); rowMatched = null;
+            undo.Clear(); rowMatched = null; transcript = null; if (saveTextBtn != null) saveTextBtn.Visible = false;
             if (undoLink != null) undoLink.Visible = false;
             if (timeline != null) { timeline.Ref = null; timeline.Orig = null; timeline.Synced = null; timeline.Highlight = null; timeline.Invalidate(); }
             UpdateButtons();
@@ -673,7 +708,7 @@ namespace TextSync
             syncBtn.Enabled = !busy && haveRef && tgtCues != null;
             saveBtn.Enabled = !busy && synced != null;
             muxBtn.Enabled = !busy && synced != null;
-            foreach (Control c in new Control[] { refBox, tgtBox, refBtn, tgtBtn, trackCombo, modeCombo, fpsCheck, extraNum, langBox, encCombo })
+            foreach (Control c in new Control[] { refBox, tgtBox, refBtn, tgtBtn, trackCombo, modeCombo, fpsCheck, extraNum, langBox, encCombo, gpuCombo })
                 if (c != null) c.Enabled = !busy;
         }
 
@@ -706,6 +741,91 @@ namespace TextSync
             if (p != null) { try { if (!p.HasExited) p.Kill(); } catch { } }
         }
 
+        // ------------------------------------------------------------ grafikkort
+        void UpdateGpuVisibility()
+        {
+            var a = trackCombo.SelectedItem as AudioRefOption;
+            bool show = (a != null && a.Mode != AudioMode.Speech) || trackCombo.SelectedItem is TextCheckOption;
+            if (show && gpuDevices == null) FillGpus();
+            gpuCombo.Visible = show;
+        }
+
+        // NVIDIA-kort (CUDA) + processorn. Intel/AMD-grafik kan inte användas av Whisper-versionen och visas inte.
+        void FillGpus()
+        {
+            gpuFilling = true;
+            gpuDevices = new List<int>();
+            gpuCombo.Items.Clear();
+            foreach (var g in Tools.ListNvidiaGpus()) { gpuDevices.Add(g.Key); gpuCombo.Items.Add("Grafikkort: " + g.Value); }
+            gpuDevices.Add(-1); gpuCombo.Items.Add("Grafikkort: inget – processorn (långsamt)");
+            string saved = Tools.GetSetting("gpu", "");
+            int parsed; int want = saved == "cpu" ? -1 : (int.TryParse(saved, out parsed) ? parsed : gpuDevices[0]);
+            int idx = gpuDevices.IndexOf(want); if (idx < 0) idx = 0;
+            gpuCombo.SelectedIndex = idx;
+            Audio.WhisperDevice = gpuDevices[idx];
+            gpuFilling = false;
+        }
+
+        // ------------------------------------------------------------ verktyg för ljudsynk
+        // Frågar en gång och laddar ner det som saknas (kontrolleras mot fasta kontrollsummor).
+        async Task<bool> EnsureTools(bool whisper, CancellationToken token)
+        {
+            var need = new List<ToolPackage>();
+            if (!Tools.IsInstalled(Tools.Ffmpeg)) need.Add(Tools.Ffmpeg);
+            if (whisper)
+            {
+                bool gpu = Tools.HasNvidia();
+                if (!Tools.IsInstalled(Tools.WhisperCpu)) need.Add(Tools.WhisperCpu);           // reserv om grafikkortet inte fungerar
+                if (gpu && !Tools.IsInstalled(Tools.WhisperGpu)) need.Add(Tools.WhisperGpu);
+                if (!Tools.IsInstalled(Tools.ModelPackage)) need.Add(Tools.ModelPackage);
+                if (!Tools.IsInstalled(Tools.SileroVad)) need.Add(Tools.SileroVad);
+            }
+            if (need.Count == 0) return true;
+            long total = need.Sum(p => p.Size);
+            var a = MessageBox.Show(this,
+                "Synk mot ljudet behöver några gratisverktyg som inte finns på datorn ännu:\n\n" +
+                string.Join("\n", need.Select(p => "•  " + p.Name + "  (" + Fmt(p.Size / 1048576.0, "0") + " MB)")) +
+                "\n\nTotalt cirka " + Fmt(total / 1048576.0, "0") + " MB. De laddas ner en gång till\n" + Tools.Root +
+                "\noch kontrolleras så att de inte har ändrats.\n\nVill du ladda ner dem nu?",
+                Caption, MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+            if (a != DialogResult.Yes) return false;
+            long doneBefore = 0;
+            foreach (var p in need)
+            {
+                var pkg = p; long before = doneBefore;
+                await Task.Run(() => Tools.Download(pkg, (d, t) => Progress((int)(100 * (before + d) / Math.Max(1, total)),
+                    "Laddar ner " + pkg.Name + "… " + Fmt((before + d) / 1048576.0, "0") + " av " + Fmt(total / 1048576.0, "0") + " MB"), token));
+                doneBefore += p.Size;
+            }
+            return true;
+        }
+
+        void SaveTranscript()
+        {
+            if (transcript == null || transcript.Count == 0) return;
+            string lang = transcriptLang.Length > 0 ? transcriptLang : "und";
+            string dir = Path.GetDirectoryName(mkvPath ?? tgtLoadedPath);
+            string name = Path.GetFileNameWithoutExtension(mkvPath ?? tgtLoadedPath) + ".whisper." + lang + ".srt";   // eget namn: skriver aldrig över en riktig undertext
+            using (var d = new SaveFileDialog { Title = "Spara igenkänd text (automatisk textning)", Filter = "SRT-undertext (*.srt)|*.srt", FileName = name, InitialDirectory = dir, OverwritePrompt = true })
+            {
+                if (d.ShowDialog(this) != DialogResult.OK) return;
+                try
+                {
+                    // utan "(tal)"-rader; bara det Whisper faktiskt hörde
+                    SaveWithBackup(d.FileName, tgtLoadedPath, transcript);
+                    lastOutput = d.FileName;
+                    SetStatus("✔ Igenkänd text sparad: " + Path.GetFileName(d.FileName) + " (automatisk – kan innehålla fel).", true);
+                    openLink.Visible = true;
+                    Log.Info("Sparade Whisper-text: " + d.FileName);
+                }
+                catch (Exception ex)
+                {
+                    Log.Error("Kunde inte spara igenkänd text", ex);
+                    MessageBox.Show(this, "Kunde inte spara: " + Friendly(ex), Caption, MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+            }
+        }
+
         // ------------------------------------------------------------ synk
         async Task DoSync()
         {
@@ -720,9 +840,22 @@ namespace TextSync
             {
                 List<Cue> refc = refSrtCues;
                 bool truncated = false;
-                if (refc == null)
+                string audioInfo = null;
+                transcript = null; saveTextBtn.Visible = false;
+                var aopt = refc == null ? trackCombo.SelectedItem as AudioRefOption : null;
+                if (aopt != null)
                 {
-                    var track = (MkvTrack)trackCombo.SelectedItem;
+                    if (!await EnsureTools(aopt.Mode != AudioMode.Speech, token)) { finalStatus = "Avbrutet."; return; }
+                    string path = mkvPath;
+                    var ar = await Task.Run(() => Audio.GetReference(path, aopt, (p, s) => { token.ThrowIfCancellationRequested(); Progress(p, s); }, token));
+                    refc = ar.Cues; audioInfo = ar.Info;
+                    transcript = ar.Transcript; transcriptLang = ar.Language;
+                    if (refc.Count < 5) throw new InvalidDataException("Det gick nästan inte att hitta något tal i ljudet. Prova en annan metod i listan Referens, eller en undertext (SRT) som referens.");
+                }
+                else if (refc == null)
+                {
+                    var tco = trackCombo.SelectedItem as TextCheckOption;
+                    var track = tco != null ? tco.Track : (MkvTrack)trackCombo.SelectedItem;
                     string key = mkvPath + "|" + track.Number + "|" + File.GetLastWriteTimeUtc(mkvPath).Ticks;
                     if (!trackCache.TryGetValue(key, out refc))
                     {
@@ -740,10 +873,28 @@ namespace TextSync
                         if (!truncated) trackCache[key] = refc;
                     }
                     if (refc.Count < 5) throw new InvalidDataException("Spåret innehåller nästan inga repliker (" + refc.Count + "). Välj ett annat spår.");
+                    if (tco != null)
+                    {
+                        // Whisper lyssnar ord för ord och rättar de delar av textspåret som inte går i takt med ljudet
+                        if (!await EnsureTools(true, token)) { finalStatus = "Avbrutet."; return; }
+                        string path2 = mkvPath; var refIn = refc; int aIdx2 = tco.AudioIndex;
+                        var chk = await Task.Run(() =>
+                        {
+                            string wl;
+                            var words = Audio.GetWords(path2, aIdx2, (p, s) => { token.ThrowIfCancellationRequested(); Progress(p, s); }, token, out wl);
+                            Progress(97, "Jämför textspåret med ljudet…");
+                            return TextCheck.Check(refIn, words);
+                        });
+                        refc = chk.Corrected;
+                        audioInfo = chk.Summary();
+                        Log.Info(audioInfo);
+                    }
                 }
                 Action<int, string> prog = (p, s) => { token.ThrowIfCancellationRequested(); Progress(p, s); };
                 var r = await Task.Run(() => SyncEngine.Sync(refc, tgt, opt, prog));
                 if (truncated) r.Notes.Insert(0, "MKV-filen verkar vara ofullständig – bara en del av referensen kunde läsas.");
+                if (audioInfo != null) r.FpsText = (r.FpsText.Length > 0 ? r.FpsText + " · " : "") + "Referens: " + audioInfo;
+                saveTextBtn.Visible = transcript != null;
                 refCuesUsed = refc;
                 result = r;
                 undo.Clear();
@@ -752,7 +903,7 @@ namespace TextSync
                 timeline.Highlight = null;
                 ShowResult();
                 RefreshPreview();
-                Log.Info("Synk: ref=" + (mkvPath ?? refLoadedPath) + (mkvPath != null ? " spår " + ((MkvTrack)trackCombo.SelectedItem).Number : "") +
+                Log.Info("Synk: ref=" + (mkvPath ?? refLoadedPath) + (mkvPath != null ? " " + trackCombo.SelectedItem : "") +
                     ", mål=" + tgtLoadedPath + ", metod=" + opt.Mode + " → " + r.Method + ", matchning " + Fmt(r.ScoreBefore * 100, "0") + "→" + Fmt(r.ScoreAfter * 100, "0") + " %");
             }
             catch (OperationCanceledException)
@@ -781,7 +932,8 @@ namespace TextSync
             {
                 int ok = rowMatched.Count(m => m), n = rowMatched.Length;
                 good = ok >= MatchThreshold * n;
-                sb.Append("     Rader med referenstext samtidigt: " + ok + " av " + n + " (" + Fmt(Math.Floor(1000.0 * ok / n) / 10, "0.#") + " %)");
+                var ao = trackCombo.SelectedItem as AudioRefOption;
+                sb.Append((ao != null && ao.Mode != AudioMode.Whisper ? "     Rader som ligger på tal i ljudet: " : "     Rader med referenstext samtidigt: ") + ok + " av " + n + " (" + Fmt(Math.Floor(1000.0 * ok / n) / 10, "0.#") + " %)");
             }
             sb.Insert(0, good ? "✔  " : "⚠  ");
             sb.Append("\n");
@@ -1001,7 +1153,7 @@ namespace TextSync
             long srcSize;
             try
             {
-                using (var f = new MkvFile(src)) srcTracks = f.Tracks;
+                if (IsMkv(src)) { using (var f = new MkvFile(src)) srcTracks = f.Tracks; } else srcTracks = new List<MkvTrack>();
                 srcSize = new FileInfo(src).Length;
             }
             catch (Exception ex)

@@ -2,6 +2,69 @@
 
 Nyast först.
 
+## 2026-11-09 – Textspår + Whisper-kontroll
+- **Område:** Synk
+- **Beslut:** Ett eget val i referenslistan, "Spår N + Whisper-kontroll", för varje textspår som inte är tvingat. Whisper körs i ordläge. Varje engelsk rads första ord letas upp i det Whisper hörde (±60 s), och varje träff blir en ankarpunkt. Där minst 6 av de 9 närmaste ankarpunkterna är överens och avviker mer än 1 s från den typiska nivån rättas textspåret innan den svenska texten synkas mot det.
+- **Varför:** Ägarens idé. Textspåret kan självt gå ur takt i vissa filmer, och engelska mot engelska går att jämföra ord för ord.
+- **Test:** Orört spår gav inga rättningar. Med 10:00–15:00 förskjutet +3 s rättades 42 rader, inga rader utanför ändrades, och svensk synk gick från 40 till 0 rader med mer än 1 s fel.
+- **Nivå:** LIVE
+
+## 2026-11-09 – A+B: A ger tiderna, B rensar
+- **Område:** Synk
+- **Beslut:** I A+B ger taldetekteringen (A) tiderna. Talavsnitt utan några ord från Whisper (musik, effekter) tas bort, och A:s avsnitt får Whispers text i förhandsvisningen. Whisper använder Silero-taldetektering.
+- **Varför:** Mätt mot facit på Blacklist S04E01:
+  - A: 0,18 s mediafel, 97 % inom 0,5 s.
+  - B ensam: 0,47 s mediafel, 50 % inom 0,5 s.
+  - Första versionen av A+B, där Whisper gav tiderna: 5,4 s mediafel.
+  - Nuvarande A+B: 0,18 s mediafel, 98 % inom 0,5 s, och rätt bildfrekvens.
+- **Nivå:** LIVE
+
+## 2026-11-09 – Valbart grafikkort, CUDA 12.4
+- **Område:** Verktyg / GUI
+- **Beslut:** Grafikkortet för Whisper väljs i referensraden. Där visas NVIDIA-kort, eller processorn. Valet sparas i `settings.txt`. Intel Iris Xe visas inte, eftersom Whisper-versionen bara stöder CUDA (NVIDIA). GPU-paketet bytte från CUDA 11.8 till 12.4, eftersom 11.8 saknade cuBLAS och därför tyst föll tillbaka på processorn. Hela avsnittet tar ungefär 1 minut på RTX A2000, mot 1,5–2 timmar på processorn med turbo-modellen.
+- **Varför:** Ägaren ville köra på RTX A2000 och kunna välja kort.
+- **Nivå:** LIVE
+
+## 2026-11-09 – Taldetekteringens gräns justerad mot facit
+- **Område:** Synk
+- **Beslut:** Gränsen börjar på 18 dB över bakgrunden och skärps tills tal täcker högst cirka 50 % av tiden.
+- **Varför:** Den första gränsen, 9 dB, hittade tal nästan överallt och gav ungefär 55 s fel.
+- **Nivå:** LIVE
+
+## 2026-11-09 – Drift som motsvarar en bildfrekvens byts till exakt bildfrekvens
+- **Område:** Synk
+- **Beslut:** Om den uppmätta driften motsvarar en känd omräkning, till exempel 4,3 % = 25 → 23,976, används den exakta bildfrekvensen och analysen görs om.
+- **Nivå:** LIVE
+
+## 2026-11-08 – Synk mot filmens ljud (A, B, A+B)
+- **Område:** Synk / GUI / verktyg
+- **Beslut:** Referenslistan har tre val för ljud. Det fungerar för alla filmer, även MP4 och AVI, och kräver ingen textundertext.
+  - **A – taldetektering:** ffmpeg läser ut ljudet, bara mittkanalen vid 5.1. Talet hittas via energin i talets frekvensband jämfört med bakgrundsnivån.
+  - **B – Whisper:** taligenkänning med whisper.cpp. Den igenkända texten blir referens.
+  - **A+B:** se 2026-11-09, där kombinationen ändrades efter mätning.
+  - Resultaten sparas i `%LOCALAPPDATA%\TextSync\cache`, så att en ny synk mot samma film går direkt.
+  - Whisper-texten kan sparas som en egen undertext med "Spara igenkänd text…".
+  - Förval när filmen saknar textundertext: A+B om Whisper redan finns, annars A.
+- **Varför:** Ägaren vill kunna synka filmer som saknar undertexter. Hen valde A och B som egna val, och dessutom en kombination.
+- **Nivå:** LIVE
+
+## 2026-11-08 – Verktyg laddas ner vid behov, med fasta kontrollsummor
+- **Område:** Drift / säkerhet
+- **Beslut:** ffmpeg 9.0.2 (Gyan essentials), whisper.cpp b5454 (för processorn, plus CUDA-versionen om det finns ett NVIDIA-kort) och språkmodellen hämtas första gången de behövs. Modellen är large-v3-turbo-q5_0 med NVIDIA-kort och small utan. Programmet frågar först och visar storleken. Varje fil kontrolleras mot en inbyggd SHA-256-summa, och filer som inte stämmer kastas. Allt hamnar i `%LOCALAPPDATA%\TextSync\tools`. ffmpeg som redan är installerat, i PATH eller via winget, används direkt.
+- **Varför:** Vännerna får bara exe-filen via USB. Ägaren valde "laddar ner vid behov", och kontrollsummorna skyddar mot manipulerade nedladdningar.
+- **Nivå:** LIVE
+
+## 2026-11-08 – Smart App Control stängs inte av
+- **Område:** Drift
+- **Beslut:** Smart App Control förblir påslaget. Nybyggda versioner testas genom att programmet laddas inifrån PowerShell.
+- **Varför:** Ägaren bad om att stänga av det för projektet. Det går inte per mapp eller projekt, utan bara för hela Windows, och det går inte att slå på igen utan ominstallation. Claude ändrar inte säkerhetsinställningar för hela datorn. Ägaren har fått veta var inställningen finns om hen själv vill ändra den.
+- **Nivå:** LIVE
+
+## 2026-11-08 – Projektet flyttat
+- **Område:** Struktur
+- **Beslut:** Projektet ligger i `%USERPROFILE%\Documents\TextSync`.
+- **Nivå:** LIVE
+
 ## 2026-11-08 – Fler teckenkodningar
 - **Område:** Inläsning
 - **Beslut:** Text Sync gissar automatiskt mellan UTF-8, västeuropeisk, centraleuropeisk (polska, tjeckiska…) och kyrillisk kodning. Det finns också ett manuellt val, "Teckenkodning", i kort 2. Det återställs till Automatisk när man byter fil.

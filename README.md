@@ -2,6 +2,8 @@
 
 Windows-program som synkar en undertext som inte går i takt (t.ex. svensk SRT) mot en undertext på ett annat språk som redan går i takt med filmen. Referensen kan vara ett textspår i en MKV-fil eller en separat SRT.
 
+Saknar filmen text kan programmet synka mot **filmens ljud**: taldetektering, Whisper eller båda kombinerat. Ett textspår kan också **kontrolleras ord för ord med Whisper**. Whisper körs på NVIDIA-grafikkort om det finns, annars på processorn.
+
 Programmet jämför *när* det pratas och *när* repliker börjar, inte vad som sägs. Därför fungerar olika språk. Det hanterar förskjutning, fel bildfrekvens (25 ↔ 23,976 fps m.fl.), drift och klipp/reklampauser.
 
 ## Komma igång
@@ -20,6 +22,7 @@ Användarhjälp finns i [docs/faq.md](docs/faq.md). Den finns också kort i prog
 | [docs/structure.md](docs/structure.md) | Var koden ligger och varför |
 | [docs/operations.md](docs/operations.md) | Bygga, dela ut, loggar, felsökning |
 | [docs/faq.md](docs/faq.md) | Hjälp till användare |
+| [docs/next.md](docs/next.md) | Nästa fas och kända begränsningar |
 
 ## Licens
 
