@@ -172,6 +172,40 @@ namespace TextSync
             back = Srt.Load(p);
             Console.WriteLine("Sloppy 1252 SRT: {0} cues, '{1}' '{2}'", back.Count, back[0].Text, back[1].Text);
 
+            // Dra-och-släpp: vilken fil blir referens/mål
+            {
+                string rf, tf, note;
+                MainForm.PlanRoute(new[] { @"C:\a\Film.sv.srt", @"C:\a\Film.mkv" }, "sv", out rf, out tf, out note);
+                bool r1 = rf == @"C:\a\Film.mkv" && tf == @"C:\a\Film.sv.srt" && note == null;
+                MainForm.PlanRoute(new[] { @"C:\a\Film.sv.srt", @"C:\a\Film.en.srt" }, "sv", out rf, out tf, out note);
+                bool r2 = rf == @"C:\a\Film.en.srt" && tf == @"C:\a\Film.sv.srt";
+                MainForm.PlanRoute(new[] { @"C:\a\Film.eng.srt", @"C:\a\Film.swe.srt" }, "sv", out rf, out tf, out note);
+                bool r3 = rf == @"C:\a\Film.eng.srt" && tf == @"C:\a\Film.swe.srt";
+                MainForm.PlanRoute(new[] { @"C:\a\svensk.srt", @"C:\a\Film.en.srt" }, "sv", out rf, out tf, out note);
+                bool r4 = rf == @"C:\a\Film.en.srt" && tf == @"C:\a\svensk.srt" && note == null;
+                MainForm.PlanRoute(new[] { @"C:\a\A.srt", @"C:\a\B.srt" }, "sv", out rf, out tf, out note);
+                bool r5 = rf == @"C:\a\A.srt" && tf == @"C:\a\B.srt" && note != null;
+                MainForm.PlanRoute(new[] { @"C:\a\bild.jpg" }, "sv", out rf, out tf, out note);
+                bool r6 = rf == null && tf == null && note != null;
+                Console.WriteLine("Route: mkv+srt={0} sv+en={1} 3letter={2} oneUnknown={3} bothUnknown={4} unsupported={5}", r1, r2, r3, r4, r5, r6);
+            }
+
+            // SRT-specialfall och teckenkodningar
+            {
+                var c1 = Srt.Parse("1\n00:00:01.500 --> 00:00:02.000\nPunkt som decimal\n2\n00:00:03,000 --> 00:00:04,000\nUtan tomrad\n\n3\n99999999999:00:00,000 --> 99999999999:00:01,000\nOrimlig\n");
+                Console.WriteLine("SRT edge: count={0} firstStart={1} secondText='{2}'", c1.Count, c1[0].Start, c1.Count > 1 ? c1[1].Text : "");
+                string p1 = Path.Combine(dir, "ru.srt");
+                File.WriteAllBytes(p1, Encoding.GetEncoding(1251).GetBytes("1\r\n00:00:01,000 --> 00:00:02,000\r\nПривет, как дела? Это проверка кириллицы.\r\n"));
+                string p2 = Path.Combine(dir, "pl.srt");
+                File.WriteAllBytes(p2, Encoding.GetEncoding(1250).GetBytes("1\r\n00:00:01,000 --> 00:00:02,000\r\nZażółć gęślą jaźń. Łódź, źródło, świat, będę.\r\n"));
+                string p3 = Path.Combine(dir, "bom.srt");
+                File.WriteAllBytes(p3, new byte[] { 0xEF, 0xBB, 0xBF }.Concat(Encoding.UTF8.GetBytes("1\n00:00:01,000 --> 00:00:02,000\nÅäö med BOM\n")).ToArray());
+                Console.WriteLine("Encodings: ru='{0}' pl='{1}' bom='{2}' forced1251='{3}'",
+                    Srt.Load(p1)[0].Text.Substring(0, 6), Srt.Load(p2)[0].Text.Substring(0, 12), Srt.Load(p3)[0].Text, Srt.Load(p1, 1251)[0].Text.Substring(0, 6));
+                double tm; bool okT = Srt.TryParseTime("00:01:23,456", out tm) && tm == 83456 && !Srt.TryParseTime("1:99:00,000", out tm) && !Srt.TryParseTime("abc", out tm);
+                Console.WriteLine("TryParseTime ok={0}", okT);
+            }
+
             // Spara med säkerhetskopia
             {
                 string sd = Path.Combine(dir, "savetest"); if (Directory.Exists(sd)) Directory.Delete(sd, true);
@@ -207,6 +241,48 @@ namespace TextSync
                         cfg[0], cfg[1], f.Tracks.Count, tr[0], subs.Count, refc.Count, ok, new FileInfo(mp).Length / 1048576, sw.ElapsedMilliseconds);
                 }
             }
+            // Avkortad MKV (t.ex. halvt nedladdad): ska ge det som gick att läsa + flagga
+            {
+                string mp = Path.Combine(dir, "trunc.mkv");
+                WriteMkv(mp, refc, false, false);
+                var bytes = File.ReadAllBytes(mp);
+                File.WriteAllBytes(mp, bytes.Take((int)(bytes.Length * 0.6)).ToArray());
+                using (var f = new MkvFile(mp))
+                {
+                    var subs = f.ReadSubtitles(f.Tracks[2], x => { }, null);
+                    Console.WriteLine("Truncated MKV: truncated={0} read {1}/{2} cues", f.Truncated, subs.Count, refc.Count);
+                }
+                try { File.WriteAllBytes(mp, bytes.Take(30).ToArray()); using (var f = new MkvFile(mp)) { } Console.WriteLine("Tiny MKV: no error?!"); }
+                catch (InvalidDataException ex) { Console.WriteLine("Tiny MKV: '" + ex.Message + "'"); }
+            }
+
+            // Lägg in i MKV med riktig mkvmerge
+            {
+                string exe = MainForm.FindMkvMergePublic();
+                if (exe == null) Console.WriteLine("Mux: mkvmerge saknas – hoppar över");
+                else
+                {
+                    string src = Path.Combine(dir, "muxsrc.mkv"), outp = Path.Combine(dir, "muxout.mkv"), srt = Path.Combine(dir, "mux.srt");
+                    var few = refc.Take(60).ToList();
+                    WriteMkv(src, few, false, false);
+                    Srt.Save(srt, few.Select(c => new Cue(c.Start, c.End, "Svensk " + c.Text)).ToList());
+                    List<MkvTrack> tr; using (var f = new MkvFile(src)) tr = f.Tracks;
+                    if (File.Exists(outp)) File.Delete(outp);
+                    var psi = new System.Diagnostics.ProcessStartInfo(exe, MainForm.BuildMuxArgs(tr, src, outp, "sv", srt)) { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true };
+                    int code; string outText;
+                    using (var proc = System.Diagnostics.Process.Start(psi)) { outText = proc.StandardOutput.ReadToEnd(); proc.WaitForExit(); code = proc.ExitCode; }
+                    if (code > 1) Console.WriteLine("Mux FAILED code " + code + ": " + outText);
+                    else using (var f = new MkvFile(outp))
+                    {
+                        var subsT = f.Tracks.Where(t => t.IsSubtitle).ToList();
+                        var nt = subsT.Last();
+                        var cues = f.ReadSubtitles(nt, x => { }, null);
+                        Console.WriteLine("Mux: code={0} subtitleTracks={1} old.default={2} new='{3}' new.default={4} cues={5}/{6} firstText='{7}'",
+                            code, subsT.Count, subsT[0].Default, nt, nt.Default, cues.Count, few.Count, cues[0].Text);
+                    }
+                }
+            }
+
             {
                 string mp = Path.Combine(dir, "nolang.mkv");
                 WriteMkv(mp, refc.Take(10).ToList(), false, false, true);

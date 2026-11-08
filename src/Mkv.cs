@@ -19,6 +19,7 @@ namespace TextSync
         public string Language = "eng";
         public string Name = "";
         public bool Forced;
+        public bool Default = true; // FlagDefault, standard 1
         public int CompAlgo = -1;
         public byte[] CompSettings;
 
@@ -68,7 +69,7 @@ namespace TextSync
         const uint ID_EBML = 0x1A45DFA3, ID_SEGMENT = 0x18538067, ID_INFO = 0x1549A966,
             ID_TCSCALE = 0x2AD7B1, ID_TRACKS = 0x1654AE6B, ID_TRACKENTRY = 0xAE,
             ID_TRACKNUM = 0xD7, ID_TRACKTYPE = 0x83, ID_CODEC = 0x86, ID_LANG = 0x22B59C,
-            ID_LANGBCP = 0x22B59D, ID_NAME = 0x536E, ID_FORCED = 0x55AA,
+            ID_LANGBCP = 0x22B59D, ID_NAME = 0x536E, ID_FORCED = 0x55AA, ID_DEFAULT = 0x88,
             ID_ENCODINGS = 0x6D80, ID_ENCODING = 0x6240, ID_COMPRESSION = 0x5034,
             ID_COMPALGO = 0x4254, ID_COMPSET = 0x4255,
             ID_CLUSTER = 0x1F43B675, ID_TIMECODE = 0xE7, ID_SIMPLEBLOCK = 0xA3,
@@ -216,6 +217,7 @@ namespace TextSync
                     case ID_LANGBCP: bcp = ReadString(s); break;
                     case ID_NAME: t.Name = ReadString(s); break;
                     case ID_FORCED: t.Forced = ReadUInt(s) != 0; break;
+                    case ID_DEFAULT: t.Default = ReadUInt(s) != 0; break;
                     case ID_ENCODINGS: ParseEncodings(t, p + s); break;
                 }
                 fs.Position = p + s;

@@ -11,7 +11,8 @@ src/
   Log.cs           Loggfil i %LOCALAPPDATA%\TextSync\log.txt
   TextSync.ico     Programikon
 test/
-  Tests.cs         Syntetiska tester: synk i 6 scenarier × 3 metoder, SRT-läsning, MKV-läsning (egen MKV-skrivare)
+  Tests.cs         Tester: synk i 6 scenarier × 3 metoder, SRT/teckenkodningar, dra-och-släpp-fördelning,
+                   spara med säkerhetskopia, MKV-läsning (egen MKV-skrivare, avkortade filer), mkvmerge-inbäddning
   Diag.cs          Felsökning mot riktiga filer: skriver ut avsnitt, träffsäkerhet och rader utan referens
 docs/              Beslut, drift, FAQ
 ```

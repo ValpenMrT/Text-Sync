@@ -33,9 +33,48 @@ namespace TextSync
             @"(\d+):(\d{1,2}):(\d{1,2})(?:[,.:](\d{1,3}))?\s*-+>\s*(\d+):(\d{1,2}):(\d{1,2})(?:[,.:](\d{1,3}))?",
             RegexOptions.Compiled);
 
-        public static string ReadTextFile(string path)
+        // Teckenkodningar man kan välja manuellt (codepage, namn)
+        public static readonly object[][] Encodings = {
+            new object[] { 0, "Automatisk" },
+            new object[] { 65001, "UTF-8" },
+            new object[] { 1252, "Västeuropeisk (sv, en, de, fr…)" },
+            new object[] { 1250, "Centraleuropeisk (pl, cs, hu, hr…)" },
+            new object[] { 1251, "Kyrillisk (ru, uk, bg, sr…)" },
+            new object[] { 1253, "Grekisk" },
+            new object[] { 1254, "Turkisk" },
+            new object[] { 1257, "Baltisk (lt, lv, et)" },
+        };
+
+        // Gissa gammal 8-bitars teckenkodning när filen inte är UTF-8.
+        // Kyrilliska/grekiska texter består mest av bytes ≥ 0xC0; svenska/engelska har bara enstaka (å ä ö).
+        public static int GuessLegacyCodepage(byte[] b)
+        {
+            int ascii = 0, high = 0, pl = 0, sv = 0, greekOnly = 0;
+            foreach (byte x in b)
+            {
+                if ((x >= 'a' && x <= 'z') || (x >= 'A' && x <= 'Z')) ascii++;
+                else if (x >= 0xC0) high++;
+                // typiska polska/tjeckiska tecken i 1250 som är ovanliga i 1252: ł ą ś ź ż ę ě č ř š ž
+                if (x == 0xB3 || x == 0xB9 || x == 0x9C || x == 0x9F || x == 0xBF || x == 0xEA || x == 0xEC || x == 0xE8 || x == 0xF8 || x == 0x9A || x == 0x9E) pl++;
+                if (x == 0xE5 || x == 0xE4 || x == 0xF6 || x == 0xC5 || x == 0xC4 || x == 0xD6) sv++;
+                if (x == 0xA2 || x == 0xB8 || x == 0xB9 || x == 0xBA || x == 0xBC || x == 0xBE || x == 0xBF) greekOnly++;
+            }
+            if (high > ascii) return greekOnly > high / 50 + 2 ? 1253 : 1251;
+            if (pl > sv * 2 && pl > 5) return 1250;
+            return 1252;
+        }
+
+        public static string ReadTextFile(string path) { return ReadTextFile(path, 0); }
+
+        // codepage 0 = automatisk
+        public static string ReadTextFile(string path, int codepage)
         {
             byte[] b = File.ReadAllBytes(path);
+            if (codepage != 0)
+            {
+                int skip = (codepage == 65001 && b.Length >= 3 && b[0] == 0xEF && b[1] == 0xBB && b[2] == 0xBF) ? 3 : 0;
+                return Encoding.GetEncoding(codepage).GetString(b, skip, b.Length - skip);
+            }
             if (b.Length >= 3 && b[0] == 0xEF && b[1] == 0xBB && b[2] == 0xBF)
                 return Encoding.UTF8.GetString(b, 3, b.Length - 3);
             if (b.Length >= 2 && b[0] == 0xFF && b[1] == 0xFE)
@@ -48,14 +87,12 @@ namespace TextSync
             }
             catch (DecoderFallbackException)
             {
-                return Encoding.GetEncoding(1252).GetString(b); // Västeuropeisk (å, ä, ö)
+                return Encoding.GetEncoding(GuessLegacyCodepage(b)).GetString(b);
             }
         }
 
-        public static List<Cue> Load(string path)
-        {
-            return Parse(ReadTextFile(path));
-        }
+        public static List<Cue> Load(string path) { return Parse(ReadTextFile(path, 0)); }
+        public static List<Cue> Load(string path, int codepage) { return Parse(ReadTextFile(path, codepage)); }
 
         static double Ms(Group h, Group m, Group s, Group f)
         {
@@ -346,12 +383,12 @@ namespace TextSync
             var res = new SyncResult();
             // orimliga tider (t.ex. en felaktig rad på 500 timmar) skulle annars äta upp minnet
             const double MaxTime = 24 * 3600000.0;
-            int badRef = refCues.Count(c => c.Start < 0 || c.Start > MaxTime);
-            int badTgt = tgtCues.Count(c => c.Start < 0 || c.Start > MaxTime);
-            if (badRef > 0) refCues = refCues.Where(c => c.Start >= 0 && c.Start <= MaxTime).ToList();
+            int badRef = refCues.Count(c => c.Start > MaxTime);
+            int badTgt = tgtCues.Count(c => c.Start > MaxTime);
+            if (badRef > 0) refCues = refCues.Where(c => c.Start <= MaxTime).ToList();
             if (badTgt > 0)
             {
-                tgtCues = tgtCues.Where(c => c.Start >= 0 && c.Start <= MaxTime).ToList();
+                tgtCues = tgtCues.Where(c => c.Start <= MaxTime).ToList();
                 res.Notes.Add(badTgt + " rad(er) med orimlig tid (över 24 timmar) hoppades över.");
             }
             // väldigt långa repliker (skyltar, sångtexter) styr inte synken

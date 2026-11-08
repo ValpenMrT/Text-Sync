@@ -12,6 +12,16 @@ Testprogrammen kompileras med samma `csc.exe` (se `build.ps1`) med `/target:exe`
 - `Tests.exe <tempmapp>`: syntetiska scenarier. Alla rader för Smart ska ha `100 % <300ms`.
 - `Diag.exe <film.mkv> <undertext.srt> <från s> <till s> <spårnr>`: riktiga filer. Visar rader utan referens (`NO-REF`).
 
+Testerna (`Tests.cs`) täcker:
+- synk i 6 scenarier
+- SRT-specialfall och teckenkodningar
+- fördelning av filer vid dra-och-släpp
+- sparande med säkerhetskopia
+- MKV-läsning, också avkortade och trasiga filer
+- inbäddning med riktig mkvmerge (hoppas över om MKVToolNix saknas)
+
+**Gränssnittstest:** skicka aldrig tangenttryckningar eller klick blint. Kontrollera först att Text Sync-fönstret ligger överst. Om programmet blockeras hamnar annars tangenterna i det fönster som ligger överst. Ett Delete hamnade en gång i Utforskaren och flyttade en film till Papperskorgen.
+
 ## Smart App Control på byggdatorn
 Smart App Control är påslaget på utvecklingsdatorn och blockerar ofta varje *nybyggd* `TextSync.exe` i flera minuter, ibland längre. Det gäller alltså även din egen dator. För att testa direkt kan programmet köras inifrån PowerShell:
 ```

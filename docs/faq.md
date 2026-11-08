@@ -26,6 +26,12 @@ Allt finns också i högerklicksmenyn. Ingenting ändras i filen förrän du spa
 **Min film har ingen engelsk textundertext.**
 Bildbaserade undertexter (PGS/VobSub) kan inte läsas. Använd i stället en engelsk SRT-fil för samma version av filmen som referens.
 
+**Bokstäverna ser konstiga ut (t.ex. "Ã¥" i stället för "å", eller fel tecken på ryska och polska).**
+Välj rätt **Teckenkodning** i kort 2, under fältet för undertexten. Västeuropeisk passar svenska och engelska, Centraleuropeisk passar polska och tjeckiska, och Kyrillisk passar ryska.
+
+**Kan jag använda programmet utan mus?**
+Ja. Tab flyttar mellan fälten och Alt + understruken bokstav trycker på en knapp, till exempel Alt+S för Synka. I tidslinjen flyttar piltangenterna och + och − zoomar. Programmet följer också Windows högkontrastläge.
+
 **Allt är lite för tidigt eller för sent.**
 Ändra **Extra justering**. 500 betyder en halv sekund senare och −500 en halv sekund tidigare.
 

@@ -2,6 +2,21 @@
 
 Nyast först.
 
+## 2026-11-08 – Fler teckenkodningar
+- **Område:** Inläsning
+- **Beslut:** Text Sync gissar automatiskt mellan UTF-8, västeuropeisk, centraleuropeisk (polska, tjeckiska…) och kyrillisk kodning. Det finns också ett manuellt val, "Teckenkodning", i kort 2. Det återställs till Automatisk när man byter fil.
+- **Varför:** Undertexter på polska, ryska, grekiska med flera blev fel tecken.
+- **Nivå:** LIVE
+
+## 2026-11-08 – Tillgänglighet: tangentbord och högkontrast
+- **Område:** GUI
+- **Beslut:**
+  - Tidslinjen går att nå med Tab. Pilarna flyttar, PageUp och PageDown flyttar en hel skärm, + och − zoomar och Home går till början.
+  - Tidslinjen visar fokus och har en beskrivning för skärmläsare.
+  - I Windows högkontrastläge används systemets färger och vanliga knappar.
+- **Varför:** Det var kvar som "kan vänta" efter den första granskningen.
+- **Nivå:** LIVE
+
 ## 2026-11-08 – Kvalitetsmått: andel rader med referenstext, 95 %
 - **Område:** GUI / synk
 - **Beslut:** Resultatet visas som "Rader med referenstext samtidigt: X av Y (Z %)". Under 95 % frågar Spara och Lägg in i MKV "spara ändå?". Svarar man Nej hoppar listan till första röda raden. F3 går till nästa röda rad.

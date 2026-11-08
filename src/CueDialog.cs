@@ -23,7 +23,7 @@ namespace TextSync
             MaximizeBox = false; MinimizeBox = false; ShowInTaskbar = false;
             StartPosition = FormStartPosition.CenterParent;
             ClientSize = new Size(480, 300);
-            BackColor = Color.White;
+            BackColor = SystemColors.Window;
 
             var t = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3, RowCount = 5, Padding = new Padding(14, 12, 14, 12) };
             t.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
@@ -37,7 +37,7 @@ namespace TextSync
 
             startBox = new TextBox { Text = Srt.FormatTime(start), Width = 120, Anchor = AnchorStyles.Left, AccessibleName = "Starttid" };
             endBox = new TextBox { Text = Srt.FormatTime(end), Width = 120, Anchor = AnchorStyles.Left, AccessibleName = "Sluttid" };
-            var hint = new Label { Text = "tim:min:sek,ms", AutoSize = true, ForeColor = Color.Gray, Anchor = AnchorStyles.Left };
+            var hint = new Label { Text = "tim:min:sek,ms", AutoSize = true, ForeColor = SystemColors.GrayText, Anchor = AnchorStyles.Left };
             t.Controls.Add(new Label { Text = "&Start:", AutoSize = true, Anchor = AnchorStyles.Left, Margin = new Padding(0, 0, 8, 0) }, 0, 0);
             t.Controls.Add(startBox, 1, 0);
             t.Controls.Add(hint, 2, 0);
@@ -54,7 +54,7 @@ namespace TextSync
             t.Controls.Add(tl, 0, 2);
             t.Controls.Add(textBox, 1, 2); t.SetColumnSpan(textBox, 2);
 
-            err = new Label { AutoSize = true, ForeColor = Color.Firebrick, Margin = new Padding(0, 6, 0, 0) };
+            err = new Label { AutoSize = true, ForeColor = MainForm.HC ? SystemColors.WindowText : Color.Firebrick, Margin = new Padding(0, 6, 0, 0) };
             t.Controls.Add(err, 1, 3); t.SetColumnSpan(err, 2);
 
             var ok = new Button { Text = "OK", Width = 90, Height = 30 };
