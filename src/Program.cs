@@ -7,14 +7,14 @@ using System.Windows.Forms;
 [assembly: System.Reflection.AssemblyProduct("Text Sync")]
 [assembly: System.Reflection.AssemblyDescription("Synka undertexter mot en referensundertext")]
 [assembly: System.Reflection.AssemblyCopyright("MIT-licens")]
-[assembly: System.Reflection.AssemblyVersion("1.1.0.0")]
-[assembly: System.Reflection.AssemblyFileVersion("1.1.0.0")]
+[assembly: System.Reflection.AssemblyVersion("1.3.0.0")]
+[assembly: System.Reflection.AssemblyFileVersion("1.3.0.0")]
 
 namespace TextSync
 {
     static class Program
     {
-        public const string Version = "1.1";
+        public const string Version = "1.3";
 
         [DllImport("user32.dll")] static extern bool SetProcessDPIAware();
 
@@ -43,7 +43,7 @@ namespace TextSync
                     "Något gick oväntat fel i Text Sync.\n\n" + (ex != null ? ex.Message : "") +
                     "\n\nDetaljer har sparats i loggfilen:\n" + Log.FilePath +
                     "\n\nSkicka gärna den filen till den som gav dig programmet.",
-                    "Text Sync", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    "Text Sync " + Version, MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
             catch { }
         }

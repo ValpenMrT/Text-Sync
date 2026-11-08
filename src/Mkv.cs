@@ -14,7 +14,9 @@ namespace TextSync
         public ulong Number;
         public int Type;
         public string Codec = "";
-        public string Language = "und";
+        // Matroska-standarden: saknas språkelementet betyder det engelska ("eng").
+        // mkvmerge utelämnar det därför ofta för engelska spår.
+        public string Language = "eng";
         public string Name = "";
         public bool Forced;
         public int CompAlgo = -1;
@@ -34,11 +36,30 @@ namespace TextSync
         public override string ToString()
         {
             string fmt = Codec.Replace("S_TEXT/", "").Replace("UTF8", "SRT");
-            string s = "Spår " + Number + ": " + Language;
+            string s = "Spår " + Number + ": " + LanguageName(Language);
             if (Name.Length > 0) s += " – " + Name;
             s += " (" + fmt + ")";
             if (Forced) s += " [tvingad]";
             return s;
+        }
+
+        static readonly Dictionary<string, string> Names = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) {
+            {"eng","engelska"},{"en","engelska"},{"swe","svenska"},{"sv","svenska"},{"nor","norska"},{"nob","norska"},{"no","norska"},{"nb","norska"},
+            {"dan","danska"},{"da","danska"},{"fin","finska"},{"fi","finska"},{"ger","tyska"},{"deu","tyska"},{"de","tyska"},
+            {"fre","franska"},{"fra","franska"},{"fr","franska"},{"spa","spanska"},{"es","spanska"},{"ita","italienska"},{"it","italienska"},
+            {"dut","nederländska"},{"nld","nederländska"},{"nl","nederländska"},{"pol","polska"},{"pl","polska"},{"por","portugisiska"},{"pt","portugisiska"},
+            {"rus","ryska"},{"ru","ryska"},{"jpn","japanska"},{"ja","japanska"},{"chi","kinesiska"},{"zho","kinesiska"},{"zh","kinesiska"},
+            {"kor","koreanska"},{"ko","koreanska"},{"ara","arabiska"},{"ar","arabiska"},{"tur","turkiska"},{"tr","turkiska"},{"und","okänt språk"} };
+
+        // "es-419" → "spanska (es-419)", "eng" → "engelska"
+        public static string LanguageName(string code)
+        {
+            if (string.IsNullOrEmpty(code)) return "okänt språk";
+            string n;
+            if (Names.TryGetValue(code, out n)) return n;
+            int dash = code.IndexOf('-');
+            if (dash > 0 && Names.TryGetValue(code.Substring(0, dash), out n)) return n + " (" + code + ")";
+            return code;
         }
     }
 

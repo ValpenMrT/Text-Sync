@@ -14,6 +14,9 @@ Så här gör du
 Bra att veta
 - Skriver du över originalfilen sparas en kopia i mappen "Text Sync original".
 - Röda rader saknar engelsk text samtidigt – ofta helt rätt (t.ex. utrop).
+  Bra synk = 98–100 % av raderna. F3 hoppar till nästa röda rad.
+- Redigera i listan: dubbelklick = ändra text/tid, Insert = lägg till,
+  Delete = ta bort, Ctrl+Z = ångra.
 - "Extra justering": 500 = en halv sekund senare, -500 = tidigare.
 - Bildbaserade undertexter i MKV (PGS/VobSub) kan inte läsas; använd då en
   engelsk SRT som referens.

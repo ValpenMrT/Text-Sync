@@ -4,7 +4,8 @@
 build.ps1          Bygger TextSync.exe med csc.exe från .NET Framework (finns i Windows). Skapar ikonen första gången.
 src/
   Program.cs       Start, globala felhanterare (visar svenskt felmeddelande och skriver loggen)
-  MainForm.cs      Hela gränssnittet: inläsning, synk, förhandsvisning, sparande, MKV-inbäddning, tidslinje
+  MainForm.cs      Hela gränssnittet: inläsning, synk, förhandsvisning, redigering med ångra, sparande, MKV-inbäddning, tidslinje
+  CueDialog.cs     Dialog för att ändra eller lägga till en rad (start, slut, text)
   Engine.cs        SRT läs/skriv och synkmotorn
   Mkv.cs           Minimal Matroska-läsare: spårlista och textundertexter (SRT/ASS/WebVTT, även zlib-komprimerade)
   Log.cs           Loggfil i %LOCALAPPDATA%\TextSync\log.txt

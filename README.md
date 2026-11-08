@@ -7,7 +7,7 @@ Programmet jämför *när* det pratas och *när* repliker börjar, inte vad som 
 ## Komma igång
 
 1. Bygg: `powershell -ExecutionPolicy Bypass -File build.ps1`. Det skapar `TextSync.exe`. Kräver bara Windows, med .NET Framework 4.8 som redan finns i Windows 10/11.
-2. Starta `TextSync.exe`, dra in filmen (MKV) och den osynkade SRT-filen och klicka **Synka**.
+2. Starta `TextSync.exe`, dra in filmen (MKV) och den osynkade SRT-filen och klicka **Synka**. Granska resultatet i listan, där röda rader saknar referenstext och F3 hoppar till nästa röd rad. Där kan du också ändra, lägga till eller ta bort rader, med ångra.
 3. **Spara SRT…** sparar `Filmnamn.sv.srt` bredvid filmen. **Lägg in i MKV…** skapar en ny MKV och kräver [MKVToolNix](https://mkvtoolnix.download/).
 
 Användarhjälp finns i [docs/faq.md](docs/faq.md). Den finns också kort i programmet under länken **Hjälp**.

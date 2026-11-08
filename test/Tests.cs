@@ -97,9 +97,9 @@ namespace TextSync
             return ms.ToArray();
         }
 
-        static void WriteMkv(string path, List<Cue> subs, bool zlib, bool unknownCluster)
+        static void WriteMkv(string path, List<Cue> subs, bool zlib, bool unknownCluster, bool noLang = false)
         {
-            var subEntry = Cat(U(0xD7, 3), U(0x83, 0x11), S(0x86, "S_TEXT/UTF8"), S(0x22B59C, "eng"), S(0x536E, "English"));
+            var subEntry = noLang ? Cat(U(0xD7, 3), U(0x83, 0x11), S(0x86, "S_TEXT/UTF8")) : Cat(U(0xD7, 3), U(0x83, 0x11), S(0x86, "S_TEXT/UTF8"), S(0x22B59C, "eng"), S(0x536E, "English"));
             if (zlib) subEntry = Cat(subEntry, El(0x6D80, El(0x6240, Cat(U(0x5032, 2), El(0x5034, U(0x4254, 0))))));
             var tracks = El(0x1654AE6B, Cat(
                 El(0xAE, Cat(U(0xD7, 1), U(0x83, 1), S(0x86, "V_MPEG4/ISO/AVC"))),
@@ -172,6 +172,26 @@ namespace TextSync
             back = Srt.Load(p);
             Console.WriteLine("Sloppy 1252 SRT: {0} cues, '{1}' '{2}'", back.Count, back[0].Text, back[1].Text);
 
+            // Spara med säkerhetskopia
+            {
+                string sd = Path.Combine(dir, "savetest"); if (Directory.Exists(sd)) Directory.Delete(sd, true);
+                Directory.CreateDirectory(sd);
+                string orig = Path.Combine(sd, "Film.sv.srt");
+                var a = new List<Cue> { new Cue(1000, 2000, "original 1"), new Cue(3000, 4000, "original 2") };
+                var b = new List<Cue> { new Cue(1500, 2500, "synkad 1") };
+                Srt.Save(orig, a);
+                string bk = MainForm.SaveWithBackup(orig, orig, b);
+                bool ok1 = bk != null && Srt.Load(bk).Count == 2 && Srt.Load(orig).Count == 1;
+                // andra sparningen får inte skriva över kopian av originalet
+                MainForm.SaveWithBackup(orig, orig, new List<Cue> { new Cue(0, 1, "x"), new Cue(2, 3, "y"), new Cue(4, 5, "z") });
+                bool ok2 = Srt.Load(bk).Count == 2 && Srt.Load(bk)[0].Text == "original 1";
+                // annan fil: ingen kopia
+                string otherFile = Path.Combine(sd, "Annan.srt");
+                bool ok3 = MainForm.SaveWithBackup(otherFile, orig, b) == null && File.Exists(otherFile);
+                bool noTmp = Directory.GetFiles(sd, "*.textsync-tmp").Length == 0;
+                Console.WriteLine("Save+backup: first={0} keepsOriginal={1} noBackupForOther={2} noTempLeft={3}", ok1, ok2, ok3, noTmp);
+            }
+
             // MKV
             foreach (var cfg in new[] { new[] { false, false }, new[] { true, false }, new[] { false, true } })
             {
@@ -186,6 +206,12 @@ namespace TextSync
                     Console.WriteLine("MKV zlib={0} unknownCluster={1}: tracks={2} '{3}' subs={4}/{5} ok={6} size={7}MB {8}ms",
                         cfg[0], cfg[1], f.Tracks.Count, tr[0], subs.Count, refc.Count, ok, new FileInfo(mp).Length / 1048576, sw.ElapsedMilliseconds);
                 }
+            }
+            {
+                string mp = Path.Combine(dir, "nolang.mkv");
+                WriteMkv(mp, refc.Take(10).ToList(), false, false, true);
+                using (var f = new MkvFile(mp))
+                    Console.WriteLine("MKV without language element: '{0}'  audio: '{1}'", f.Tracks[2], MkvTrack.LanguageName(f.Tracks[1].Language));
             }
             return 0;
         }

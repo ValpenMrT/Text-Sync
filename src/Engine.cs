@@ -112,6 +112,20 @@ namespace TextSync
             return true;
         }
 
+        static readonly Regex OneTimeRx = new Regex(@"^\s*(\d{1,2}):(\d{1,2}):(\d{1,2})(?:[,.](\d{1,3}))?\s*$");
+
+        // "00:01:23,456" → millisekunder. Används när man ändrar en rad för hand.
+        public static bool TryParseTime(string s, out double ms)
+        {
+            ms = 0;
+            var m = OneTimeRx.Match(s ?? "");
+            if (!m.Success) return false;
+            int mm = int.Parse(m.Groups[2].Value), ss = int.Parse(m.Groups[3].Value);
+            if (mm > 59 || ss > 59) return false;
+            ms = Ms(m.Groups[1], m.Groups[2], m.Groups[3], m.Groups[4]);
+            return true;
+        }
+
         public static string FormatTime(double ms)
         {
             if (ms < 0) ms = 0;

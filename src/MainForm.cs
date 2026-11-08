@@ -22,6 +22,11 @@ namespace TextSync
         static readonly Color Card = Color.White;
         static readonly Color Muted = Color.FromArgb(96, 96, 96);
         public const string BackupFolder = "Text Sync original";
+        static readonly string Caption = "Text Sync " + Program.Version;
+        readonly Stack<List<Cue>> undo = new Stack<List<Cue>>(); // för att ångra ändringar av rader
+        const double MatchThreshold = 0.95;   // andel rader som ska ha referenstext samtidigt
+        bool[] rowMatched;
+        LinkLabel undoLink;
 
         TextBox refBox, tgtBox, langBox;
         ComboBox trackCombo, modeCombo;
@@ -79,7 +84,16 @@ namespace TextSync
             var head = new Panel { Dock = DockStyle.Top, Height = 56, Margin = new Padding(0, 0, 0, 6) };
             var title = new Label { Text = "Text Sync", Font = new Font("Segoe UI Semibold", 20F), AutoSize = true, Location = new Point(0, 0), ForeColor = Color.FromArgb(28, 28, 28) };
             var sub = new Label { Text = "Synka en undertext mot en annan undertext (annat språk) som redan går i takt med filmen.", AutoSize = true, Location = new Point(3, 36), ForeColor = Muted };
-            head.Controls.Add(title); head.Controls.Add(sub);
+            var ver = new Label { Text = "version " + Program.Version, AutoSize = true, ForeColor = Muted, Location = new Point(title.PreferredWidth + 8, 14) };
+            head.Controls.Add(title); head.Controls.Add(ver); head.Controls.Add(sub);
+            head.Layout += (s, e) => { ver.Left = title.Right + 6; ver.Top = title.Bottom - ver.Height - (int)(title.Height * 0.12); };
+            KeyPreview = true;
+            KeyDown += (s, e) =>
+            {
+                if (e.Control && e.KeyCode == Keys.Z && !(ActiveControl is TextBoxBase) && !(ActiveControl is NumericUpDown) && undo.Count > 0)
+                { UndoChange(); e.Handled = true; }
+                else if (e.KeyCode == Keys.F3 && synced != null) { NextUnmatched(); e.Handled = true; }
+            };
             root.Controls.Add(head, 0, 0);
 
             // --- 1. referens
@@ -127,6 +141,9 @@ namespace TextSync
             openLink = new LinkLabel { Text = "Visa i mappen", AutoSize = true, Margin = new Padding(0, 9, 0, 0), Visible = false, LinkColor = Accent };
             openLink.LinkClicked += (s, e) => ShowInFolder(lastOutput);
             opts.Controls.Add(openLink);
+            undoLink = new LinkLabel { Text = "Ångra", AutoSize = true, Margin = new Padding(0, 9, 0, 0), Visible = false, LinkColor = Accent };
+            undoLink.LinkClicked += (s, e) => UndoChange();
+            opts.Controls.Add(undoLink);
             root.Controls.Add(opts, 0, 3);
 
             // --- resultat
@@ -152,6 +169,34 @@ namespace TextSync
                     timeline.Center = (c.Start + c.End) / 2; timeline.Highlight = c; timeline.Invalidate();
                 }
             };
+            // redigera rader: dubbelklick/Enter = ändra, Insert = lägg till, Delete = ta bort, F3 = nästa röda rad, Ctrl+Z = ångra
+            list.MultiSelect = true;
+            list.DoubleClick += (s, e) => EditSelected();
+            list.KeyDown += (s, e) =>
+            {
+                if (e.KeyCode == Keys.Delete) { DeleteSelected(); e.Handled = true; }
+                else if (e.KeyCode == Keys.Return) { EditSelected(); e.Handled = true; }
+                else if (e.KeyCode == Keys.Insert) { AddRow(); e.Handled = true; }
+                else if (e.Control && e.KeyCode == Keys.A) { foreach (ListViewItem it in list.Items) it.Selected = true; e.Handled = true; }
+            };
+            var menu = new ContextMenuStrip();
+            var miEdit = new ToolStripMenuItem("Ändra rad…", null, (s, e) => EditSelected()) { ShortcutKeyDisplayString = "Enter" };
+            var miAdd = new ToolStripMenuItem("Lägg till rad…", null, (s, e) => AddRow()) { ShortcutKeyDisplayString = "Insert" };
+            var miDel = new ToolStripMenuItem("Ta bort markerade rader", null, (s, e) => DeleteSelected()) { ShortcutKeyDisplayString = "Delete" };
+            var miNext = new ToolStripMenuItem("Gå till nästa röda rad", null, (s, e) => NextUnmatched()) { ShortcutKeyDisplayString = "F3" };
+            var miUndo = new ToolStripMenuItem("Ångra", null, (s, e) => UndoChange()) { ShortcutKeyDisplayString = "Ctrl+Z" };
+            menu.Items.AddRange(new ToolStripItem[] { miEdit, miAdd, miDel, new ToolStripSeparator(), miNext, miUndo });
+            menu.Opening += (s, e) =>
+            {
+                if (synced == null || busy) { e.Cancel = true; return; }
+                int n = list.SelectedIndices.Count;
+                miEdit.Enabled = n == 1;
+                miDel.Enabled = n > 0;
+                miDel.Text = n > 1 ? "Ta bort " + n + " markerade rader" : "Ta bort markerad rad";
+                miNext.Enabled = rowMatched != null && rowMatched.Any(m => !m);
+                miUndo.Enabled = undo.Count > 0;
+            };
+            list.ContextMenuStrip = menu;
             split.Panel1.Controls.Add(list);
             timeline = new TimelinePanel { Dock = DockStyle.Fill };
             split.Panel2.Controls.Add(timeline);
@@ -467,8 +512,123 @@ namespace TextSync
             if (list != null) list.Items.Clear();
             if (resultLabel != null) resultLabel.Visible = false;
             if (openLink != null) openLink.Visible = false;
+            undo.Clear(); rowMatched = null;
+            if (undoLink != null) undoLink.Visible = false;
             if (timeline != null) { timeline.Ref = null; timeline.Orig = null; timeline.Synced = null; timeline.Highlight = null; timeline.Invalidate(); }
             UpdateButtons();
+        }
+
+        // ------------------------------------------------------------ redigera rader (med ångra)
+        void SelectRow(int i)
+        {
+            list.SelectedIndices.Clear();
+            if (i < 0 || i >= list.Items.Count) return;
+            list.Items[i].Selected = true; list.Items[i].Focused = true; list.EnsureVisible(i);
+            list.Focus();
+        }
+
+        // Varje ändring sparar först en kopia av hela listan, så att den kan ångras
+        void Changed(List<Cue> newOutput, Cue select, string status, string log)
+        {
+            undo.Push(result.Output);
+            result.Output = newOutput.OrderBy(c => c.Start).ToList();
+            unsaved = true;
+            list.SelectedIndices.Clear();
+            RefreshPreview();
+            int i = select != null ? result.Output.IndexOf(select) : -1;
+            if (i >= 0) SelectRow(i);
+            SetStatus(status, false);
+            openLink.Visible = false;
+            undoLink.Visible = true;
+            Log.Info(log);
+        }
+
+        void DeleteSelected()
+        {
+            if (busy || result == null || list.SelectedIndices.Count == 0) return;
+            var idx = list.SelectedIndices.Cast<int>().OrderBy(i => i).ToList();
+            if (idx.Count == result.Output.Count)
+            {
+                SetStatus("Minst en rad måste finnas kvar.", false);
+                return;
+            }
+            var del = new HashSet<int>(idx);
+            var keep = result.Output.Where((c, i) => !del.Contains(i)).ToList();
+            int next = Math.Min(idx[0], keep.Count - 1);
+            Changed(keep, keep[next], idx.Count == 1 ? "1 rad borttagen." : idx.Count + " rader borttagna.", "Tog bort " + idx.Count + " rad(er)");
+        }
+
+        void EditSelected()
+        {
+            if (busy || result == null || list.SelectedIndices.Count != 1) return;
+            int i = list.SelectedIndices[0];
+            var shown = synced[i];
+            double extra = (double)extraNum.Value;
+            using (var d = new CueDialog("Ändra rad " + (i + 1), shown.Start, shown.End, shown.Text))
+            {
+                if (d.ShowDialog(this) != DialogResult.OK) return;
+                var nc = new Cue(d.StartMs - extra, d.EndMs - extra, d.CueText);
+                var list2 = new List<Cue>(result.Output);
+                list2[i] = nc;
+                Changed(list2, nc, "Rad " + (i + 1) + " ändrad.", "Ändrade rad " + (i + 1));
+            }
+        }
+
+        void AddRow()
+        {
+            if (busy || result == null) return;
+            double extra = (double)extraNum.Value;
+            double start = 0;
+            if (list.SelectedIndices.Count > 0) start = synced[list.SelectedIndices[list.SelectedIndices.Count - 1]].End + 200;
+            else if (synced.Count > 0) start = synced[synced.Count - 1].End + 200;
+            using (var d = new CueDialog("Lägg till rad", start, start + 2000, ""))
+            {
+                if (d.ShowDialog(this) != DialogResult.OK) return;
+                var nc = new Cue(d.StartMs - extra, d.EndMs - extra, d.CueText);
+                var list2 = new List<Cue>(result.Output); list2.Add(nc);
+                Changed(list2, nc, "Rad tillagd.", "Lade till rad vid " + Srt.FormatTime(d.StartMs));
+            }
+        }
+
+        void UndoChange()
+        {
+            if (busy || result == null || undo.Count == 0) return;
+            result.Output = undo.Pop();
+            unsaved = true;
+            list.SelectedIndices.Clear();
+            RefreshPreview();
+            SetStatus("Ändringen ångrades.", false);
+            undoLink.Visible = undo.Count > 0;
+        }
+
+        // Hoppa till nästa rad som saknar referenstext samtidigt (börjar om från toppen)
+        void NextUnmatched()
+        {
+            if (rowMatched == null || rowMatched.Length == 0) return;
+            int from = list.SelectedIndices.Count > 0 ? list.SelectedIndices[0] + 1 : 0;
+            for (int k = 0; k < rowMatched.Length; k++)
+            {
+                int i = (from + k) % rowMatched.Length;
+                if (!rowMatched[i]) { SelectRow(i); return; }
+            }
+            SetStatus("Alla rader har referenstext samtidigt.", true);
+        }
+
+        // Under 95 % matchade rader: fråga innan sparning
+        bool ConfirmLowMatch()
+        {
+            if (rowMatched == null || rowMatched.Length == 0) return true;
+            int ok = rowMatched.Count(m => m), n = rowMatched.Length;
+            if (ok >= MatchThreshold * n) return true;
+            var a = MessageBox.Show(this,
+                "Bara " + ok + " av " + n + " rader (" + Fmt(100.0 * ok / n, "0") + " %) har en referensrad samtidigt.\n\n" +
+                "Det kan betyda att synken är fel, men också att texten har rader som inte finns i referensen (t.ex. utrop eller textarens namn).\n\n" +
+                "Vill du spara ändå?\n\nVälj Nej för att granska de röda raderna – F3 hoppar till nästa.",
+                Caption, MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2);
+            if (a == DialogResult.Yes) return true;
+            list.SelectedIndices.Clear();
+            NextUnmatched();
+            return false;
         }
 
         void UpdateButtons()
@@ -487,7 +647,7 @@ namespace TextSync
             busy = b;
             progress.Visible = b; progress.Value = 0;
             cancelBtn.Visible = b; cancelBtn.Enabled = b;
-            if (b) openLink.Visible = false;
+            if (b) { openLink.Visible = false; undoLink.Visible = false; }
             statusLabel.ForeColor = Muted;
             statusLabel.Text = status ?? "";
             UseWaitCursor = b;
@@ -551,6 +711,7 @@ namespace TextSync
                 if (truncated) r.Notes.Insert(0, "MKV-filen verkar vara ofullständig – bara en del av referensen kunde läsas.");
                 refCuesUsed = refc;
                 result = r;
+                undo.Clear();
                 unsaved = true;
                 extraNum.Value = 0;
                 timeline.Highlight = null;
@@ -566,7 +727,7 @@ namespace TextSync
             catch (Exception ex)
             {
                 Log.Error("Synk misslyckades", ex);
-                MessageBox.Show(this, "Synken misslyckades: " + Friendly(ex), "Text Sync", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show(this, "Synken misslyckades: " + Friendly(ex), Caption, MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
             finally
             {
@@ -579,7 +740,16 @@ namespace TextSync
         {
             var r = result;
             var sb = new StringBuilder();
-            sb.Append("✔  " + r.Method + "     Matchning: " + Fmt(r.ScoreBefore * 100, "0") + " % → " + Fmt(r.ScoreAfter * 100, "0") + " %\n");
+            bool good = true;
+            sb.Append(r.Method);
+            if (rowMatched != null && rowMatched.Length > 0)
+            {
+                int ok = rowMatched.Count(m => m), n = rowMatched.Length;
+                good = ok >= MatchThreshold * n;
+                sb.Append("     Rader med referenstext samtidigt: " + ok + " av " + n + " (" + Fmt(Math.Floor(1000.0 * ok / n) / 10, "0.#") + " %)");
+            }
+            sb.Insert(0, good ? "✔  " : "⚠  ");
+            sb.Append("\n");
             if (r.Segments.Count > 1)
             {
                 sb.Append("Avsnitt: ");
@@ -596,9 +766,10 @@ namespace TextSync
             }
             if (r.FpsText.Length > 0) sb.Append(r.FpsText + "\n");
             foreach (var n in r.Notes) sb.Append("⚠  " + n + "\n");
-            sb.Append("Kontrollera gärna några rader i listan nedan (rödmarkerade rader har ingen referenstext samtidigt) och spara sedan.");
+            if (!good) sb.Append("Under 95 % av raderna har referenstext samtidigt – granska de röda raderna (F3 hoppar till nästa).\n");
+            sb.Append("Redigera i listan: dubbelklicka för att ändra text och tid, Insert lägger till, Delete tar bort, Ctrl+Z ångrar.");
             resultLabel.Text = sb.ToString().TrimEnd();
-            resultLabel.ForeColor = r.ScoreAfter < 0.35 ? Color.Firebrick : Color.FromArgb(16, 110, 40);
+            resultLabel.ForeColor = good ? Color.FromArgb(16, 110, 40) : Color.Firebrick;
             resultLabel.MaximumSize = new Size(Math.Max(200, root.ClientSize.Width - 40), 0);
             resultLabel.Visible = true;
         }
@@ -613,6 +784,7 @@ namespace TextSync
             list.Items.Clear();
             int ri = 0, lost = 0;
             var items = new List<ListViewItem>(synced.Count);
+            rowMatched = new bool[synced.Count];
             for (int i = 0; i < synced.Count; i++)
             {
                 var c = synced[i];
@@ -627,6 +799,7 @@ namespace TextSync
                 var it = new ListViewItem(new[] { (i + 1).ToString(), Srt.FormatTime(c.Start), Srt.FormatTime(c.End),
                     c.Text.Replace("\n", " / "), bestOv > 0 ? best.Replace("\n", " / ") : "— (ingen referenstext samtidigt)" });
                 if (bestOv <= 0) it.ForeColor = Color.FromArgb(170, 60, 60);
+                rowMatched[i] = bestOv > 0;
                 items.Add(it);
             }
             list.Items.AddRange(items.ToArray());
@@ -638,6 +811,7 @@ namespace TextSync
             else if (synced.Count > 0) { timeline.Highlight = null; timeline.Center = synced[0].Start + 20000; }
             timeline.Invalidate();
             if (lost > 0) SetStatus(lost + " repliker hamnar före filmens början och tas bort när du sparar.", false);
+            ShowResult();
             UpdateButtons();
         }
 
@@ -646,7 +820,7 @@ namespace TextSync
         {
             lang = langBox.Text.Trim().ToLowerInvariant();
             if (Regex.IsMatch(lang, @"^[a-z]{2,3}(-[a-z0-9]{2,8})*$")) return true;
-            MessageBox.Show(this, "Skriv språkkoden med 2–3 bokstäver, t.ex. sv, en eller no.", "Text Sync", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show(this, "Skriv språkkoden med 2–3 bokstäver, t.ex. sv, en eller no.", Caption, MessageBoxButtons.OK, MessageBoxIcon.Information);
             langBox.Focus(); langBox.SelectAll();
             return false;
         }
@@ -667,11 +841,29 @@ namespace TextSync
             else File.Move(tmp, path);
         }
 
+        // Skriver man över originalet (den osynkade filen) sparas först en kopia i en undermapp,
+        // så att spelare som VLC/Plex inte visar den som ett extra spår. En befintlig kopia skrivs aldrig över.
+        // Returnerar sökvägen till kopian, eller null om ingen behövdes.
+        public static string SaveWithBackup(string path, string originalPath, List<Cue> cues)
+        {
+            string backup = null;
+            if (File.Exists(path) && SamePath(path, originalPath))
+            {
+                string bdir = Path.Combine(Path.GetDirectoryName(path), BackupFolder);
+                backup = Path.Combine(bdir, Path.GetFileName(path));
+                Directory.CreateDirectory(bdir);
+                if (!File.Exists(backup)) File.Copy(path, backup);
+            }
+            WriteSafely(path, Srt.ToSrt(cues));
+            return backup;
+        }
+
         void SaveSrt()
         {
             if (synced == null) return;
             string lang;
             if (!TryGetLang(out lang)) return;
+            if (!ConfirmLowMatch()) return;
             string def = DefaultSrtPath(lang);
             using (var d = new SaveFileDialog { Title = "Spara synkad undertext", Filter = "SRT-undertext (*.srt)|*.srt", FileName = Path.GetFileName(def), InitialDirectory = Path.GetDirectoryName(def), OverwritePrompt = true })
             {
@@ -679,19 +871,9 @@ namespace TextSync
                 string path = d.FileName;
                 try
                 {
-                    string backupNote = "";
-                    // Skriver man över originalet (den osynkade filen) sparas först en kopia.
-                    // Kopian läggs i en undermapp så att spelare som VLC/Plex inte visar den som ett extra spår.
-                    if (File.Exists(path) && SamePath(path, tgtLoadedPath))
-                    {
-                        string bdir = Path.Combine(Path.GetDirectoryName(path), BackupFolder);
-                        string backup = Path.Combine(bdir, Path.GetFileName(path));
-                        Directory.CreateDirectory(bdir);
-                        if (!File.Exists(backup)) File.Copy(path, backup);
-                        backupNote = "  Originalet finns kvar i mappen \"" + BackupFolder + "\".";
-                        Log.Info("Säkerhetskopia av original: " + backup);
-                    }
-                    WriteSafely(path, Srt.ToSrt(synced));
+                    string backup = SaveWithBackup(path, tgtLoadedPath, synced);
+                    string backupNote = backup != null ? "  Originalet finns kvar i mappen \"" + BackupFolder + "\"." : "";
+                    if (backup != null) Log.Info("Säkerhetskopia av original: " + backup);
                     unsaved = false;
                     lastOutput = path;
                     string auto = "";
@@ -699,13 +881,13 @@ namespace TextSync
                         && Path.GetFileName(path).StartsWith(Path.GetFileNameWithoutExtension(mkvPath) + ".", StringComparison.OrdinalIgnoreCase))
                         auto = "  Spelare som VLC, Plex och Kodi hittar den automatiskt.";
                     SetStatus("✔ Sparad: " + Path.GetFileName(path) + "." + auto + backupNote, true);
-                    openLink.Visible = true;
+                    openLink.Visible = true; undoLink.Visible = false;
                     Log.Info("Sparad: " + path);
                 }
                 catch (Exception ex)
                 {
                     Log.Error("Kunde inte spara " + path, ex);
-                    MessageBox.Show(this, "Kunde inte spara: " + Friendly(ex), "Text Sync", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    MessageBox.Show(this, "Kunde inte spara: " + Friendly(ex), Caption, MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
             }
         }
@@ -734,13 +916,14 @@ namespace TextSync
             if (synced == null || busy) return;
             string lang;
             if (!TryGetLang(out lang)) return;
+            if (!ConfirmLowMatch()) return;
             string exe = FindMkvMerge();
             if (exe == null)
             {
                 var a = MessageBox.Show(this,
                     "För att lägga in undertexten i själva MKV-filen behövs det kostnadsfria programmet MKVToolNix.\n\n" +
                     "Vill du öppna nedladdningssidan?\n\n(Enklare alternativ: \"Spara SRT…\" bredvid filmen med samma namn – de flesta spelare hittar den då automatiskt.)",
-                    "Text Sync", MessageBoxButtons.YesNo, MessageBoxIcon.Information);
+                    Caption, MessageBoxButtons.YesNo, MessageBoxIcon.Information);
                 if (a == DialogResult.Yes) { try { Process.Start("https://mkvtoolnix.download/downloads.html#windows"); } catch { } }
                 return;
             }
@@ -761,7 +944,7 @@ namespace TextSync
             }
             if (SamePath(outPath, src))
             {
-                MessageBox.Show(this, "Välj ett annat filnamn än originalet – originalfilmen ska inte skrivas över.", "Text Sync"); return;
+                MessageBox.Show(this, "Välj ett annat filnamn än originalet – originalfilmen ska inte skrivas över.", Caption); return;
             }
 
             List<MkvTrack> srcTracks;
@@ -774,7 +957,7 @@ namespace TextSync
             catch (Exception ex)
             {
                 Log.Error("Kunde inte läsa " + src, ex);
-                MessageBox.Show(this, "Kunde inte läsa MKV-filen: " + Friendly(ex), "Text Sync", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show(this, "Kunde inte läsa MKV-filen: " + Friendly(ex), Caption, MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return;
             }
             // diskutrymme: den nya filen blir ungefär lika stor som originalet
@@ -785,7 +968,7 @@ namespace TextSync
                 if (drive.IsReady && drive.AvailableFreeSpace < need)
                 {
                     MessageBox.Show(this, "Det finns inte tillräckligt med plats på " + drive.Name + "\n\nBehövs: " + Gb(need) + "\nLedigt: " + Gb(drive.AvailableFreeSpace) +
-                        "\n\nVälj en annan disk, eller använd \"Spara SRT…\" som inte tar någon plats.", "Text Sync", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        "\n\nVälj en annan disk, eller använd \"Spara SRT…\" som inte tar någon plats.", Caption, MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return;
                 }
             }
@@ -858,7 +1041,7 @@ namespace TextSync
                 Log.Error("mkvmerge misslyckades (kod " + code + "):\r\n" + log, null);
                 MessageBox.Show(this, "Det gick inte att skapa MKV-filen. Ingen ny fil har sparats och originalet är orört.\n\n" +
                     "Detaljer (från mkvmerge):\n" + Truncate(log.ToString(), 600) + "\n\nMer information finns i loggen (Hjälp → loggmapp).",
-                    "Text Sync", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    Caption, MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
@@ -885,7 +1068,7 @@ namespace TextSync
                 "Text Sync " + Program.Version + " · MIT-licens\n" +
                 "Loggfil (för felsökning): " + Log.FilePath + "\n\n" +
                 "Vill du öppna mappen med loggfilen?",
-                "Hjälp – Text Sync", MessageBoxButtons.YesNo, MessageBoxIcon.Information);
+                "Hjälp – " + Caption, MessageBoxButtons.YesNo, MessageBoxIcon.Information);
             if (a == DialogResult.Yes)
             {
                 try { Directory.CreateDirectory(Log.Dir); Process.Start("explorer.exe", "\"" + Log.Dir + "\""); } catch { }
@@ -896,7 +1079,7 @@ namespace TextSync
         {
             if (busy)
             {
-                var a = MessageBox.Show(this, "Text Sync arbetar fortfarande. Vill du avbryta och stänga?", "Text Sync", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
+                var a = MessageBox.Show(this, "Text Sync arbetar fortfarande. Vill du avbryta och stänga?", Caption, MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
                 if (a != DialogResult.Yes) { e.Cancel = true; return; }
                 CancelWork();
                 var p = muxProc;
@@ -905,7 +1088,7 @@ namespace TextSync
             }
             else if (unsaved && synced != null)
             {
-                var a = MessageBox.Show(this, "Den synkade undertexten är inte sparad. Vill du stänga ändå?", "Text Sync", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+                var a = MessageBox.Show(this, "Den synkade undertexten är inte sparad. Vill du stänga ändå?", Caption, MessageBoxButtons.YesNo, MessageBoxIcon.Question);
                 if (a != DialogResult.Yes) { e.Cancel = true; return; }
             }
             base.OnFormClosing(e);

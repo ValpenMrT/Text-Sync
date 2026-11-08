@@ -11,8 +11,17 @@ Text Sync är inte signerat med ett köpt certifikat.
 3. Titta på några rader i listan. Den engelska texten bredvid ska betyda samma sak.
 4. Klicka **Spara SRT…**. Filen sparas som `Filmnamn.sv.srt` bredvid filmen, och då hittar VLC, Plex och Kodi den automatiskt.
 
-**Vad betyder röda rader?**
-De rader har ingen engelsk text samtidigt. Det är ofta helt rätt, till exempel ett utrop eller en skylt som bara är textad på svenska. Är många rader röda i följd har synken gått fel. Prova då metoden **Avancerad**, eller välj ett annat engelskt spår.
+**Vad betyder röda rader och procenten?**
+Röda rader har ingen engelsk text samtidigt. Det är ofta helt rätt, till exempel ett utrop eller textarens namn. Procenten visar hur många rader som *har* engelsk text samtidigt, och en lyckad synk brukar ge 98–100 %. Under 95 % frågar programmet innan det sparar. Tryck **F3** för att hoppa till nästa röda rad. Är många rader röda i följd har synken gått fel. Prova då metoden **Avancerad**, eller välj ett annat engelskt spår.
+
+**Kan jag ändra, lägga till eller ta bort rader?**
+Ja, i listan:
+- **Dubbelklick** eller **Enter** ändrar text och tid.
+- **Insert** lägger till en rad.
+- **Delete** tar bort de markerade raderna.
+- **Ctrl+Z** ångrar, i flera steg.
+
+Allt finns också i högerklicksmenyn. Ingenting ändras i filen förrän du sparar.
 
 **Min film har ingen engelsk textundertext.**
 Bildbaserade undertexter (PGS/VobSub) kan inte läsas. Använd i stället en engelsk SRT-fil för samma version av filmen som referens.

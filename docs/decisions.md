@@ -2,6 +2,38 @@
 
 Nyast först.
 
+## 2026-11-08 – Kvalitetsmått: andel rader med referenstext, 95 %
+- **Område:** GUI / synk
+- **Beslut:** Resultatet visas som "Rader med referenstext samtidigt: X av Y (Z %)". Under 95 % frågar Spara och Lägg in i MKV "spara ändå?". Svarar man Nej hoppar listan till första röda raden. F3 går till nästa röda rad.
+- **Varför:** Ägaren vill att alla rader ska matcha. Det gamla överlappsmåttet blev 86–92 % även när synken var helt rätt, så en gräns på 95 % hade gett frågan vid varje sparning.
+- **Invändning:** Claude föreslog först 75 % på överlappsmåttet. Ägaren ville ha 95 % och att alla rader ska matcha. Det löstes med det nya radmåttet, där en rätt synk ger 98–99,5 %.
+- **Nivå:** LIVE
+
+## 2026-11-08 – Rader kan ändras, läggas till och tas bort
+- **Område:** GUI / data
+- **Beslut:** Dubbelklick eller Enter ändrar text och tid i en dialog, Insert lägger till en rad och Delete tar bort. Allt kan ångras i flera steg med Ctrl+Z eller länken "Ångra", och det finns också i högerklicksmenyn. Ändringarna gäller bara den synkade texten. Originalfilen ändras inte förrän man sparar, och då sparas en säkerhetskopia.
+- **Varför:** Ägaren vill kunna ta bort textarnamn, rätta fel och lägga till rader.
+- **Invändning:** Claude rekommenderade att bara kunna ta bort, eftersom det ger ett enklare gränssnitt. Ägaren valde full redigering. Därför ligger den i högerklicksmenyn och på kortkommandon, så att huvudvyn inte blir rörigare.
+- **Nivå:** LIVE
+
+## 2026-11-08 – Filnamn för VLC/Plex/Kodi
+- **Område:** Spara
+- **Beslut:** Förvalt namn är `Film.sv.srt`. Det behövs inget val för TV-spelare som kräver `Film.srt`.
+- **Varför:** Vännerna tittar med VLC, Plex eller Kodi på dator.
+- **Nivå:** LIVE
+
+## 2026-11-08 – Saknat språk på MKV-spår betyder engelska
+- **Område:** MKV
+- **Beslut:** Har ett spår inget språkelement tolkas det som engelska, enligt Matroska-standarden. Språken visas med svenska namn i spårlistan.
+- **Varför:** Spåren visades som "und" medan spelaren visade "English", eftersom mkvmerge utelämnar språket för engelska spår. Det påverkade också vilket spår som valdes automatiskt.
+- **Nivå:** LIVE
+
+## 2026-11-08 – Versionsnummer synligt
+- **Område:** GUI
+- **Beslut:** Versionen visas i fönstrets rubrik, i namnlisten och i alla dialogrutor, till exempel "Text Sync 1.3".
+- **Varför:** Vännerna får nya versioner via USB och behöver kunna säga vilken de har när de rapporterar fel.
+- **Nivå:** LIVE
+
 ## 2026-11-08 – Byggutdata hålls utanför git
 - **Område:** Struktur
 - **Beslut:** `TextSync.exe` och testprogram byggs med `build.ps1` och checkas inte in (`.gitignore`). Ikonen (`src/TextSync.ico`) checkas in.

@@ -12,6 +12,12 @@ Testprogrammen kompileras med samma `csc.exe` (se `build.ps1`) med `/target:exe`
 - `Tests.exe <tempmapp>`: syntetiska scenarier. Alla rader för Smart ska ha `100 % <300ms`.
 - `Diag.exe <film.mkv> <undertext.srt> <från s> <till s> <spårnr>`: riktiga filer. Visar rader utan referens (`NO-REF`).
 
+## Smart App Control på byggdatorn
+Smart App Control är påslaget på utvecklingsdatorn och blockerar ofta varje *nybyggd* `TextSync.exe` i flera minuter, ibland längre. Det gäller alltså även din egen dator. För att testa direkt kan programmet köras inifrån PowerShell:
+```
+powershell -STA -Command "$a=[Reflection.Assembly]::Load([IO.File]::ReadAllBytes('TextSync.exe')); $a.GetType('TextSync.Program').GetMethod('Main',[Reflection.BindingFlags]'Static,NonPublic').Invoke($null,@(,[string[]]@()))"
+```
+
 ## Dela ut
 Kopiera `TextSync.exe` till USB. Programmet är osignerat (se beslutsloggen):
 - Från USB visas normalt ingen SmartScreen-varning.
