@@ -1,0 +1,26 @@
+TEXT SYNC – synka undertexter mot en annan undertext
+=====================================================
+
+Så här gör du
+1. Dra in filmen (MKV) och den svenska SRT-filen i fönstret
+   (eller använd Bläddra…). Referensen kan också vara en engelsk SRT.
+2. Klicka "Synka". Titta på några rader i listan – den engelska texten
+   bredvid ska betyda samma sak.
+3. "Spara SRT…" – sparas som  Filmnamn.sv.srt  bredvid filmen, så hittar
+   VLC, Plex, Kodi m.fl. den automatiskt.
+   "Lägg in i MKV…" skapar en NY MKV (originalet ändras inte) med texten
+   som standardspår. Kräver gratisprogrammet MKVToolNix.
+
+Bra att veta
+- Skriver du över originalfilen sparas en kopia i mappen "Text Sync original".
+- Röda rader saknar engelsk text samtidigt – ofta helt rätt (t.ex. utrop).
+- "Extra justering": 500 = en halv sekund senare, -500 = tidigare.
+- Bildbaserade undertexter i MKV (PGS/VobSub) kan inte läsas; använd då en
+  engelsk SRT som referens.
+
+Om Windows blockerar programmet
+- "Windows skyddade datorn": klicka "Mer information" → "Kör ändå".
+- "Smart App Control blockerade...": tyvärr går programmet inte att köra på
+  den datorn (programmet är inte signerat).
+
+Problem? Klicka "Hjälp" i programmet → öppna loggmappen och skicka log.txt.

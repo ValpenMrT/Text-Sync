@@ -1,0 +1,6 @@
+# byggutdata
+*.exe
+*.pdb
+# tillfälliga filer
+*.part
+*.textsync-tmp
