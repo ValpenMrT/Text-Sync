@@ -8,7 +8,7 @@ Text Sync är inte signerat med ett köpt certifikat.
 **Hur gör jag?**
 1. Dra in filmen (MKV) och den svenska SRT-filen i fönstret. Det går också att använda **Bläddra…**.
 2. Klicka **Synka**.
-3. Titta på några rader i listan. Den engelska texten bredvid ska betyda samma sak.
+3. Titta på några rader i listan. Den engelska texten bredvid ska betyda samma sak, och **Synkad start** ska ligga nära **Referenstid**. **Före synk** visar tiden i din osynkade fil, och **Flyttad** hur mycket raden flyttades. Ett plötsligt hopp i Flyttad betyder ett klipp i filmen. Kontrollera gärna raderna där.
 4. Klicka **Spara SRT…**. Filen sparas som `Filmnamn.sv.srt` bredvid filmen, och då hittar VLC, Plex och Kodi den automatiskt.
 
 **Vad betyder röda rader och procenten?**

@@ -16,8 +16,9 @@ namespace TextSync
         public double Start; // ms
         public double End;   // ms
         public string Text;
+        public double OrigStart = double.NaN; // tiden i filen före synk (NaN = okänd, t.ex. en tillagd rad)
         public Cue(double s, double e, string t) { Start = s; End = e; Text = t ?? ""; }
-        public Cue Clone() { return new Cue(Start, End, Text); }
+        public Cue Clone() { return new Cue(Start, End, Text) { OrigStart = OrigStart }; }
     }
 
     public struct Iv
@@ -202,6 +203,7 @@ namespace TextSync
         public bool DetectFramerate = true;
         public double MaxOffsetSec = 900;   // global sökning ±15 min
         public double LocalRangeSec = 20;   // lokal sökning ±20 s (klipp/pauser)
+        public bool RefineCues = true;      // finjustera per replik (korta klipp under ungefär en minut)
     }
 
     public class Segment
@@ -551,7 +553,7 @@ namespace TextSync
             {
                 progress(82, "Letar efter klipp och pauser…");
                 List<Segment> segs;
-                List<Cue> outPw = Piecewise(refIv, refSt, tgtCues, gT, grid, scores, R, K, out segs);
+                List<Cue> outPw = Piecewise(refIv, refSt, tgtCues, gT, grid, scores, R, K, opt.RefineCues, out segs);
                 double scorePw = Fit(refIv, refSt, outPw, x => x);
                 bool usePw = opt.Mode == SyncMode.Advanced
                     ? scorePw > scoreOut
@@ -571,6 +573,9 @@ namespace TextSync
                 }
             }
 
+            // output[i] hör till tgtCues[i] här (sorteras först nedan) → spara tiden före synk
+            if (output.Count == tgtCues.Count)
+                for (int i = 0; i < output.Count; i++) output[i].OrigStart = tgtCues[i].Start;
             foreach (var c in output) { if (c.Start < 0) c.Start = 0; if (c.End < c.Start) c.End = c.Start; }
             output.Sort((x, y) => x.Start.CompareTo(y.Start));
             res.Output = output;
@@ -690,7 +695,7 @@ namespace TextSync
         }
 
         static List<Cue> Piecewise(Iv[] refIv, double[] refSt, List<Cue> tgt, Func<double, double> gT, List<double> grid,
-            double[][] scores, double R, int K, out List<Segment> segs)
+            double[][] scores, double R, int K, bool refine, out List<Segment> segs)
         {
             int G = grid.Count;
             const double Lambda = 0.03;   // kostnad för små steg (drift)
@@ -771,6 +776,9 @@ namespace TextSync
                 for (int j = 0; j < m; j++) cueOff[idx[j]] = j < bestP ? off[i] : off[i + 1];
             }
 
+            // korta avsnitt (under ungefär en minut) syns inte i mätpunkterna ovan → finjustera per replik
+            if (refine) RefineCues(refIv, refSt, tgt, gT, cueOff);
+
             // segmentlista + finjustering per avsnitt (±60 ms)
             segs = new List<Segment>();
             int startIdx = 0;
@@ -807,6 +815,78 @@ namespace TextSync
             return outc;
         }
 
+        // ---------- finjustering per replik (Viterbi över repliker i tidsordning)
+        // Mätpunkterna i Piecewise ligger var 10:e s och ser ±30 s, så ett klipp som bara gäller
+        // 15–60 s (t.ex. en förkortad scen) suddas ut och raderna där hamnar en till flera sekunder fel.
+        // Här får varje replik en egen förskjutning inom ±RefineRange runt den nuvarande. Byte kostar Jump,
+        // så det krävs flera repliker i rad som är överens. Raderna får inte heller hamna i fel ordning.
+        const double RefineRange = 6000, RefineStep = 50, RefineJump = 1.0, RefinePrior = 0.1;
+
+        static double CueScore(Iv[] refIv, double[] refSt, double s, double e)
+        {
+            double on = OnsetKernel(refSt, s), ov = 0;
+            if (e > s)
+            {
+                int r = LowerBoundE(refIv, s);
+                for (; r < refIv.Length && refIv[r].S < e; r++)
+                {
+                    double o = Math.Min(e, refIv[r].E) - Math.Max(s, refIv[r].S);
+                    if (o > 0) ov += o;
+                }
+                ov /= e - s;
+            }
+            return 0.5 * on + 0.5 * ov;
+        }
+
+        static void RefineCues(Iv[] refIv, double[] refSt, List<Cue> tgt, Func<double, double> gT, double[] cueOff)
+        {
+            int n = tgt.Count;
+            if (n < 3) return;
+            int K = (int)Math.Round(2 * RefineRange / RefineStep) + 1, mid = K / 2;
+            var ord = Enumerable.Range(0, n).OrderBy(i => tgt[i].Start).ToArray();
+            var S = new double[n]; var E = new double[n];
+            for (int j = 0; j < n; j++) { int ci = ord[j]; S[j] = gT(tgt[ci].Start) + cueOff[ci]; E[j] = gT(tgt[ci].End) + cueOff[ci]; }
+            const double Inf = 1e18;
+            var dp = new double[K]; var nd = new double[K]; var pre = new double[K]; var preArg = new int[K];
+            var back = new int[n][];
+            Func<int, int, double> local = (j, k) =>
+            {
+                double d = -RefineRange + k * RefineStep;
+                return -CueScore(refIv, refSt, S[j] + d, E[j] + d) + RefinePrior * Math.Abs(d) / RefineRange;
+            };
+            for (int k = 0; k < K; k++) dp[k] = local(0, k);
+            for (int j = 1; j < n; j++)
+            {
+                back[j] = new int[K];
+                // tillåtet: ny start för j får inte ligga före föregående rads nya slut (utöver den överlappning som redan fanns)
+                double origOverlap = Math.Max(0, gT(tgt[ord[j - 1]].End) - gT(tgt[ord[j]].Start));
+                double slack = S[j] - E[j - 1] + origOverlap + 100; // dPrev ≤ dCur + slack
+                pre[0] = dp[0]; preArg[0] = 0;
+                for (int k = 1; k < K; k++) { if (dp[k] < pre[k - 1]) { pre[k] = dp[k]; preArg[k] = k; } else { pre[k] = pre[k - 1]; preArg[k] = preArg[k - 1]; } }
+                bool any = false;
+                for (int k = 0; k < K; k++)
+                {
+                    int maxPrev = (int)Math.Floor((k * RefineStep + slack) / RefineStep + 1e-9);
+                    double best = Inf; int arg = -1;
+                    if (k <= maxPrev) { best = dp[k]; arg = k; }
+                    if (maxPrev >= 0)
+                    {
+                        int mp = Math.Min(K - 1, maxPrev);
+                        if (pre[mp] + RefineJump < best) { best = pre[mp] + RefineJump; arg = preArg[mp]; }
+                    }
+                    if (arg < 0) { nd[k] = Inf; back[j][k] = mid; continue; }
+                    nd[k] = best + local(j, k); back[j][k] = arg; any = true;
+                }
+                if (!any) return; // ordningen går inte att rädda inom intervallet – lämna som det är
+                var t = dp; dp = nd; nd = t;
+            }
+            int last = 0; for (int k = 1; k < K; k++) if (dp[k] < dp[last]) last = k;
+            if (dp[last] >= Inf / 2) return;
+            var path = new int[n]; path[n - 1] = last;
+            for (int j = n - 1; j > 0; j--) path[j - 1] = back[j][path[j]];
+            for (int j = 0; j < n; j++) cueOff[ord[j]] += -RefineRange + path[j] * RefineStep;
+        }
+
         static double CueFit(Iv[] refIv, double[] refSt, List<Cue> tgt, Func<double, double> gT, int ci, double o)
         {
             double sum = 0;
@@ -827,7 +907,7 @@ namespace TextSync
 
         public static List<Cue> ApplyExtra(List<Cue> cues, double extraMs)
         {
-            return cues.Select(c => new Cue(Math.Max(0, c.Start + extraMs), Math.Max(0, c.End + extraMs), c.Text)).ToList();
+            return cues.Select(c => new Cue(Math.Max(0, c.Start + extraMs), Math.Max(0, c.End + extraMs), c.Text) { OrigStart = c.OrigStart }).ToList();
         }
     }
 }

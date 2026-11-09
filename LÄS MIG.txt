@@ -7,7 +7,8 @@ Så här gör du
    Saknar filmen engelsk text men du har en engelsk SRT som inte går i takt:
    dra in filmen + båda SRT-filerna, så synkas den engelska mot ljudet först.
 2. Klicka "Synka". Titta på några rader i listan – den engelska texten
-   bredvid ska betyda samma sak.
+   bredvid ska betyda samma sak, och "Synkad start" ska ligga nära
+   "Referenstid". "Före synk" visar tiden i din osynkade fil.
 3. "Spara SRT…" – sparas som  Filmnamn.sv.srt  bredvid filmen, så hittar
    VLC, Plex, Kodi m.fl. den automatiskt.
    "Lägg in i MKV…" skapar en NY MKV (originalet ändras inte) med texten

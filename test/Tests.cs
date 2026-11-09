@@ -156,6 +156,16 @@ namespace TextSync
                 Eval("D drift 0.08% + 600ms", refc, Distort(other, t => t * 1.0008 + 600), m);
                 Eval("E big offset -95s", refc, Distort(other, t => t - 95000), m);
                 Eval("F fps + cut", refc, Distort(other, t => t * 25 / 23.976 + 1500 + (t > 3000000 ? 12000 : 0)), m);
+                // korta klipp: +1 s i bara 60 s, och ett avsnitt på 20 s före nästa hopp (som Blacklist S04E01 03:29 och 07:18)
+                Eval("G korta klipp (60 s, 20 s)", refc, Distort(other, t => t + 2000 + (t > 600000 && t < 660000 ? 1000 : 0) + (t > 1200000 ? 1800 : 0) + (t > 1220000 ? 4600 : 0)), m);
+            }
+            {   // tiden före synk följer med varje rad (visas i listan), även efter extra förskjutning
+                var inp = Distort(other, t => t * 25 / 23.976 + 1500 + (t > 3000000 ? 12000 : 0));
+                var outp = SyncEngine.ApplyExtra(SyncEngine.Sync(refc, inp, new SyncOptions(), null).Output, 250);
+                var want = inp.Select(c => c.Start).OrderBy(x => x).ToList();
+                var got = outp.Select(c => c.OrigStart).OrderBy(x => x).ToList();
+                bool sameText = outp.All(c => inp.Any(q => q.Text == c.Text && q.Start == c.OrigStart));
+                Console.WriteLine("OrigStart: count={0} allSet={1} same={2} textMatch={3}", got.Count, !got.Any(double.IsNaN), want.SequenceEqual(got), sameText);
             }
 
             int n = 0;

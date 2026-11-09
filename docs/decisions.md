@@ -2,6 +2,15 @@
 
 Nyast först.
 
+## 2026-11-09 – 1.8: finjustering per replik + tidskolumner i listan
+- **Område:** Synk / GUI
+- **Problem (ägaren):** Blacklist S04E01 mot engelska spåret: runt 03:45 kom den svenska texten lite för tidigt. Felsökningen visade två korta klipp som synken missade. Rad 24–40 (03:30–04:33) skulle ha +8,2 s men fick +7,2 s, alltså cirka 1 s för tidigt. Rad 67–71 (07:18–07:38) skulle ha +5,4 s men låg upp till 4,6 s för tidigt och i fel ordning. Mätpunkterna i den styckvisa synken ligger var 10:e s och ser ±30 s, så avsnitt kortare än ungefär en minut suddas ut.
+- **Beslut:** Efter den styckvisa synken körs en finjustering per replik (Viterbi över raderna i tidsordning, ±6 s, steg 50 ms). Varje rad får poäng för repliksstart och överlapp mot referensen. Byte av förskjutning kostar lika mycket som en rads hela poäng, så det krävs flera rader i rad som är överens. Små steg är inte tillåtna, eftersom de bara följde slumpvariationer (medianfelet steg från 27 till 72 ms i testerna). Raderna får inte hamna i fel ordning eller överlappa mer än i originalet. Finjusteringen kan slås av med `SyncOptions.RefineCues` för tester.
+- **Test:** De syntetiska testerna A–F ger exakt samma resultat som förut. Nytt test G (+1 s i 60 s, ett avsnitt på 20 s före nästa hopp) gav 98,5 % inom 0,3 s före och 100 % efter. På Blacklist hittades klippen 03:30, 04:32, 07:18 och 07:45, och Whispers ordtider bekräftar 07:30. Separat engelsk SRT (OrigSrtDiag, samma facit): utan finjustering 85–94 % inom 0,3 s och 5 rader över 1 s, med finjustering 90–100 % och 0 rader över 1 s. Mot ljud A och A+B blev 90 %-felet 383 → 283 ms och 338 → 272 ms. Antalet rader över 1 s är oförändrat: ljudsynken missar fortfarande klippet vid 07:18. B ensam var redan fel (12 s globalt) och påverkas inte.
+- **GUI:** Listan visar nu **Före synk** (tiden i den osynkade filen), **Synkad start/slut** och **Referenstid** (starttiden för referensraden som visas bredvid). Raden får sin tid före synk från synkmotorn (`Cue.OrigStart`) och behåller den när man ändrar den. En tillagd rad visar "— (ny rad)". Kolumnen **Flyttad** visar hur mycket raden flyttades efter omräkningen av bildfrekvensen, alltså samma tal som "Avsnitt" i resultatet. Ett klipp syns som ett hopp i kolumnen. Textkolumnerna fyller bredden, så att listan inte får en vågrät rullist.
+- **Product-check:** Ägaren valde kolumnen Flyttad. Att färga rader där synkad start skiljer sig från referenstiden valdes bort, eftersom svenska ofta slår ihop två engelska repliker och det skulle ge falsklarm. Fönstret startar nu 1000 px högt i stället för 800 (begränsat till skärmen), eftersom listan bara visade cirka 3 rader.
+- **Nivå:** LIVE
+
 ## 2026-11-09 – Varning innan Whisper körs på processorn
 - **Område:** GUI
 - **Beslut:** Är processorn vald och Whisper-resultatet för filmen inte redan sparat i cachen, frågar programmet innan det startar: det tar ungefär lika lång tid som filmen. Det gäller Ljud B, A+B, Whisper-kontrollen och originaltexten.

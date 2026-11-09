@@ -14,7 +14,7 @@ src/
   Log.cs           Loggfil i %LOCALAPPDATA%\TextSync\log.txt
   TextSync.ico     Programikon
 test/
-  Tests.cs         Tester: synk i 6 scenarier × 3 metoder, SRT/teckenkodningar, dra-och-släpp-fördelning,
+  Tests.cs         Tester: synk i 7 scenarier × 3 metoder (G = korta klipp), tid före synk, SRT/teckenkodningar, dra-och-släpp-fördelning,
                    spara med säkerhetskopia, MKV-läsning (egen MKV-skrivare, avkortade filer), mkvmerge-inbäddning
   Diag.cs          Felsökning mot riktiga filer: skriver ut avsnitt, träffsäkerhet och rader utan referens
   AudioDiag.cs     Jämför ljudsynk A, B och A+B mot facit (synk mot filmens undertextspår)
@@ -31,4 +31,5 @@ docs/              Beslut, drift, FAQ, nästa fas (next.md)
 2. **Lokala mätpunkter:** var 10:e sekund (±30 s fönster) beräknas hur väl varje förskjutning inom ±20 s passar. Måttet är 50 % överlapp och 50 % träff på repliksstarter. Starterna gör träffen skarp i tät dialog.
 3. **Linjär drift** anpassas robust till mätpunkterna.
 4. **Styckvis synk (Viterbi):** hittar avsnitt med olika förskjutning, alltså klipp och reklampauser. Vid varje hopp prövas alla repliker ±25 s runt gränsen, och en enda brytpunkt väljs.
-5. **Smart**-läget väljer styckvis synk bara när den är klart bättre än linjär.
+5. **Finjustering per replik:** en andra Viterbi över raderna (±6 s) hittar korta klipp (15–60 s) som mätpunkterna missar. Byte kräver flera rader som är överens, och raderna får inte byta ordning.
+6. **Smart**-läget väljer styckvis synk bara när den är klart bättre än linjär.

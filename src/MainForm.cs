@@ -73,7 +73,7 @@ namespace TextSync
             Font = new Font("Segoe UI", 9.5F);
             BackColor = Bg;
             MinimumSize = new Size(940, 600);
-            Size = new Size(1080, 800);
+            Size = new Size(1080, 1000);
             StartPosition = FormStartPosition.Manual;
             try { Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath); } catch { }
             AllowDrop = true;
@@ -212,10 +212,21 @@ namespace TextSync
             float k = 1f;
             using (var gr = CreateGraphics()) k = gr.DpiX / 96f;
             list.Columns.Add("#", (int)(50 * k), HorizontalAlignment.Right);
-            list.Columns.Add("Start", (int)(95 * k));
-            list.Columns.Add("Slut", (int)(95 * k));
-            list.Columns.Add("Synkad text", (int)(380 * k));
-            list.Columns.Add("Referens (samtidigt)", (int)(380 * k));
+            list.Columns.Add("Före synk", (int)(95 * k));
+            list.Columns.Add("Synkad start", (int)(95 * k));
+            list.Columns.Add("Synkad slut", (int)(95 * k));
+            list.Columns.Add("Flyttad", (int)(75 * k), HorizontalAlignment.Right);
+            list.Columns.Add("Synkad text", (int)(300 * k));
+            list.Columns.Add("Referenstid", (int)(95 * k));
+            list.Columns.Add("Referens (samtidigt)", (int)(300 * k));
+            // textkolumnerna delar på bredden som blir över, så att listan inte får en vågrät rullist
+            list.ClientSizeChanged += (s, e) =>
+            {
+                int fixedW = 0;
+                foreach (ColumnHeader ch in list.Columns) if (ch.Index != 5 && ch.Index != 7) fixedW += ch.Width;
+                int w = Math.Max((int)(150 * k), (list.ClientSize.Width - fixedW - 2) / 2);
+                list.Columns[5].Width = w; list.Columns[7].Width = w;
+            };
             list.SelectedIndexChanged += (s, e) =>
             {
                 if (list.SelectedIndices.Count > 0 && synced != null)
@@ -728,7 +739,7 @@ namespace TextSync
             using (var d = new CueDialog("Ändra rad " + (i + 1), shown.Start, shown.End, shown.Text))
             {
                 if (d.ShowDialog(this) != DialogResult.OK) return;
-                var nc = new Cue(d.StartMs - extra, d.EndMs - extra, d.CueText);
+                var nc = new Cue(d.StartMs - extra, d.EndMs - extra, d.CueText) { OrigStart = result.Output[i].OrigStart };
                 var list2 = new List<Cue>(result.Output);
                 list2[i] = nc;
                 Changed(list2, nc, "Rad " + (i + 1) + " ändrad.", "Ändrade rad " + (i + 1));
@@ -1130,14 +1141,20 @@ namespace TextSync
                 var c = synced[i];
                 if (c.End <= 0) lost++;
                 while (ri < refc.Count && refc[ri].End < c.Start) ri++;
-                string best = ""; double bestOv = 0;
+                string best = ""; double bestOv = 0, bestStart = 0;
                 for (int j = Math.Max(0, ri - 2); j < refc.Count && refc[j].Start < c.End; j++)
                 {
                     double ov = Math.Min(c.End, refc[j].End) - Math.Max(c.Start, refc[j].Start);
-                    if (ov > bestOv) { bestOv = ov; best = refc[j].Text; }
+                    if (ov > bestOv) { bestOv = ov; best = refc[j].Text; bestStart = refc[j].Start; }
                 }
-                var it = new ListViewItem(new[] { (i + 1).ToString(), Srt.FormatTime(c.Start), Srt.FormatTime(c.End),
-                    c.Text.Replace("\n", " / "), bestOv > 0 ? best.Replace("\n", " / ") : "— (ingen referenstext samtidigt)" });
+                var it = new ListViewItem(new[] { (i + 1).ToString(),
+                    double.IsNaN(c.OrigStart) ? "— (ny rad)" : Srt.FormatTime(c.OrigStart),
+                    Srt.FormatTime(c.Start), Srt.FormatTime(c.End),
+                    // flyttad efter bildfrekvensomräkning – samma tal som "Avsnitt" i resultatet
+                    double.IsNaN(c.OrigStart) ? "" : Fmt((c.Start - c.OrigStart * result.Scale) / 1000, "+0.00;-0.00;0.00") + " s",
+                    c.Text.Replace("\n", " / "),
+                    bestOv > 0 ? Srt.FormatTime(bestStart) : "—",
+                    bestOv > 0 ? best.Replace("\n", " / ") : "— (ingen referenstext samtidigt)" });
                 if (bestOv <= 0) it.ForeColor = RedRow;
                 rowMatched[i] = bestOv > 0;
                 items.Add(it);
