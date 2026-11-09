@@ -2,6 +2,14 @@
 
 Nyast först.
 
+## 2026-11-09 – 1.9: listan visar alla rader i båda texterna
+- **Område:** GUI
+- **Problem (ägaren):** Listan visade inte alla rader i den engelska texten. Den hade en rad per svensk replik, med bara den engelska rad som överlappade mest bredvid. När en svensk rad täckte två engelska syntes bara den ena, och engelska rader utan svensk rad samtidigt syntes inte alls.
+- **Beslut:** Varje engelsk rad som inte redan står bredvid en svensk rad får en egen grå rad i tidsordning, med tomma svenska kolumner. Grå rader sparas aldrig och kan inte tas bort. Dubbelklick eller Enter på en grå rad öppnar "Lägg till rad" med den engelska radens tid. Resultatet visar antalet grå rader. Procenten och de röda raderna räknas som förut, bara på svenska rader. "(tal)"-avsnitt från taldetekteringen (Ljud A) visas inte som grå rader, eftersom de inte är text.
+- **Teknik:** Listrader och synkade rader har egna index (`rowCue`/`cueRow`). Redigera, ta bort, F3 och markeringen efter en ändring går via dem.
+- **Product-check:** Claude granskade själv (liten GUI-ändring). Det finns inget val för att dölja de grå raderna, eftersom ägaren ville se alla rader. Det kan läggas till om listan blir för lång.
+- **Nivå:** LIVE
+
 ## 2026-11-09 – 1.8: finjustering per replik + tidskolumner i listan
 - **Område:** Synk / GUI
 - **Problem (ägaren):** Blacklist S04E01 mot engelska spåret: runt 03:45 kom den svenska texten lite för tidigt. Felsökningen visade två korta klipp som synken missade. Rad 24–40 (03:30–04:33) skulle ha +8,2 s men fick +7,2 s, alltså cirka 1 s för tidigt. Rad 67–71 (07:18–07:38) skulle ha +5,4 s men låg upp till 4,6 s för tidigt och i fel ordning. Mätpunkterna i den styckvisa synken ligger var 10:e s och ser ±30 s, så avsnitt kortare än ungefär en minut suddas ut.

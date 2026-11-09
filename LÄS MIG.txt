@@ -18,6 +18,8 @@ Bra att veta
 - Skriver du över originalfilen sparas en kopia i mappen "Text Sync original".
 - Röda rader saknar engelsk text samtidigt – ofta helt rätt (t.ex. utrop).
   Bra synk = 98–100 % av raderna. F3 hoppar till nästa röda rad.
+- Listan visar alla rader i båda texterna. Grå rader är engelska rader
+  utan egen svensk rad; de sparas inte. Dubbelklick = lägg till svensk rad där.
 - Redigera i listan: dubbelklick = ändra text/tid, Insert = lägg till,
   Delete = ta bort, Ctrl+Z = ångra.
 - "Extra justering": 500 = en halv sekund senare, -500 = tidigare.

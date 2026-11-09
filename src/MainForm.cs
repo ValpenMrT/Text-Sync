@@ -31,7 +31,11 @@ namespace TextSync
         static readonly string Caption = "Text Sync " + Program.Version;
         readonly Stack<List<Cue>> undo = new Stack<List<Cue>>(); // för att ångra ändringar av rader
         const double MatchThreshold = 0.95;   // andel rader som ska ha referenstext samtidigt
-        bool[] rowMatched;
+        bool[] rowMatched;             // per synkad rad: har referenstext samtidigt
+        int[] rowCue;                  // listrad -> index i synced, -1 = grå referensrad utan egen synkad rad
+        int[] cueRow;                  // index i synced -> listrad
+        Cue[] rowRef;                  // listrad -> referensraden som visas (eller null)
+        static readonly Color RefOnlyRow = HC ? SystemColors.GrayText : Color.FromArgb(110, 110, 110);
         LinkLabel undoLink;
         Label gpuLabel; ComboBox gpuCombo; List<int> gpuDevices; bool gpuFilling;
         List<Cue> transcript; string transcriptLang = ""; // Whisper-text från senaste ljudsynk
@@ -229,14 +233,18 @@ namespace TextSync
             };
             list.SelectedIndexChanged += (s, e) =>
             {
-                if (list.SelectedIndices.Count > 0 && synced != null)
+                if (list.SelectedIndices.Count > 0 && synced != null && rowCue != null && list.SelectedIndices[0] < rowCue.Length)
                 {
-                    var c = synced[list.SelectedIndices[0]];
-                    timeline.Center = (c.Start + c.End) / 2; timeline.Highlight = c; timeline.Invalidate();
+                    int row = list.SelectedIndices[0];
+                    int ci = rowCue[row];
+                    var c = ci >= 0 ? synced[ci] : rowRef[row];
+                    if (c == null) return;
+                    timeline.Center = (c.Start + c.End) / 2; timeline.Highlight = ci >= 0 ? c : null; timeline.Invalidate();
                 }
             };
             // redigera rader: dubbelklick/Enter = ändra, Insert = lägg till, Delete = ta bort, F3 = nästa röda rad, Ctrl+Z = ångra
             list.MultiSelect = true;
+            list.ShowItemToolTips = true;
             list.DoubleClick += (s, e) => EditSelected();
             list.KeyDown += (s, e) =>
             {
@@ -255,8 +263,10 @@ namespace TextSync
             menu.Opening += (s, e) =>
             {
                 if (synced == null || busy) { e.Cancel = true; return; }
-                int n = list.SelectedIndices.Count;
-                miEdit.Enabled = n == 1;
+                int n = SelectedCues().Count;
+                bool refOnly = list.SelectedIndices.Count == 1 && rowCue != null && rowCue[list.SelectedIndices[0]] < 0;
+                miEdit.Text = refOnly ? "Lägg till rad här…" : "Ändra rad…";
+                miEdit.Enabled = (n == 1 && list.SelectedIndices.Count == 1) || refOnly;
                 miDel.Enabled = n > 0;
                 miDel.Text = n > 1 ? "Ta bort " + n + " markerade rader" : "Ta bort markerad rad";
                 miNext.Enabled = rowMatched != null && rowMatched.Any(m => !m);
@@ -682,6 +692,7 @@ namespace TextSync
         {
             result = null; synced = null; refCuesUsed = null; unsaved = false;
             if (list != null) list.Items.Clear();
+            rowCue = null; cueRow = null; rowRef = null;
             if (resultLabel != null) resultLabel.Visible = false;
             if (openLink != null) openLink.Visible = false;
             undo.Clear(); rowMatched = null; transcript = null; origSynced = null; origUsed = null; if (saveTextBtn != null) saveTextBtn.Visible = false;
@@ -691,9 +702,23 @@ namespace TextSync
         }
 
         // ------------------------------------------------------------ redigera rader (med ångra)
-        void SelectRow(int i)
+        // Markerade rader som index i synced (grå referensrader hoppas över)
+        List<int> SelectedCues()
+        {
+            var r = new List<int>();
+            if (rowCue == null) return r;
+            foreach (int row in list.SelectedIndices)
+                if (row < rowCue.Length && rowCue[row] >= 0) r.Add(rowCue[row]);
+            r.Sort();
+            return r;
+        }
+
+        // Markera synkad rad nummer ci (index i synced)
+        void SelectRow(int ci)
         {
             list.SelectedIndices.Clear();
+            if (cueRow == null || ci < 0 || ci >= cueRow.Length) return;
+            int i = cueRow[ci];
             if (i < 0 || i >= list.Items.Count) return;
             list.Items[i].Selected = true; list.Items[i].Focused = true; list.EnsureVisible(i);
             list.Focus();
@@ -718,7 +743,12 @@ namespace TextSync
         void DeleteSelected()
         {
             if (busy || result == null || list.SelectedIndices.Count == 0) return;
-            var idx = list.SelectedIndices.Cast<int>().OrderBy(i => i).ToList();
+            var idx = SelectedCues();
+            if (idx.Count == 0)
+            {
+                SetStatus("Grå rader kommer från referensen och sparas inte – de kan inte tas bort.", false);
+                return;
+            }
             if (idx.Count == result.Output.Count)
             {
                 SetStatus("Minst en rad måste finnas kvar.", false);
@@ -733,7 +763,10 @@ namespace TextSync
         void EditSelected()
         {
             if (busy || result == null || list.SelectedIndices.Count != 1) return;
-            int i = list.SelectedIndices[0];
+            int row = list.SelectedIndices[0];
+            if (rowCue == null || row >= rowCue.Length) return;
+            if (rowCue[row] < 0) { AddRow(rowRef[row]); return; }   // grå referensrad: lägg till en egen rad på samma tid
+            int i = rowCue[row];
             var shown = synced[i];
             double extra = (double)extraNum.Value;
             using (var d = new CueDialog("Ändra rad " + (i + 1), shown.Start, shown.End, shown.Text))
@@ -746,14 +779,20 @@ namespace TextSync
             }
         }
 
-        void AddRow()
+        void AddRow() { AddRow(null); }
+
+        // at = grå referensrad att ta tiden från, annars hamnar raden efter den markerade
+        void AddRow(Cue at)
         {
             if (busy || result == null) return;
             double extra = (double)extraNum.Value;
             double start = 0;
-            if (list.SelectedIndices.Count > 0) start = synced[list.SelectedIndices[list.SelectedIndices.Count - 1]].End + 200;
+            var selCues = SelectedCues();
+            if (at != null) start = at.Start;
+            else if (selCues.Count > 0) start = synced[selCues[selCues.Count - 1]].End + 200;
             else if (synced.Count > 0) start = synced[synced.Count - 1].End + 200;
-            using (var d = new CueDialog("Lägg till rad", start, start + 2000, ""))
+            double end = at != null ? at.End : start + 2000;
+            using (var d = new CueDialog("Lägg till rad", start, end, ""))
             {
                 if (d.ShowDialog(this) != DialogResult.OK) return;
                 var nc = new Cue(d.StartMs - extra, d.EndMs - extra, d.CueText);
@@ -777,7 +816,13 @@ namespace TextSync
         void NextUnmatched()
         {
             if (rowMatched == null || rowMatched.Length == 0) return;
-            int from = list.SelectedIndices.Count > 0 ? list.SelectedIndices[0] + 1 : 0;
+            int from = 0;
+            if (list.SelectedIndices.Count > 0 && rowCue != null)
+            {
+                // första synkade raden efter den markerade listraden
+                int row = list.SelectedIndices[0];
+                for (int r = row + 1; r < rowCue.Length; r++) if (rowCue[r] >= 0) { from = rowCue[r]; break; }
+            }
             for (int k = 0; k < rowMatched.Length; k++)
             {
                 int i = (from + k) % rowMatched.Length;
@@ -1118,6 +1163,8 @@ namespace TextSync
             if (r.FpsText.Length > 0) sb.Append(r.FpsText + "\n");
             foreach (var n in r.Notes) sb.Append("⚠  " + n + "\n");
             if (!good) sb.Append("Under 95 % av raderna har referenstext samtidigt – granska de röda raderna (F3 hoppar till nästa).\n");
+            int refOnlyRows = rowCue != null ? rowCue.Count(x => x < 0) : 0;
+            if (refOnlyRows > 0) sb.Append("Listan visar alla rader i båda texterna. " + refOnlyRows + " grå rader är referensrader utan egen synkad rad och sparas inte.\n");
             sb.Append("Redigera i listan: dubbelklicka för att ändra text och tid, Insert lägger till, Delete tar bort, Ctrl+Z ångrar.");
             resultLabel.Text = sb.ToString().TrimEnd();
             resultLabel.ForeColor = good ? OkColor : ErrColor;
@@ -1128,43 +1175,87 @@ namespace TextSync
         void RefreshPreview()
         {
             if (result == null) return;
-            int sel = list.SelectedIndices.Count > 0 ? list.SelectedIndices[0] : -1;
+            // behåll markeringen: synkad rad, annars den grå referensraden
+            int selCue = -1; Cue selRef = null;
+            if (list.SelectedIndices.Count > 0 && rowCue != null && list.SelectedIndices[0] < rowCue.Length)
+            {
+                int row = list.SelectedIndices[0];
+                selCue = rowCue[row]; if (selCue < 0) selRef = rowRef[row];
+            }
             synced = SyncEngine.ApplyExtra(result.Output, (double)extraNum.Value);
-            var refc = refCuesUsed;
-            list.BeginUpdate();
-            list.Items.Clear();
+            var refc = refCuesUsed ?? new List<Cue>();
             int ri = 0, lost = 0;
-            var items = new List<ListViewItem>(synced.Count);
             rowMatched = new bool[synced.Count];
+
+            // 1) den referensrad som överlappar mest, för varje synkad rad
+            var best = new Cue[synced.Count];
+            var shownRef = new HashSet<Cue>();
             for (int i = 0; i < synced.Count; i++)
             {
                 var c = synced[i];
                 if (c.End <= 0) lost++;
                 while (ri < refc.Count && refc[ri].End < c.Start) ri++;
-                string best = ""; double bestOv = 0, bestStart = 0;
+                double bestOv = 0;
                 for (int j = Math.Max(0, ri - 2); j < refc.Count && refc[j].Start < c.End; j++)
                 {
                     double ov = Math.Min(c.End, refc[j].End) - Math.Max(c.Start, refc[j].Start);
-                    if (ov > bestOv) { bestOv = ov; best = refc[j].Text; bestStart = refc[j].Start; }
+                    if (ov > bestOv) { bestOv = ov; best[i] = refc[j]; }
                 }
-                var it = new ListViewItem(new[] { (i + 1).ToString(),
-                    double.IsNaN(c.OrigStart) ? "— (ny rad)" : Srt.FormatTime(c.OrigStart),
-                    Srt.FormatTime(c.Start), Srt.FormatTime(c.End),
-                    // flyttad efter bildfrekvensomräkning – samma tal som "Avsnitt" i resultatet
-                    double.IsNaN(c.OrigStart) ? "" : Fmt((c.Start - c.OrigStart * result.Scale) / 1000, "+0.00;-0.00;0.00") + " s",
-                    c.Text.Replace("\n", " / "),
-                    bestOv > 0 ? Srt.FormatTime(bestStart) : "—",
-                    bestOv > 0 ? best.Replace("\n", " / ") : "— (ingen referenstext samtidigt)" });
-                if (bestOv <= 0) it.ForeColor = RedRow;
-                rowMatched[i] = bestOv > 0;
-                items.Add(it);
+                rowMatched[i] = best[i] != null;
+                if (best[i] != null) shownRef.Add(best[i]);
             }
+
+            // 2) referensrader som inte redan står bredvid en synkad rad får en egen grå rad i tidsordning,
+            //    så att listan visar alla rader i båda texterna. "(tal)" från taldetekteringen är ingen text och visas inte.
+            var extraRef = refc.Where(r => !shownRef.Contains(r) && r.Text != "(tal)").OrderBy(r => r.Start).ToList();
+            int total = synced.Count + extraRef.Count;
+            rowCue = new int[total]; rowRef = new Cue[total]; cueRow = new int[synced.Count];
+            var items = new List<ListViewItem>(total);
+            int si = 0, ei = 0;
+            while (si < synced.Count || ei < extraRef.Count)
+            {
+                bool takeRef = ei < extraRef.Count && (si >= synced.Count || extraRef[ei].Start < synced[si].Start);
+                int row = items.Count;
+                if (takeRef)
+                {
+                    var r = extraRef[ei++];
+                    var it = new ListViewItem(new[] { "", "", "", "", "", "",
+                        Srt.FormatTime(r.Start), r.Text.Replace("\n", " / ") });
+                    it.ForeColor = RefOnlyRow;
+                    it.ToolTipText = "Referensrad utan egen synkad rad – sparas inte. Dubbelklicka för att lägga till en rad på samma tid.";
+                    rowCue[row] = -1; rowRef[row] = r;
+                    items.Add(it);
+                }
+                else
+                {
+                    int i = si++;
+                    var c = synced[i]; var bc = best[i];
+                    var it = new ListViewItem(new[] { (i + 1).ToString(),
+                        double.IsNaN(c.OrigStart) ? "— (ny rad)" : Srt.FormatTime(c.OrigStart),
+                        Srt.FormatTime(c.Start), Srt.FormatTime(c.End),
+                        // flyttad efter bildfrekvensomräkning – samma tal som "Avsnitt" i resultatet
+                        double.IsNaN(c.OrigStart) ? "" : Fmt((c.Start - c.OrigStart * result.Scale) / 1000, "+0.00;-0.00;0.00") + " s",
+                        c.Text.Replace("\n", " / "),
+                        bc != null ? Srt.FormatTime(bc.Start) : "—",
+                        bc != null ? bc.Text.Replace("\n", " / ") : "— (ingen referenstext samtidigt)" });
+                    if (bc == null) it.ForeColor = RedRow;
+                    rowCue[row] = i; rowRef[row] = bc; cueRow[i] = row;
+                    items.Add(it);
+                }
+            }
+            list.BeginUpdate();
+            list.Items.Clear();
             list.Items.AddRange(items.ToArray());
-            if (sel >= 0 && sel < list.Items.Count) { list.Items[sel].Selected = true; list.EnsureVisible(sel); }
+            int selRow = -1;
+            if (selCue >= 0 && selCue < cueRow.Length) selRow = cueRow[selCue];
+            else if (selRef != null) selRow = Array.IndexOf(rowRef, selRef);
+            if (selRow >= 0 && selRow < list.Items.Count) { list.Items[selRow].Selected = true; list.EnsureVisible(selRow); }
             list.EndUpdate();
+            int sel = selRow >= 0 ? rowCue[selRow] : -1;
 
             timeline.Ref = refc; timeline.Orig = tgtCues; timeline.Synced = synced;
             if (sel >= 0 && sel < synced.Count) timeline.Highlight = synced[sel];
+            else if (selRow >= 0 && selRef != null) { timeline.Highlight = null; timeline.Center = (selRef.Start + selRef.End) / 2; }
             else if (synced.Count > 0) { timeline.Highlight = null; timeline.Center = synced[0].Start + 20000; }
             timeline.Invalidate();
             if (lost > 0) SetStatus(lost + " repliker hamnar före filmens början och tas bort när du sparar.", false);

@@ -14,6 +14,9 @@ Text Sync är inte signerat med ett köpt certifikat.
 **Vad betyder röda rader och procenten?**
 Röda rader har ingen engelsk text samtidigt. Det är ofta helt rätt, till exempel ett utrop eller textarens namn. Procenten visar hur många rader som *har* engelsk text samtidigt, och en lyckad synk brukar ge 98–100 %. Under 95 % frågar programmet innan det sparar. Tryck **F3** för att hoppa till nästa röda rad. Är många rader röda i följd har synken gått fel. Prova då metoden **Avancerad**, eller välj ett annat engelskt spår.
 
+**Vad betyder grå rader?**
+Listan visar alla rader i både den svenska och den engelska texten. En grå rad är en engelsk rad som inte står bredvid någon svensk rad, till exempel när en svensk rad täcker två engelska. Grå rader sparas aldrig. Dubbelklicka på en grå rad om du vill lägga till en svensk rad på samma tid.
+
 **Kan jag ändra, lägga till eller ta bort rader?**
 Ja, i listan:
 - **Dubbelklick** eller **Enter** ändrar text och tid.
