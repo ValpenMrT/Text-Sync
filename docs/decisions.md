@@ -2,6 +2,11 @@
 
 Nyast först.
 
+## 2026-11-09 – Commit efter varje ändring, product-check före varje commit
+- **Område:** Arbetssätt
+- **Beslut (ägaren):** Claude committar efter varje ändring, när bygget och testerna går igenom. Product-check körs före varje commit, men inte före push. Bara egna ändringar committas, eftersom en annan session kan arbeta i samma filer samtidigt.
+- **Nivå:** LIVE
+
 ## 2026-11-09 – 2.0: filter i listan, mörkt läge, förslag om att dela och slå ihop rader
 - **Område:** GUI / synk
 - **Önskemål (ägaren):** dölja grå rader, visa bara röda rader, mörkt läge, och matcha de svenska raderna mot de engelska (två svenska rader kan slås ihop till en, och en kan delas i två).

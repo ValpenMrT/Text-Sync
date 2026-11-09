@@ -11,7 +11,8 @@
 - Nästa arbete börjar med att gå igenom **"Obesvarade frågor"** i `README.md` med ägaren, och sedan `docs/next.md` (önskemål och kvarstående fynd). Stryk en fråga ur README när den är besvarad och för in svaret i `docs/decisions.md`.
 
 ## Arbetssätt
-- Kör skillen `product-check` innan commit och push.
+- Committa efter varje ändring, när bygget och testerna går igenom (`build.ps1 -Test`). Committa bara det du själv har ändrat: en annan session kan arbeta i samma filer samtidigt (stadga då bara dina delar, t.ex. med `git apply --cached`).
+- Kör skillen `product-check` före varje commit. Före push behövs den inte.
 - Beslut förs in i `docs/decisions.md`, nyast först.
 - Användarhjälpen finns i `docs/faq.md`, i snabbstarten i `README.md` och i `ShowHelp()` i `src/MainForm.cs`. Tabellen i `docs/structure.md` visar vad som ska stå var.
 - Python finns inte på datorn. Ändra filer med Edit eller PowerShell.
