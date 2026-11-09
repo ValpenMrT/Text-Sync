@@ -49,7 +49,9 @@ namespace TextSync
         readonly HashSet<string> rejected = new HashSet<string>();   // avvisade förslag (AlignProposal.Key)
         bool refIsText;                // referensen är riktig text (inte ljud), så att raderna kan matchas
         LinkLabel undoLink;
-        Label gpuLabel; ComboBox gpuCombo; List<int> gpuDevices; bool gpuFilling;
+        Label gpuLabel; ComboBox gpuCombo; List<int> gpuDevices; bool gpuFilling, gpuPending;
+        // ljudspår för ljudsynk och Whisper (visas bara när filmen har mer än ett ljudspår)
+        Label audioLabel; ComboBox audioCombo; FlowLayoutPanel audioRow; bool audioFilling;
         List<Cue> transcript; string transcriptLang = ""; // Whisper-text från senaste ljudsynk
         List<Cue> origSynced; OrigSrtOption origUsed; string origLang = "";    // originaltexten (t.ex. engelska) efter synk mot ljudet
         LinkLabel saveTextBtn;
@@ -162,7 +164,7 @@ namespace TextSync
             gpuCombo = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 280, Margin = new Padding(0, 3, 12, 0), Visible = false, AccessibleName = "Grafikkort för taligenkänning" };
             gpuCombo.SelectedIndexChanged += (s, e) =>
             {
-                if (gpuFilling || gpuCombo.SelectedIndex < 0) return;
+                if (gpuFilling || gpuDevices == null || gpuCombo.SelectedIndex < 0 || gpuCombo.SelectedIndex >= gpuDevices.Count) return;
                 int dev = gpuDevices[gpuCombo.SelectedIndex];
                 Audio.WhisperDevice = dev;
                 Tools.SetSetting("gpu", dev < 0 ? "cpu" : dev.ToString());
@@ -175,8 +177,14 @@ namespace TextSync
             origLink.LinkClicked += (s, e) => BrowseOrig();
             var irow = new FlowLayoutPanel { AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, WrapContents = false, Dock = DockStyle.Fill, Margin = new Padding(0) };
             irow.Controls.Add(refInfo); irow.Controls.Add(origLink);
-            var rinfo = new TableLayoutPanel { AutoSize = true, ColumnCount = 1, RowCount = 2, Dock = DockStyle.Fill, Margin = new Padding(0) };
-            rinfo.Controls.Add(trow, 0, 0); rinfo.Controls.Add(irow, 0, 1);
+            audioLabel = new Label { Text = "Lj&udspår:", AutoSize = true, Margin = new Padding(0, 7, 6, 0) };
+            audioCombo = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 460, Margin = new Padding(0, 3, 12, 0), AccessibleName = "Ljudspår för synk mot ljudet" };
+            audioCombo.SelectedIndexChanged += (s, e) => { if (!audioFilling && audioCombo.SelectedIndex >= 0) SetAudioIndex(audioCombo.SelectedIndex); };
+            audioRow = new FlowLayoutPanel { AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, WrapContents = false, Margin = new Padding(0, 2, 0, 0), Visible = false };
+            audioRow.Controls.Add(audioLabel); audioRow.Controls.Add(audioCombo);
+            var rinfo = new TableLayoutPanel { AutoSize = true, ColumnCount = 1, RowCount = 3, Dock = DockStyle.Fill, Margin = new Padding(0) };
+            rinfo.Controls.Add(trow, 0, 0); rinfo.Controls.Add(audioRow, 0, 1); rinfo.Controls.Add(irow, 0, 2);
+            Tools.GpuScan();   // letar efter NVIDIA-kort i bakgrunden redan nu, så att listan Grafikkort är klar när den behövs
             root.Controls.Add(MakeCard("1.  Referens – undertext i takt med filmen (textspår i MKV eller SRT) eller filmens ljud", refBox, refBtn, rinfo), 0, 1);
 
             // --- 2. mål
@@ -685,6 +693,7 @@ namespace TextSync
             refBox.Text = path; refLoadedPath = path;
             mkvPath = null; refSrtCues = null;
             trackCombo.Items.Clear(); trackCombo.Visible = trackLabel.Visible = false;
+            audioFilling = true; audioCombo.Items.Clear(); audioFilling = false; audioRow.Visible = false; refAudioIndex = 0;
             origLink.Visible = false; origLink.Text = "Lägg till undertext på filmens originalspråk (SRT)…"; refInfoDefault = "";
             ClearResult();
             if (path.Length == 0) { refInfo.Text = ""; return; }
@@ -708,22 +717,30 @@ namespace TextSync
                     var subs = tracks.Where(t => t.IsSubtitle).ToList();
                     var text = subs.Where(t => t.IsText).ToList();
                     foreach (var t in text) trackCombo.Items.Add(t);
-                    // ljudsynk: alltid möjlig när ljud finns (för MKV: standardljudspåret)
-                    var audio = tracks.Where(t => t.Type == 2).ToList();
-                    int aIdx = Math.Max(0, audio.FindIndex(t => t.Default));
-                    string aDesc = audio.Count > 1 ? "ljudspår " + (aIdx + 1) + ", " + MkvTrack.LanguageName(audio[aIdx].Language) : "";
+                    // ljudsynk: alltid möjlig när ljud finns. Har filmen flera ljudspår väljs ett i listan Ljudspår.
+                    var audio = tracks.Where(t => t.Type == 2).Select(t => new Audio.AudioStream
+                    { Language = t.Language, Name = t.Name, Default = t.Default, Commentary = Audio.LooksLikeCommentary(t.Name) }).ToList();
                     foreach (var t in text.Where(x => !x.Forced))
-                        trackCombo.Items.Add(new TextCheckOption { Track = t, AudioIndex = aIdx });
+                        trackCombo.Items.Add(new TextCheckOption { Track = t });
                     int firstAudio = trackCombo.Items.Count;
                     foreach (AudioMode m in new[] { AudioMode.Speech, AudioMode.Whisper, AudioMode.Combined })
-                        trackCombo.Items.Add(new AudioRefOption { Mode = m, AudioIndex = aIdx, AudioDesc = aDesc });
+                        trackCombo.Items.Add(new AudioRefOption { Mode = m });
                     trackCombo.Visible = trackLabel.Visible = true;
-                    refAudioIndex = aIdx;
+                    FillAudio(audio);
+                    // andra format än MKV: ljudspåren läses med ffprobe i bakgrunden (om ffmpeg redan är nedladdat)
+                    if (!IsMkv(path) && Audio.IsVideo(path) && Tools.FindFfprobe() != null)
+                    {
+                        string p0 = path;
+                        Task.Run(() => Audio.ListAudioStreams(p0)).ContinueWith(t =>
+                        {
+                            if (!IsDisposed && !t.IsFaulted && t.Result.Count > 1 && refLoadedPath == p0 && mkvPath == p0 && !busy) FillAudio(t.Result);
+                        }, TaskScheduler.FromCurrentSynchronizationContext());
+                    }
                     origLink.Visible = audio.Count > 0 || Audio.IsVideo(path);
                     if (text.Count == 0)
                     {
                         // ingen textundertext: synka mot ljudet. A+B om Whisper redan finns, annars A (snabbt, ingen stor nedladdning)
-                        bool whisperReady = Tools.IsInstalled(Tools.WhisperPackage) && Tools.IsInstalled(Tools.ModelPackage);
+                        bool whisperReady = Tools.WhisperReady();
                         trackCombo.SelectedIndex = firstAudio + (whisperReady ? 2 : 0);
                         refInfo.Text = subs.Count > 0
                             ? "Bara bildbaserade undertexter (PGS/VobSub) – synkar mot filmens ljud i stället."
@@ -1054,8 +1071,9 @@ namespace TextSync
             syncBtn.Enabled = !busy && haveRef && tgtCues != null;
             saveBtn.Enabled = !busy && synced != null;
             muxBtn.Enabled = !busy && synced != null;
-            foreach (Control c in new Control[] { refBox, tgtBox, refBtn, tgtBtn, trackCombo, modeCombo, fpsCheck, extraNum, langBox, encCombo, gpuCombo, origLink })
+            foreach (Control c in new Control[] { refBox, tgtBox, refBtn, tgtBtn, trackCombo, modeCombo, fpsCheck, extraNum, langBox, encCombo, gpuCombo, audioCombo, origLink })
                 if (c != null) c.Enabled = !busy;
+            gpuCombo.Enabled = !busy && !gpuPending;
         }
 
         void SetBusy(bool b, string status)
@@ -1087,22 +1105,69 @@ namespace TextSync
             if (p != null) { try { if (!p.HasExited) p.Kill(); } catch { } }
         }
 
+        // ------------------------------------------------------------ ljudspår
+        // Fyller listan Ljudspår. Den visas bara när filmen har mer än ett ljudspår och referensen använder ljudet.
+        void FillAudio(List<Audio.AudioStream> audio)
+        {
+            audioFilling = true;
+            audioCombo.Items.Clear();
+            for (int i = 0; i < audio.Count; i++)
+            {
+                var s = audio[i];
+                audioCombo.Items.Add("Ljudspår " + (i + 1) + ": " + MkvTrack.LanguageName(s.Language.Length > 0 ? s.Language : "und") +
+                    (s.Name.Length > 0 ? " – " + s.Name : "") + (s.Default ? " (standard)" : ""));
+            }
+            int pick = audio.Count > 0 ? Audio.PickAudio(audio) : 0;
+            if (audio.Count > 0) audioCombo.SelectedIndex = pick;
+            audioFilling = false;
+            SetAudioIndex(pick);
+            if (audio.Count > 1) Log.Info("Ljudspår: " + audio.Count + " st, förvalt " + audioCombo.SelectedItem);
+        }
+
+        // Valt ljudspår gäller alla val i referenslistan som använder ljudet
+        void SetAudioIndex(int idx)
+        {
+            bool changed = idx != refAudioIndex;
+            refAudioIndex = idx;
+            foreach (var it in trackCombo.Items)
+            {
+                if (it is AudioRefOption) ((AudioRefOption)it).AudioIndex = idx;
+                else if (it is TextCheckOption) ((TextCheckOption)it).AudioIndex = idx;
+                else if (it is OrigSrtOption) ((OrigSrtOption)it).AudioIndex = idx;
+            }
+            if (changed && !busy) { ClearResult(); Log.Info("Ljudspår valt: " + audioCombo.SelectedItem); }
+            UpdateGpuVisibility();
+        }
+
         // ------------------------------------------------------------ grafikkort
         void UpdateGpuVisibility()
         {
             var a = trackCombo.SelectedItem as AudioRefOption;
-            bool show = (a != null && a.Mode != AudioMode.Speech) || trackCombo.SelectedItem is TextCheckOption || trackCombo.SelectedItem is OrigSrtOption;
-            if (show && gpuDevices == null) FillGpus();
-            gpuCombo.Visible = show;
+            bool whisper = (a != null && a.Mode != AudioMode.Speech) || trackCombo.SelectedItem is TextCheckOption || trackCombo.SelectedItem is OrigSrtOption;
+            if (whisper && gpuDevices == null) FillGpus();
+            gpuCombo.Visible = whisper;
+            audioRow.Visible = audioCombo.Items.Count > 1 && (a != null || whisper);
         }
 
         // NVIDIA-kort (CUDA) + processorn. Intel/AMD-grafik kan inte användas av Whisper-versionen och visas inte.
+        // Sökningen görs i bakgrunden (Tools.GpuScan). Är den inte klar visas "letar…" och listan fylls när den är klar.
         void FillGpus()
         {
+            var scan = Tools.GpuScan();
+            if (!scan.IsCompleted)
+            {
+                if (gpuPending) return;
+                gpuPending = true;
+                gpuFilling = true;
+                gpuCombo.Items.Clear(); gpuCombo.Items.Add("Grafikkort: letar…"); gpuCombo.SelectedIndex = 0; gpuCombo.Enabled = false;
+                gpuFilling = false;
+                scan.ContinueWith(t => { gpuPending = false; if (IsDisposed) return; gpuCombo.Enabled = !busy; FillGpus(); }, TaskScheduler.FromCurrentSynchronizationContext());
+                return;
+            }
             gpuFilling = true;
             gpuDevices = new List<int>();
             gpuCombo.Items.Clear();
-            foreach (var g in Tools.ListNvidiaGpus()) { gpuDevices.Add(g.Key); gpuCombo.Items.Add("Grafikkort: " + g.Value); }
+            foreach (var g in scan.Result) { gpuDevices.Add(g.Key); gpuCombo.Items.Add("Grafikkort: " + g.Value); }
             gpuDevices.Add(-1); gpuCombo.Items.Add("Grafikkort: inget – processorn (långsamt)");
             string saved = Tools.GetSetting("gpu", "");
             int parsed; int want = saved == "cpu" ? -1 : (int.TryParse(saved, out parsed) ? parsed : gpuDevices[0]);
@@ -1131,16 +1196,22 @@ namespace TextSync
         {
             var need = new List<ToolPackage>();
             if (!Tools.IsInstalled(Tools.Ffmpeg)) need.Add(Tools.Ffmpeg);
-            if (whisper)
-            {
-                bool gpu = Tools.HasNvidia();
-                if (!Tools.IsInstalled(Tools.WhisperCpu)) need.Add(Tools.WhisperCpu);           // reserv om grafikkortet inte fungerar
-                if (gpu && !Tools.IsInstalled(Tools.WhisperGpu)) need.Add(Tools.WhisperGpu);
-                if (!Tools.IsInstalled(Tools.ModelPackage)) need.Add(Tools.ModelPackage);
-                if (!Tools.IsInstalled(Tools.SileroVad)) need.Add(Tools.SileroVad);
-            }
+            // bara det som behövs för valt grafikkort (eller processorn), inte allt som skulle kunna användas
+            if (whisper) need.AddRange(Tools.WhisperNeeds(Audio.WhisperDevice >= 0));
             if (need.Count == 0) return true;
             long total = need.Sum(p => p.Size);
+            long free = Tools.FreeBytes(), want = Tools.SpaceNeeded(need);
+            if (free >= 0 && free < want)
+            {
+                Log.Info("För lite diskutrymme för verktygen: " + free / 1048576 + " MB ledigt, behöver " + want / 1048576 + " MB");
+                MessageBox.Show(this,
+                    "Det finns för lite ledigt utrymme på disken " + Path.GetPathRoot(Path.GetFullPath(Tools.Root)).TrimEnd('\\') + " för verktygen som synk mot ljudet behöver.\n\n" +
+                    "De behöver cirka " + Fmt(want / 1073741824.0, "0.0") + " GB under nedladdningen, men bara " + Fmt(free / 1073741824.0, "0.0") + " GB är ledigt.\n\n" +
+                    "Frigör utrymme, till exempel genom att tömma Papperskorgen, och försök igen. Du kan också synka mot en undertext (textspår eller SRT) i stället" +
+                    (whisper ? ", eller välja \"Ljud A – taldetektering\", som behöver mycket mindre." : "."),
+                    Caption, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return false;
+            }
             var a = MessageBox.Show(this,
                 "Synk mot ljudet behöver några gratisverktyg som inte finns på datorn ännu:\n\n" +
                 string.Join("\n", need.Select(p => "•  " + p.Name + "  (" + Fmt(p.Size / 1048576.0, "0") + " MB)")) +
@@ -1155,6 +1226,13 @@ namespace TextSync
                 await Task.Run(() => Tools.Download(pkg, (d, t) => Progress((int)(100 * (before + d) / Math.Max(1, total)),
                     "Laddar ner " + pkg.Name + "… " + Fmt((before + d) / 1048576.0, "0") + " av " + Fmt(total / 1048576.0, "0") + " MB"), token));
                 doneBefore += p.Size;
+            }
+            // ffprobe finns först nu: läs ljudspåren i en film som inte är MKV, så att rätt spår väljs redan första gången
+            if (need.Contains(Tools.Ffmpeg) && mkvPath != null && !IsMkv(mkvPath) && audioCombo.Items.Count == 0)
+            {
+                string p0 = mkvPath;
+                var streams = await Task.Run(() => Audio.ListAudioStreams(p0));
+                if (streams.Count > 1 && mkvPath == p0) FillAudio(streams);
             }
             return true;
         }
@@ -1226,6 +1304,13 @@ namespace TextSync
                 bool truncated = false;
                 string audioInfo = null;
                 transcript = null; origSynced = null; origUsed = null; saveTextBtn.Visible = false;
+                // Whisper behöver veta vilket grafikkort som gäller: vänta på sökningen om den inte är klar (oftast är den det)
+                if (gpuCombo.Visible && gpuDevices == null)
+                {
+                    statusLabel.Text = "Letar efter grafikkort…";
+                    await Tools.GpuScan();
+                    FillGpus();
+                }
                 var aopt = refc == null ? trackCombo.SelectedItem as AudioRefOption : null;
                 var oopt = refc == null ? trackCombo.SelectedItem as OrigSrtOption : null;
                 if (oopt != null)
@@ -1766,6 +1851,7 @@ namespace TextSync
                 "Tips: dra in båda filerna samtidigt. Rödmarkerade rader saknar engelsk text samtidigt – ofta helt i sin ordning (t.ex. utrop).\n" +
                 "Kryssa i \"Föreslå radindelning som referensen\" så föreslår programmet att dela eller slå ihop rader som de engelska (blå, \"Dela?\"/\"Ihop?\") – högerklicka för att godkänna. " +
                 "Visa ovanför listan döljer grå rader eller visar bara röda eller blå. Utseende längst upp väljer ljust eller mörkt.\n\n" +
+                "Verktygen för synk mot ljudet (0,6–1,4 GB) ligger i mappen tools i " + Log.Dir + ". Mappen kan tas bort när Text Sync är stängt, och verktygen hämtas igen vid behov.\n\n" +
                 "Text Sync " + Program.Version + " · MIT-licens\n" +
                 "Loggfil (för felsökning): " + Log.FilePath + "\n\n" +
                 "Vill du öppna mappen med loggfilen?",

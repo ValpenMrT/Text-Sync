@@ -404,6 +404,57 @@ namespace TextSync
                     LineAligner.MergeText("Det här är en rad som är ganska så lång,\noch här kommer en till som är lång", "och sedan en tredje rad som inte får plats.", "x") == null);
             }
 
+            // ---- grafikkort, ljudspår, Whisper-kontroll, sökvägar (product-check 2026-11-09)
+            {
+                var g = Tools.ParseNvidiaSmi("0, NVIDIA RTX A2000 Laptop GPU, 8.6, 560.94\r\n1, NVIDIA GeForce GTX 680, 3.0, 470.10\r\n2, Quadro M2000, 5.2, 470.05\r\nField \"compute_cap\" is not a valid field to query.\r\n");
+                Check("Grafikkort: bara kort med compute capability 5.0 och drivrutin 527 eller senare listas", g.Count == 1 && g[0].Key == 0 && g[0].Value == "NVIDIA RTX A2000 Laptop GPU");
+                Check("Grafikkort: gammal drivrutin utan compute_cap ger inga kort (Whisper körs på processorn)", Tools.ParseNvidiaSmi("Field \"compute_cap\" is not a valid field to query.").Count == 0);
+
+                Func<string, string, bool, Audio.AudioStream> A = (l, nm, d) => new Audio.AudioStream { Language = l, Name = nm, Default = d, Commentary = Audio.LooksLikeCommentary(nm) };
+                Check("Ljudspår: engelska väljs före svensk dubbning som är standard",
+                    Audio.PickAudio(new List<Audio.AudioStream> { A("swe", "", true), A("eng", "Director's Commentary", false), A("eng", "", false) }) == 2);
+                Check("Ljudspår: utan engelska väljs standardspåret",
+                    Audio.PickAudio(new List<Audio.AudioStream> { A("fre", "", false), A("ger", "", true) }) == 1);
+                Check("Ljudspår: kommentarspår och syntolkning väljs inte, även om de är standard",
+                    Audio.PickAudio(new List<Audio.AudioStream> { A("eng", "Commentary", true), A("swe", "Syntolkning", false), A("swe", "", false) }) == 2);
+
+                // Whisper-kontrollen: antalet rättade rader i rapporten ska stämma med det som faktiskt ändrades
+                bool reportOk = true; int scen = 0;
+                foreach (var shift in new[] { new[] { 40, 60, 3000 }, new[] { 30, 33, 2500 }, new[] { 50, 52, 4000 }, new[] { 10, 90, -1500 } })
+                    for (int rep = 0; rep < 5; rep++)
+                    {
+                        var track = new List<Cue>(); var heard = new List<Cue>();
+                        for (int i = 0; i < 120; i++)
+                        {
+                            double t = 5000 + i * 4000 + rnd.NextDouble() * 500;
+                            string txt = "ordet" + i + " andra" + i + " tredje" + i;
+                            track.Add(new Cue(t, t + 2000, txt));
+                            double d = (i >= shift[0] && i < shift[1] ? shift[2] : 0) + N(rep * 250);
+                            heard.Add(new Cue(t + d, t + d + 2000, txt));
+                        }
+                        var cr = TextCheck.Check(track, heard);
+                        int changed = cr.Corrected.Where((c, i) => Math.Abs(c.Start - track[i].Start) > 0.5).Count();
+                        int reported = cr.Regions.Sum(r => r.Lines);
+                        if (changed != reported) { reportOk = false; Console.WriteLine("Whisper-kontroll, scenario " + scen + ": " + changed + " rader ändrade men " + reported + " i rapporten"); }
+                        scen++;
+                    }
+                Check("Whisper-kontroll: rapporten visar alla rader som rättades", reportOk);
+
+                string uni = Path.Combine(dir, "Жора 测试");
+                Directory.CreateDirectory(uni);
+                string wav = Path.Combine(uni, "TextSync_x.wav");
+                File.WriteAllBytes(wav, new byte[] { 1 });
+                string safe = Audio.AnsiSafePath(wav), safeOut = Audio.AnsiSafePath(Path.Combine(uni, "TextSync_w_abc"));
+                Console.WriteLine("Sökväg för Whisper: " + safe + "  |  " + safeOut);
+                Check("Sökvägar: västeuropeiska tecken (åäö) behöver inte skrivas om", Audio.IsAnsi(@"C:\Users\Åsa\Film.mkv") && Audio.AnsiSafePath(dir) == dir);
+                Check("Sökvägar: kyrilliska och kinesiska tecken skrivs om till korta namn som pekar på samma fil",
+                    !Audio.IsAnsi(wav) && Audio.IsAnsi(safe) && File.Exists(safe) && Audio.IsAnsi(safeOut) && safeOut.EndsWith("TextSync_w_abc"));
+                Directory.Delete(uni, true);
+
+                long need = Tools.SpaceNeeded(new[] { Tools.WhisperGpu, Tools.ModelTurbo });
+                Check("Diskutrymme: nedladdningen kräver mer än paketens storlek (zip + uppackat)", need > Tools.WhisperGpu.Size * 2 + Tools.ModelTurbo.Size);
+            }
+
             Console.WriteLine();
             if (muxSkipped) Console.WriteLine("OBS: testet av \"Lägg in i MKV\" hoppades över, eftersom mkvmerge (MKVToolNix) inte är installerat.");
             if (failed == 0) Console.WriteLine("RESULTAT: alla {0} kontroller gick igenom.", checks);

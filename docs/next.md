@@ -31,24 +31,20 @@
     - Gäller både texten som sparas och texten som synkas, eftersom ljudbeskrivningar inte motsvarar tal och kan störa ljudsynken.
     - Visa hur många rader som ändrades eller togs bort, och gör ändringen ångringsbar som annan redigering.
     - Tester: en `Check(...)` per mönster ovan, plus kontroller av att vanlig dialog med parenteser eller versaler (t.ex. "FBI" eller "Han (min bror) kom hem") inte förstörs.
-    - Fråga 10 i README.md (om rutan är ikryssad från början) besvaras innan arbetet börjar.
+    - Fråga 9 i README.md (om rutan är ikryssad från början) besvaras innan arbetet börjar.
 11. **Varna för fel avsnitt** (önskemål 2026-11-09). Programmet varnar innan det synkar om texten verkar höra till ett annat avsnitt eller en annan version av filmen. Ett exempel är S04E02.srt mot S04E01.mkv. Varningen stoppar inte synken: rutan har knapparna "Synka ändå" och "Avbryt".
     - Kontroller: avsnittsnummer i filnamnen skiljer sig (samma tolkning som i punkt 5), textens längd skiljer sig mycket från filmens längd, eller synken hittar ingen tydlig matchning alls (den globala sökningen har ingen tydlig topp).
     - Meddelandet ska vara på svenska och säga vad som inte stämmer, t.ex. "Texten verkar höra till avsnitt 2, men filmen är avsnitt 1."
     - I kön för en hel säsong (punkt 5) blir varningen ett "osäkert"-besked för avsnittet i stället för en ruta som stoppar kön.
     - Gränserna sätts mot testerna och testfilmen, så att varningen inte visas för vanliga filmer med förtexter eller eftertexter som saknar text.
 
-## Kvar från product-check 2026-11-09 (bör åtgärdas)
-Blockerande fynd är rättade: inget undantag kastas i processernas utdatahändelser, och felmeddelandena är begripliga och på svenska (nätverk, Smart App Control, ffmpeg, Whisper).
-- **Välja ljudspår:** ljudsynk använder alltid standardljudspåret. Filmer med kommentarspår eller dubbning som standard behöver ett val.
-- **Nedladdning efter valt grafikkort:** i dag hämtas CUDA-paketet och turbo-modellen (cirka 1,3 GB) så fort `nvcuda.dll` finns, även om man har valt processorn eller kortet är för gammalt. Processorpaketet hämtas också i onödan på NVIDIA-datorer.
-- **Statusrad när grafikkortet inte fungerar** och Whisper börjar om på processorn. I dag hoppar förloppet då tillbaka från cirka 50 % till 0. Varningen före en lång körning på processorn finns sedan 1.7.
-- **Taldetekteringen** kan inte avbrytas medan den räknar. Den tar nu bara några sekunder.
-- **nvidia-smi läses på gränssnittets tråd** och kan frysa fönstret om drivrutinen hänger sig.
-- **Whisper-kontrollen** rättar ibland enstaka rader som inte syns i rapporten.
-- **Ingen kontroll av diskutrymme** före nedladdningen på cirka 1,3–2 GB, och ingen hjälptext om hur man frigör `%LOCALAPPDATA%\TextSync\tools`.
-- **ffmpeg och Whisper** lägger till engelsk teknisk text i felmeddelanden, under rubriken "Teknisk information".
-- **Sökvägar med tecken utanför västeuropeiska** i användarnamnet kan få whisper-cli att misslyckas. Det är inte verifierat.
+## Kvar från product-check 2026-11-09
+Alla punkter är åtgärdade i 2.1 (se beslutsloggen 2026-11-09, "Rättningar från product-check"). Det som återstår:
+- **Sökvägar med tecken utanför västeuropeiska:** skyddet (korta 8.3-namn till whisper-cli) är testat i `Tests`, men whisper-cli har inte körts med en sådan sökväg, eftersom nedladdade program inte får köras i Claudes miljö. Prova en gång med en mapp som heter till exempel `Жора` och en riktig film. Är korta namn avstängda på disken fungerar skyddet inte, och då står det i loggen.
+- **Listan Ljudspår för MP4 och andra format än MKV** läses med ffprobe: direkt om ffmpeg finns, annars strax efter att ffmpeg har laddats ner. Kommer ffprobes svar medan en synk pågår visas listan inte för den filen förrän den läses in igen (kan vänta).
+- **Turbo-modellen erbjuds inte** den som först körde Whisper på processorn (small) och sedan väljer grafikkort. Small används då även på grafikkortet (kan vänta, ägaren bör välja).
+- **Diskutrymmet för den tillfälliga ljudfilen** (cirka 230 MB för 2 timmar film i `%TEMP%`) kontrolleras inte. Fullt utrymme ger felmeddelandet om att filen inte kunde läsas eller skrivas (kan vänta).
+- **Ordningen på ljudspåren** i MKV antas vara samma som ffmpegs `0:a:n`. Det stämmer enligt Matroska och ffmpeg, men är inte provat på en riktig film med flera ljudspår.
 
 ## Frågor till ägaren
 Obesvarade frågor står i README.md under "Obesvarade frågor (tas upp vid nästa körning)". Flytta svaren hit eller till beslutsloggen när de är besvarade.

@@ -48,7 +48,7 @@ namespace TextSync
     public static class Audio
     {
         public const int Rate = 16000;
-        public static int WhisperDevice = 0;   // CUDA-enhet (NVIDIA), -1 = processorn
+        public static int WhisperDevice = -1;  // CUDA-enhet (NVIDIA), -1 = processorn. Sätts av gränssnittet när grafikkorten har hittats.
         public static bool UsedGpu;            // om senaste Whisper-körningen gick på grafikkortet
         static readonly string CacheDir = Path.Combine(Log.Dir, "cache");
 
@@ -134,7 +134,64 @@ namespace TextSync
                 code = Run(ff, args.Replace(mix, "-ac 1"), null, ct, out tail);
             }
             if (code != 0 || !File.Exists(wavOut))
-                throw new UserMessageException("Det gick inte att läsa ljudet ur filmen. Filen kan sakna ljud, vara skadad eller ha ett ljudformat som inte stöds.\n\nTeknisk information:\n" + Last(tail, 300));
+            {
+                // ffmpegs (engelska) felutskrift hamnar i loggen, inte i meddelandet
+                Log.Info("ffmpeg misslyckades, kod " + code + ": " + Last(tail, 1000));
+                throw new UserMessageException("Det gick inte att läsa ljudet ur filmen. Filen kan sakna ljud, vara skadad eller ha ett ljudformat som inte stöds.\n\nDetaljer finns i loggfilen (Hjälp → Öppna mappen med loggfilen).");
+            }
+        }
+
+        // ---------------------------------------------------------- ljudspår
+        public class AudioStream
+        {
+            public string Language = "", Name = "";
+            public bool Default, Commentary;
+        }
+
+        // Kommentarspår och syntolkning ska inte väljas automatiskt
+        public static bool LooksLikeCommentary(string name)
+        {
+            return Regex.IsMatch(name ?? "", @"comment|kommentar|director|descri|syntolk|\bAD\b", RegexOptions.IgnoreCase);
+        }
+
+        // Förvalt ljudspår: engelska först (originalspråket för de flesta filmer), annars standardspåret. Aldrig kommentar eller syntolkning om det finns annat.
+        public static int PickAudio(List<AudioStream> a)
+        {
+            int i = a.FindIndex(s => !s.Commentary && s.Language.StartsWith("en"));
+            if (i < 0) i = a.FindIndex(s => !s.Commentary && s.Default);
+            if (i < 0) i = a.FindIndex(s => !s.Commentary);
+            return Math.Max(0, i);
+        }
+
+        // Ljudspår i andra filmformat än MKV (MP4 m.fl.) via ffprobe. Tom lista om ffprobe saknas eller inte svarar inom 10 s.
+        public static List<AudioStream> ListAudioStreams(string file)
+        {
+            var res = new List<AudioStream>();
+            string probe = Tools.FindFfprobe();
+            if (probe == null) return res;
+            var lines = new List<string>();
+            try
+            {
+                using (var cts = new CancellationTokenSource(10000))
+                {
+                    string tail;
+                    Run(probe, "-v error -select_streams a -show_entries stream=index:stream_disposition=default,comment,visual_impaired:stream_tags=language,title -of default=nw=1 " + Q(file),
+                        l => { lock (lines) lines.Add(l); }, cts.Token, out tail);
+                }
+            }
+            catch (Exception ex) { Log.Info("ffprobe kunde inte lista ljudspåren: " + ex.Message); return res; }
+            AudioStream cur = null;
+            foreach (var l in lines)
+            {
+                if (l.StartsWith("index=")) { cur = new AudioStream(); res.Add(cur); }
+                else if (cur == null) continue;
+                else if (l == "DISPOSITION:default=1") cur.Default = true;
+                else if (l == "DISPOSITION:comment=1" || l == "DISPOSITION:visual_impaired=1") cur.Commentary = true;
+                else if (l.StartsWith("TAG:language=")) cur.Language = l.Substring(13);
+                else if (l.StartsWith("TAG:title=")) cur.Name = l.Substring(10);
+            }
+            foreach (var s in res) if (LooksLikeCommentary(s.Name)) s.Commentary = true;
+            return res;
         }
 
         static string Last(string s, int n) { s = (s ?? "").Trim(); return s.Length <= n ? s : "…" + s.Substring(s.Length - n); }
@@ -164,10 +221,10 @@ namespace TextSync
         // Energi i talets frekvensband (150–3800 Hz) jämfört med en rörlig brusnivå.
         // Gränsen är självjusterande: start 18 dB över bakgrunden (bäst mot facit i test),
         // skärps tills tal täcker högst ~50 % av tiden. Tal "överallt" ger annars fel förskjutning.
-        public static List<Iv> DetectSpeech(string wavPath)
+        public static List<Iv> DetectSpeech(string wavPath, CancellationToken ct)
         {
             double[] db, floor;
-            Analyze(ReadWav(wavPath), out db, out floor);
+            Analyze(ReadWav(wavPath), out db, out floor, ct);
             double total = db.Length * 10.0;
             List<Iv> best = null;
             foreach (double rel in new[] { 18.0, 21, 24, 27, 30 })
@@ -179,9 +236,9 @@ namespace TextSync
             return best;
         }
 
-        public static void AnalyzeFile(string wavPath, out double[] db, out double[] floor) { Analyze(ReadWav(wavPath), out db, out floor); }
+        public static void AnalyzeFile(string wavPath, out double[] db, out double[] floor) { Analyze(ReadWav(wavPath), out db, out floor, CancellationToken.None); }
 
-        static void Analyze(short[] x, out double[] dbOut, out double[] floorOut)
+        static void Analyze(short[] x, out double[] dbOut, out double[] floorOut, CancellationToken ct)
         {
             const int Hop = 160;          // 10 ms
             int frames = x.Length / Hop;
@@ -191,6 +248,7 @@ namespace TextSync
             double h1 = 0, h2 = 0, hy1 = 0, hy2 = 0, l1 = 0, l2 = 0, ly1 = 0, ly2 = 0;
             for (int f = 0; f < frames; f++)
             {
+                if ((f & 4095) == 0) ct.ThrowIfCancellationRequested();   // var 41:a sekund ljud: Avbryt fungerar även här
                 double sum = 0;
                 for (int i = f * Hop; i < (f + 1) * Hop; i++)
                 {
@@ -270,7 +328,31 @@ namespace TextSync
         // ---------------------------------------------------------- B: Whisper
         public static List<Cue> RunWhisper(string wavPath, double durationMs, Action<int> progress, CancellationToken ct, out string language)
         {
-            return RunWhisper(wavPath, durationMs, progress, ct, out language, false);
+            return RunWhisper(wavPath, durationMs, progress, ct, out language, false, null);
+        }
+
+        // whisper-cli läser sökvägar i Windows teckentabell (ANSI). Tecken utanför den (t.ex. kyrilliska i användarnamnet,
+        // som finns i %TEMP% och %LOCALAPPDATA%) blir då "?". Sådana sökvägar ersätts med Windows korta namn (8.3).
+        [System.Runtime.InteropServices.DllImport("kernel32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
+        static extern uint GetShortPathName(string longPath, StringBuilder shortPath, uint size);
+
+        public static bool IsAnsi(string s)
+        {
+            var enc = Encoding.GetEncoding(Encoding.Default.CodePage, EncoderFallback.ReplacementFallback, DecoderFallback.ReplacementFallback);
+            return enc.GetString(enc.GetBytes(s)) == s;
+        }
+
+        // Sökväg som whisper-cli kan läsa. Filen behöver inte finnas, men mappen måste göra det.
+        public static string AnsiSafePath(string path)
+        {
+            if (IsAnsi(path)) return path;
+            string dir = Path.GetDirectoryName(path), name = Path.GetFileName(path);
+            if (!IsAnsi(name) && File.Exists(path)) { dir = path; name = ""; }
+            var sb = new StringBuilder(1024);
+            uint n = GetShortPathName(dir, sb, (uint)sb.Capacity);
+            string res = n > 0 && n < sb.Capacity ? (name.Length > 0 ? Path.Combine(sb.ToString(), name) : sb.ToString()) : path;
+            if (!IsAnsi(res)) Log.Info("Sökvägen kan inte skrivas om till tecken som Whisper kan läsa (korta namn är avstängda på disken?): " + path);
+            return res;
         }
 
         // DTW ger exaktare tid per ord; kräver att modellens namn anges
@@ -284,10 +366,11 @@ namespace TextSync
         }
 
         // words=true: ett ord per rad med egen tid (-ml 1 -sow), används för att kontrollera ett textspår ord för ord
-        public static List<Cue> RunWhisper(string wavPath, double durationMs, Action<int> progress, CancellationToken ct, out string language, bool words)
+        // onCpuRetry: anropas när grafikkortet inte fungerade och Whisper börjar om från början på processorn
+        public static List<Cue> RunWhisper(string wavPath, double durationMs, Action<int> progress, CancellationToken ct, out string language, bool words, Action onCpuRetry)
         {
             language = "";
-            var model = Tools.FindModel(Tools.ModelPackage) ?? Tools.FindModel(Tools.ModelTurbo) ?? Tools.FindModel(Tools.ModelSmall);
+            var model = Tools.FindModel(Tools.ModelFor(WhisperDevice >= 0)) ?? Tools.FindModel(Tools.ModelTurbo) ?? Tools.FindModel(Tools.ModelSmall);
             if (model == null) throw new UserMessageException("Språkmodellen för Whisper saknas. Försök synka igen – Text Sync erbjuder då att ladda ner den.");
             string outBase = Path.Combine(Path.GetTempPath(), "TextSync_w_" + Guid.NewGuid().ToString("N"));
             string lang = "";
@@ -296,7 +379,9 @@ namespace TextSync
             int threads = Math.Max(1, Math.Min(16, Environment.ProcessorCount - 2));
             // Silero-taldetektering i Whisper: färre grova tidsfel och snabbare (testat mot facit). -dev: valt grafikkort
             string vad = Tools.FindModel(Tools.SileroVad);
-            string args = "-m " + Q(model) + " -f " + Q(wavPath) + " -l auto" + (words ? " -ml 1 -sow" + DtwArg(model) : "") + (vad != null ? " --vad -vm " + Q(vad) : "") + " -osrt -of " + Q(outBase) + " -pp -t " + threads;
+            string args = "-m " + Q(AnsiSafePath(model)) + " -f " + Q(AnsiSafePath(wavPath)) + " -l auto" + (words ? " -ml 1 -sow" + DtwArg(model) : "") +
+                (vad != null ? " --vad -vm " + Q(AnsiSafePath(vad)) : "") + " -osrt -of " + Q(AnsiSafePath(outBase)) + " -pp -t " + threads;
+            bool gpuFailed = false;
             Action<string> onLine = l =>
             {
                 var m = rxLang.Match(l); if (m.Success) lang = m.Groups[1].Value;
@@ -315,19 +400,25 @@ namespace TextSync
                 if (exe == null) continue;
                 string a = args + (gpu ? " -dev " + WhisperDevice : " -ng");
                 Log.Info("Whisper på " + (gpu ? "grafikkort " + WhisperDevice : "processorn"));
+                if (!gpu && gpuFailed && onCpuRetry != null) { onCpuRetry(); progress(0); }
                 try { code = Run(exe, a, onLine, ct, out tail); }
                 catch (UserMessageException ex)
                 {
                     if (!gpu) throw;   // grafikkortsversionen blockerad: försök med processorn
                     Log.Info("Whisper (GPU) kunde inte startas: " + ex.Message);
+                    gpuFailed = true;
+                    Tools.SetSetting("gpuwhisperfailed", "1");
                     continue;
                 }
                 if (code == 0 && File.Exists(outBase + ".srt")) { done = true; UsedGpu = gpu; break; }
-                Log.Info("Whisper (" + (gpu ? "GPU" : "CPU") + ") misslyckades, kod " + code + ": " + Last(tail, 300));
+                Log.Info("Whisper (" + (gpu ? "GPU" : "CPU") + ") misslyckades, kod " + code + ": " + Last(tail, 1000));
+                if (gpu) { gpuFailed = true; Tools.SetSetting("gpuwhisperfailed", "1"); }
             }
             try
             {
-                if (!done) throw new UserMessageException("Taligenkänningen (Whisper) misslyckades. Prova \"Ljud A – taldetektering\", som inte behöver Whisper, eller välj processorn i listan Grafikkort.\n\nTeknisk information:\n" + Last(tail, 300));
+                if (!done) throw new UserMessageException("Taligenkänningen (Whisper) misslyckades." +
+                    (Tools.FindWhisper(false) == null ? " Välj processorn i listan Grafikkort och synka igen. Text Sync erbjuder då att ladda ner Whisper för processorn (21 MB)." : "") +
+                    " Du kan också välja \"Ljud A – taldetektering\", som inte behöver Whisper.\n\nDetaljer finns i loggfilen (Hjälp → Öppna mappen med loggfilen).");
                 language = lang;
                 return Srt.Load(outBase + ".srt", 65001).Where(c => c.Text.Trim().Length > 0).ToList();
             }
@@ -360,6 +451,9 @@ namespace TextSync
                 return speech.Select(s => new Cue(s.S, s.E, "(tal)")).ToList();
             return res;
         }
+        // Visas när Whisper börjar om på processorn, så att det syns varför förloppet gick tillbaka
+        const string CpuRetryText = "Grafikkortet fungerade inte – Whisper börjar om på processorn (tar längre tid)… ";
+
         // ---------------------------------------------------------- hela kedjan, med cache
         static string CacheKey(string file, int audioIndex)
         {
@@ -404,14 +498,15 @@ namespace TextSync
                     if (needSpeech && !haveSpeech)
                     {
                         progress(needWhisper && !haveWhisper ? 30 : 80, "Letar efter tal i ljudet…");
-                        speech = DetectSpeech(wav);
+                        speech = DetectSpeech(wav, ct);
                         SaveIv(vadFile, speech);
                     }
                     if (needWhisper && !haveWhisper)
                     {
                         sw.Restart();
                         string l;
-                        transcript = RunWhisper(wav, dur, p => progress(30 + p * 65 / 100, "Taligenkänning (Whisper)… " + p + " %"), ct, out l);
+                        string phase = "Taligenkänning (Whisper)… ";
+                        transcript = RunWhisper(wav, dur, p => progress(30 + p * 65 / 100, phase + p + " %"), ct, out l, false, () => phase = CpuRetryText);
                         lang = l;
                         Srt.Save(wFile, transcript);
                         File.WriteAllText(langFile, lang);
@@ -460,7 +555,8 @@ namespace TextSync
             {
                 ExtractWav(file, audioIndex, ch, dur, wav, p => progress(p * 30 / 100, "Läser ljudet ur filmen… " + p + " %"), ct);
                 var sw = Stopwatch.StartNew();
-                var words = RunWhisper(wav, dur, p => progress(30 + p * 65 / 100, "Whisper lyssnar ord för ord… " + p + " %"), ct, out language, true);
+                string phase = "Whisper lyssnar ord för ord… ";
+                var words = RunWhisper(wav, dur, p => progress(30 + p * 65 / 100, phase + p + " %"), ct, out language, true, () => phase = CpuRetryText);
                 Srt.Save(wFile, words);
                 File.WriteAllText(langFile, language);
                 Log.Info("Whisper ordläge klar på " + sw.Elapsed.TotalSeconds.ToString("0") + " s, " + words.Count + " ord, språk " + language);

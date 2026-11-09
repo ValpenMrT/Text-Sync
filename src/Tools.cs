@@ -74,7 +74,11 @@ namespace TextSync
             try { return File.Exists(Path.Combine(Environment.SystemDirectory, "nvcuda.dll")); } catch { return false; }
         }
 
+        // Whisper-versionen är byggd för CUDA 12.4: kräver kort från Maxwell (compute capability 5.0) och drivrutin 527 eller senare.
+        const double MinComputeCap = 5.0, MinDriver = 527;
+
         // NVIDIA-kort som Whisper (CUDA) kan använda: (index, namn). Intel/AMD-grafik stöds inte av den här Whisper-versionen.
+        // För gamla kort och drivrutiner tas bort (skrivs i loggen). nvidia-smi får högst 5 s, så att en hängande drivrutin inte stoppar programmet.
         public static List<KeyValuePair<int, string>> ListNvidiaGpus()
         {
             var res = new List<KeyValuePair<int, string>>();
@@ -82,22 +86,64 @@ namespace TextSync
             {
                 string smi = Path.Combine(Environment.SystemDirectory, "nvidia-smi.exe");
                 if (!File.Exists(smi)) return res;
-                var psi = new System.Diagnostics.ProcessStartInfo(smi, "--query-gpu=index,name --format=csv,noheader")
+                var psi = new System.Diagnostics.ProcessStartInfo(smi, "--query-gpu=index,name,compute_cap,driver_version --format=csv,noheader")
                 { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true };
                 using (var p = System.Diagnostics.Process.Start(psi))
                 {
-                    string all = p.StandardOutput.ReadToEnd();
-                    p.WaitForExit(5000);
-                    foreach (var line in all.Split('\n'))
+                    var read = p.StandardOutput.ReadToEndAsync();
+                    if (!read.Wait(5000))
                     {
-                        var parts = line.Split(new[] { ',' }, 2);
-                        int i;
-                        if (parts.Length == 2 && int.TryParse(parts[0].Trim(), out i)) res.Add(new KeyValuePair<int, string>(i, parts[1].Trim()));
+                        try { p.Kill(); } catch { }
+                        Log.Info("nvidia-smi svarade inte inom 5 s – Whisper körs på processorn");
+                        return res;
                     }
+                    res = ParseNvidiaSmi(read.Result);
+                    if (res.Count == 0) Log.Info("nvidia-smi hittade inget grafikkort som Whisper kan använda: " + read.Result.Trim());
                 }
             }
-            catch { }
+            catch (Exception ex) { Log.Info("nvidia-smi kunde inte köras: " + ex.Message); }
             return res;
+        }
+
+        // Rader som "0, NVIDIA RTX A2000, 8.6, 560.94". Gamla drivrutiner känner inte till compute_cap och ger då bara ett felmeddelande, alltså inga kort.
+        public static List<KeyValuePair<int, string>> ParseNvidiaSmi(string output)
+        {
+            var res = new List<KeyValuePair<int, string>>();
+            var inv = System.Globalization.CultureInfo.InvariantCulture;
+            foreach (var line in (output ?? "").Split('\n'))
+            {
+                var parts = line.Split(',').Select(s => s.Trim()).ToArray();
+                int i; double cc, drv;
+                if (parts.Length < 4 || !int.TryParse(parts[0], out i)) continue;
+                string name = string.Join(", ", parts.Skip(1).Take(parts.Length - 3));
+                string ccs = parts[parts.Length - 2], drvs = parts[parts.Length - 1];
+                if (!double.TryParse(ccs, System.Globalization.NumberStyles.Float, inv, out cc) || !double.TryParse(drvs.Split('.')[0], System.Globalization.NumberStyles.Integer, inv, out drv))
+                { Log.Info("Grafikkort " + i + " (" + name + ") hoppas över: okänd version (" + ccs + ", " + drvs + ")"); continue; }
+                if (cc < MinComputeCap) { Log.Info("Grafikkort " + i + " (" + name + ") är för gammalt för Whisper (compute capability " + ccs + ")"); continue; }
+                if (drv < MinDriver) { Log.Info("Grafikkort " + i + " (" + name + "): drivrutinen " + drvs + " är för gammal för Whisper (behöver " + MinDriver + " eller senare)"); continue; }
+                res.Add(new KeyValuePair<int, string>(i, name));
+            }
+            return res;
+        }
+
+        // Sökningen efter grafikkort görs en gång i bakgrunden, aldrig på gränssnittets tråd
+        static System.Threading.Tasks.Task<List<KeyValuePair<int, string>>> gpuScan;
+        static readonly object gpuLock = new object();
+        public static System.Threading.Tasks.Task<List<KeyValuePair<int, string>>> GpuScan()
+        {
+            lock (gpuLock) { if (gpuScan == null) gpuScan = System.Threading.Tasks.Task.Run(() => ListNvidiaGpus()); return gpuScan; }
+        }
+
+        // Ledigt utrymme på disken där verktygen sparas (-1 om det inte går att läsa)
+        public static long FreeBytes()
+        {
+            try { return new DriveInfo(Path.GetPathRoot(Path.GetFullPath(Root))).AvailableFreeSpace; } catch { return -1; }
+        }
+
+        // Utrymme som en nedladdning behöver: zip-filen och det uppackade samtidigt (uppackat är oftast större än zip-filen)
+        public static long SpaceNeeded(IEnumerable<ToolPackage> pkgs)
+        {
+            return pkgs.Sum(p => p.Zip ? (long)(p.Size * 2.5) : p.Size) + 100L * 1048576;
         }
 
         // Inställningar som sparas mellan körningar (t.ex. valt grafikkort)
@@ -125,8 +171,28 @@ namespace TextSync
             catch { }
         }
 
-        public static ToolPackage WhisperPackage { get { return HasNvidia() ? WhisperGpu : WhisperCpu; } }
-        public static ToolPackage ModelPackage { get { return HasNvidia() ? ModelTurbo : ModelSmall; } }
+        // Språkmodell efter var Whisper körs: turbo på grafikkortet (bäst), small på processorn (snabbare där)
+        public static ToolPackage ModelFor(bool gpu) { return gpu ? ModelTurbo : ModelSmall; }
+
+        // Det som behövs för Whisper på valt grafikkort (gpu = true) eller på processorn. Finns redan en språkmodell
+        // används den, så att ingen ny modell hämtas bara för att man har bytt mellan grafikkort och processor.
+        public static List<ToolPackage> WhisperNeeds(bool gpu)
+        {
+            var need = new List<ToolPackage>();
+            if (gpu) { if (!IsInstalled(WhisperGpu)) need.Add(WhisperGpu); }
+            // processorn: grafikkortsversionen kan också köras på processorn (-ng) på en dator med NVIDIA-drivrutin,
+            // men inte om den redan har misslyckats här (t.ex. blockerad av Smart App Control). Då hämtas processorpaketet (21 MB).
+            else if (!IsInstalled(WhisperCpu) && !(HasNvidia() && IsInstalled(WhisperGpu) && GetSetting("gpuwhisperfailed", "") != "1")) need.Add(WhisperCpu);
+            if (FindModel(ModelTurbo) == null && FindModel(ModelSmall) == null) need.Add(ModelFor(gpu));
+            if (!IsInstalled(SileroVad)) need.Add(SileroVad);
+            return need;
+        }
+
+        // Finns allt för Whisper redan (på något sätt)? Avgör förvalet A+B i stället för A.
+        public static bool WhisperReady()
+        {
+            return (FindWhisper(true) != null || FindWhisper(false) != null) && (FindModel(ModelTurbo) != null || FindModel(ModelSmall) != null);
+        }
 
         static string FindIn(string dir, string exe)
         {

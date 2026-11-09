@@ -36,7 +36,7 @@ powershell -ExecutionPolicy Bypass -File build.ps1
 Det skapar `Build\TextSync-<version>.exe`, till exempel `Build\TextSync-2.1.exe`. Versionen läses ur `Program.Version` i [src/Program.cs](src/Program.cs), och bygget avbryts om `AssemblyVersion` och `AssemblyFileVersion` inte stämmer med den. Äldre versioner ligger kvar i `Build\`. Kräver bara Windows, med .NET Framework 4.8 som redan finns i Windows 10/11.
 
 - **Lägg in i MKV…** kräver [MKVToolNix](https://mkvtoolnix.download/). Det behövs bara för den knappen.
-- Ljudsynk och Whisper behöver ffmpeg, whisper.cpp och en språkmodell. Programmet frågar och laddar ner dem första gången, och kontrollerar varje fil mot en SHA-256-summa. De hamnar i `%LOCALAPPDATA%\TextSync\tools`, cirka 1,3–2 GB med NVIDIA-kort. Loggen och cachen ligger också i `%LOCALAPPDATA%\TextSync`.
+- Ljudsynk och Whisper behöver ffmpeg, whisper.cpp och en språkmodell. Programmet frågar och laddar ner dem första gången, och kontrollerar varje fil mot en SHA-256-summa. De hamnar i `%LOCALAPPDATA%\TextSync\tools`, cirka 1,4 GB med NVIDIA-grafikkort och 0,6 GB med processorn (det som hämtas följer valet i listan Grafikkort). Loggen och cachen ligger också i `%LOCALAPPDATA%\TextSync`.
 
 ### Testa
 ```
@@ -52,21 +52,20 @@ Programmet är inte signerat (se [docs/decisions.md](docs/decisions.md)). Versio
 ### Obesvarade frågor (tas upp vid nästa körning)
 Från granskningen 2026-11-09 (product-check):
 1. Vänner med Smart App Control: ska ljudsynken döljas, eller räcker det svenska felmeddelandet som finns nu?
-2. Är cirka 1,3 GB nedladdning okej för NVIDIA-användare, eller ska man kunna välja ett mindre paket (processor + small)?
-3. Behövs val av ljudspår? (Filmer med kommentarspår eller dubbning som standard.)
-4. Ska programmet rekommendera Ljud A när det inte finns något NVIDIA-grafikkort?
-5. Behövs en knapp eller hjälptext för att ta bort nedladdade verktyg i `%LOCALAPPDATA%\TextSync\tools`?
-6. Ska rättningar från Whisper-kontrollen markeras i listan så att man kan granska dem?
+2. Sedan 2.1 hämtas bara det som behövs för valt grafikkort: cirka 1,4 GB med NVIDIA-kort och 0,6 GB med processorn. Räcker det, eller ska NVIDIA-användare också få frågan om de vill ha det mindre paketet?
+3. Ska programmet rekommendera Ljud A när det inte finns något NVIDIA-grafikkort?
+4. Hjälptext om hur man tar bort de nedladdade verktygen finns sedan 2.1 (Hjälp-rutan och docs/faq.md). Behövs också en knapp i programmet?
+5. Ska rättningar från Whisper-kontrollen markeras i listan så att man kan granska dem?
 
 Från genomgången av projektstrukturen 2026-11-09:
 
-7. Ska testutdata översättas till svenska ("offset", "cuts", "Route" m.fl.), enligt regeln i CLAUDE.md?
-8. Ska en `.gitattributes` läggas till för enhetliga radslut? `src/Mkv.cs` har blandade radslut.
-9. Ska `MainForm.cs` (cirka 1 900 rader) delas upp, med tidslinjen i en egen fil och resten i delar (partial class)?
+6. Ska testutdata översättas till svenska ("offset", "cuts", "Route" m.fl.), enligt regeln i CLAUDE.md?
+7. Ska en `.gitattributes` läggas till för enhetliga radslut? `src/Mkv.cs` har blandade radslut.
+8. Ska `MainForm.cs` (cirka 2 000 rader) delas upp, med tidslinjen i en egen fil och resten i delar (partial class)?
 
 Från planen för att ta bort text för hörselskadade 2026-11-09 (se docs/next.md, punkt 10):
 
-10. Ska inställningen "Ta bort text för hörselskadade" vara ikryssad från början? Förslag: inte ikryssad, så att ingen text försvinner utan att man har valt det. Valet sparas till nästa gång.
+9. Ska inställningen "Ta bort text för hörselskadade" vara ikryssad från början? Förslag: inte ikryssad, så att ingen text försvinner utan att man har valt det. Valet sparas till nästa gång.
 
 ### Dokumentation
 

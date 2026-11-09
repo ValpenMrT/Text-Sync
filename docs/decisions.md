@@ -2,6 +2,23 @@
 
 Nyast först.
 
+## 2026-11-09 – Rättningar från product-check: ljudspår, grafikkort, nedladdning, felmeddelanden
+- **Område:** GUI / ljudsynk / drift
+- **Beslut (ägarens svar):** listan **Ljudspår** visas bara när filmen har mer än ett ljudspår och referensen använder ljudet (Ljud A/B/A+B eller Whisper-kontroll). Engelska väljs först, annars standardspåret, men aldrig ett kommentarspår eller syntolkning om det finns något annat. Valet gäller alla val i listan Referens. För MKV läses spåren ur filen, och för andra format med ffprobe i bakgrunden.
+- **Claudes val (övriga punkter från granskningen):**
+  - **Nedladdning efter valt grafikkort:** grafikkortet ger CUDA-versionen och turbo, processorn ger processorversionen och small. Finns redan en modell används den. Processorpaketet hämtas inte på NVIDIA när grafikkortet är valt, eftersom CUDA-versionen kan köras med `-ng`. Har CUDA-versionen misslyckats en gång sparas det (`gpuwhisperfailed` i settings.txt), och då hämtas processorpaketet (21 MB) när man väljer processorn. Felmeddelandet säger då hur man gör.
+  - **Grafikkort:** nvidia-smi körs en gång i bakgrunden vid start, med högst 5 s. Listan visar "letar…" tills sökningen är klar, och Synka väntar på den. Kort under compute capability 5.0 och drivrutiner före 527 (CUDA 12.4) visas inte. Orsaken skrivs i loggen.
+  - **Omstart på processorn:** statusraden säger "Grafikkortet fungerade inte – Whisper börjar om på processorn (tar längre tid)…" innan förloppet går tillbaka.
+  - **Taldetekteringen** kan avbrytas.
+  - **Whisper-kontrollen** rättar inte längre ensamma rader. Rapporten stämmer därmed alltid med det som ändrades. En ensam avvikande rad är oftast brus i Whispers ordtider.
+  - **Diskutrymme** kontrolleras före nedladdningen: 2,5 × zip-filernas storlek + övriga filer + 100 MB. Hjälp-rutan och FAQ säger var verktygen ligger och hur man tar bort dem.
+  - **Felmeddelanden** innehåller inte längre ffmpegs och Whispers engelska text. Den skrivs i loggen, och meddelandet hänvisar dit.
+  - **Sökvägar till whisper-cli** med tecken utanför Windows teckentabell (t.ex. kyrilliska i användarnamnet) skrivs om till korta 8.3-namn.
+- **Test:** 55 av 55 kontroller (9 nya: nvidia-smi-tolkning, förval av ljudspår, att rapporten från Whisper-kontrollen stämmer i 20 scenarier, korta sökvägar, diskutrymme). Kontrollen av Whisper-rapporten misslyckades i 6 av 20 scenarier utan rättningen. Gränssnittet provades inifrån samma process mot Blacklist S04E01 (ett ljudspår, listan dold), och med tre påhittade spår (engelska förvalt, bytet slår igenom på valen). RTX A2000 hittas med den nya kontrollen.
+- **Ej provat:** whisper-cli med en sökväg med kyrilliska tecken (nedladdade program får inte köras i Claudes miljö), omstart på processorn och fullt diskutrymme på en riktig dator.
+- **Product-check (oberoende granskning):** inget blockerande. Rättat: reserv på processorn när CUDA-versionen inte fungerar (Bör), förklaringen visas före nollan (Bör), ljudspåren i MP4 läses efter att ffmpeg har laddats ner (Bör), kontroll av stängt fönster, nvidia-smis svar i loggen när inga kort hittas och ett eget lås för sökningen. Kan vänta (docs/next.md): ffprobes svar under en synk, turbo efter byte till grafikkort, diskutrymme i `%TEMP%`.
+- **Nivå:** LIVE
+
 ## 2026-11-09 – 2.1: versionsnummer i filnamnet och mappen Build
 - **Område:** Bygge / distribution
 - **Önskemål (ägaren):** det ska synas vilken version som ligger på ett USB-minne, och det som byggs ska hamna i en egen mapp.

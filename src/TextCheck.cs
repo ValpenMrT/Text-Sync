@@ -26,7 +26,7 @@ namespace TextSync
         public override string ToString() { return "Separat SRT: " + System.IO.Path.GetFileName(Path) + "  + Whisper-kontroll"; }
     }
 
-    public class CheckedRegion { public double FromMs, ToMs, OffsetMs; public int Lines; }
+    public class CheckedRegion { public double FromMs, ToMs, OffsetMs; public int Lines, First; }
 
     public class TextCheckResult
     {
@@ -133,13 +133,16 @@ namespace TextSync
                 {
                     if (cur == null || Math.Abs(cur.OffsetMs - d) > 300 || i == 0 || !(res.Corrected.Count > 1))
                     {
-                        cur = new CheckedRegion { FromMs = c.Start + d, OffsetMs = d };
+                        cur = new CheckedRegion { FromMs = c.Start + d, OffsetMs = d, First = i };
                         res.Regions.Add(cur);
                     }
                     cur.ToMs = c.End + d; cur.Lines++;
                 }
                 else cur = null;
             }
+            // En ensam rad som skiljer sig är oftast brus i Whispers ordtider. Den rättas inte, så att rapporten
+            // ("N rader rättade i M avsnitt") alltid stämmer med det som faktiskt ändrades.
+            foreach (var r in res.Regions.Where(r => r.Lines < 2)) res.Corrected[r.First] = cues[r.First].Clone();
             res.Regions = res.Regions.Where(r => r.Lines >= 2).ToList();
             return res;
         }
