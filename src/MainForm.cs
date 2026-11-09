@@ -244,8 +244,22 @@ namespace TextSync
             // --- förhandsvisning
             var split = new SplitContainer { Dock = DockStyle.Fill, Orientation = Orientation.Horizontal, SplitterWidth = 6, BackColor = Bg };
             list = new ListView { Dock = DockStyle.Fill, View = View.Details, FullRowSelect = true, GridLines = false, HideSelection = false, BorderStyle = BorderStyle.None };
-            // Mörkt läge: Windows mörka tema ritar kolumnrubrikerna med grå text, så de ritas här i stället (Theme.Apply slår på OwnerDraw).
-            // Raderna ritas som vanligt av Windows.
+            // Listan ritas delvis av programmet (OwnerDraw):
+            // - mörkt läge: kolumnrubrikerna, eftersom Windows mörka tema ritar dem med grå text
+            // - raden under muspekaren (båda lägena) och den markerade raden i mörkt läge, som annars blir grå på grå
+            // Allt annat ritas av Windows som vanligt. Högkontrast ritas helt av Windows.
+            list.OwnerDraw = !HC;
+            int hotRow = -1;
+            Action<int> redrawRow = i => { if (i >= 0 && i < list.Items.Count) list.Invalidate(list.GetItemRect(i)); };
+            list.MouseMove += (s, e) =>
+            {
+                var it = list.GetItemAt(e.X, e.Y);
+                int i = it != null ? it.Index : -1;
+                if (i == hotRow) return;
+                int old = hotRow; hotRow = i;
+                redrawRow(old); redrawRow(i);
+            };
+            list.MouseLeave += (s, e) => { int old = hotRow; hotRow = -1; redrawRow(old); };
             list.DrawColumnHeader += (s, e) =>
             {
                 if (!Theme.Dark) { e.DrawDefault = true; return; }
@@ -260,17 +274,22 @@ namespace TextSync
                 var r = new Rectangle(e.Bounds.X + 6, e.Bounds.Y, e.Bounds.Width - 12, e.Bounds.Height);
                 TextRenderer.DrawText(e.Graphics, e.Header.Text, list.Font, r, Theme.Title, flags);
             };
-            // Raderna ritas av Windows, utom den markerade raden i mörkt läge, som annars blir grå på grå
-            list.DrawItem += (s, e) => e.DrawDefault = !(Theme.Dark && e.Item.Selected);
+            // true = programmet ritar raden: markerad i mörkt läge, eller under muspekaren (och inte markerad)
+            Func<ListViewItem, bool> ownRow = it => (Theme.Dark && it.Selected) || (it.Index == hotRow && !it.Selected);
+            list.DrawItem += (s, e) => e.DrawDefault = !ownRow(e.Item);
             list.DrawSubItem += (s, e) =>
             {
-                if (!Theme.Dark || !e.Item.Selected) { e.DrawDefault = true; return; }
+                if (!ownRow(e.Item)) { e.DrawDefault = true; return; }
+                bool sel = e.Item.Selected;
                 // första kolumnen får hela radens yta: begränsa till kolumnens bredd
                 var b = e.ColumnIndex == 0 ? new Rectangle(e.Bounds.X, e.Bounds.Y, e.Header.Width, e.Bounds.Height) : e.Bounds;
-                using (var bg = new SolidBrush(Theme.SelBg)) e.Graphics.FillRectangle(bg, b);
+                using (var bg = new SolidBrush(sel ? Theme.SelBg : Theme.HotBg)) e.Graphics.FillRectangle(bg, b);
                 var flags = TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix |
                     (e.Header.TextAlign == HorizontalAlignment.Right && e.ColumnIndex > 0 ? TextFormatFlags.Right : TextFormatFlags.Left);   // Windows vänsterjusterar alltid första kolumnen
-                TextRenderer.DrawText(e.Graphics, e.SubItem.Text, list.Font, new Rectangle(b.X + 6, b.Y, b.Width - 12, b.Height), Color.White, flags);
+                // radens egen färg (röd, blå, grå) behålls när muspekaren är över
+                // samma marginaler som Windows: 6 px i första kolumnen, 2 px vänster och 3 px höger i övriga
+                var tr = e.ColumnIndex == 0 ? new Rectangle(b.X + 6, b.Y, b.Width - 8, b.Height) : new Rectangle(b.X + 2, b.Y, b.Width - 5, b.Height);
+                TextRenderer.DrawText(e.Graphics, e.SubItem.Text, list.Font, tr, sel ? Color.White : e.Item.ForeColor, flags);
             };
             float k = 1f;
             using (var gr = CreateGraphics()) k = gr.DpiX / 96f;

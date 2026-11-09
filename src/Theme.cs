@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Runtime.InteropServices;
@@ -19,6 +19,8 @@ namespace TextSync
         // färger som sätts efter typ av kontroll eller används vid ritning
         public static Color Accent, Link, Input, BtnBg, BtnBorder, BtnDisabled, RedRow, RefOnly, Prop;
         public static Color Grid, TlRef, TlOrig, TlSynced, TlHighlight;
+        // när muspekaren är över: listrad, knappar (vanlig/blå) och nedtryckt knapp
+        public static Color HotBg, BtnHover, BtnDown, AccentHover, AccentDown;
         public static readonly Color SelBg = Color.FromArgb(0, 95, 170);   // markerad rad i listan i mörkt läge (vit text)
 
         static Theme() { Set(false); }
@@ -38,6 +40,7 @@ namespace TextSync
                 BtnBg = SystemColors.Control; BtnBorder = SystemColors.ControlDark; BtnDisabled = SystemColors.ControlDark;
                 RedRow = SystemColors.GrayText; RefOnly = SystemColors.GrayText; Prop = SystemColors.HotTrack;
                 Grid = SystemColors.GrayText; TlRef = SystemColors.Highlight; TlOrig = SystemColors.GrayText; TlSynced = SystemColors.HotTrack; TlHighlight = SystemColors.WindowText;
+                HotBg = SystemColors.Window; BtnHover = SystemColors.Control; BtnDown = SystemColors.Control; AccentHover = SystemColors.Highlight; AccentDown = SystemColors.Highlight;
             }
             else if (Dark)
             {
@@ -47,6 +50,7 @@ namespace TextSync
                 BtnBg = C(55, 55, 55); BtnBorder = C(85, 85, 85); BtnDisabled = C(70, 70, 70);
                 RedRow = C(255, 130, 130); RefOnly = C(135, 135, 135); Prop = C(105, 170, 255);
                 Grid = C(58, 58, 58); TlRef = C(76, 160, 255); TlOrig = C(120, 120, 120); TlSynced = C(70, 190, 110); TlHighlight = C(240, 240, 240);
+                HotBg = C(52, 52, 52); BtnHover = C(72, 72, 72); BtnDown = C(90, 90, 90); AccentHover = C(25, 140, 230); AccentDown = C(0, 95, 170);
             }
             else
             {
@@ -56,6 +60,7 @@ namespace TextSync
                 BtnBg = C(255, 255, 255); BtnBorder = C(200, 200, 200); BtnDisabled = C(200, 200, 200);
                 RedRow = C(170, 60, 60); RefOnly = C(110, 110, 110); Prop = C(0, 90, 180);
                 Grid = C(235, 235, 235); TlRef = C(0, 103, 192); TlOrig = C(160, 160, 160); TlSynced = C(16, 140, 60); TlHighlight = C(0, 0, 0);
+                HotBg = C(229, 241, 251); BtnHover = C(229, 241, 251); BtnDown = C(204, 228, 247); AccentHover = C(0, 120, 215); AccentDown = C(0, 84, 153);
             }
             var now = new[] { Bg, Card, Fg, Muted, Err, Ok, Title };
             var map = new Dictionary<int, Color>();
@@ -97,9 +102,7 @@ namespace TextSync
             if (c is TextBoxBase || c is ComboBox || c is NumericUpDown || c is ListView)
             {
                 c.BackColor = Input; c.ForeColor = Fg;
-                // listrubrikerna ritas av programmet i mörkt läge (vit text), annars av Windows
-                var lv = c as ListView;
-                if (lv != null && lv.OwnerDraw != Dark) { lv.OwnerDraw = Dark; lv.Invalidate(); }
+                if (c is ListView) c.Invalidate();   // rubriker, markerad rad och raden under muspekaren ritas om i nya färger
                 Native(c);
             }
             else if (c is Button && ((Button)c).FlatStyle == FlatStyle.Flat || c is Button && Dark)
@@ -108,6 +111,10 @@ namespace TextSync
                 b.FlatStyle = FlatStyle.Flat; b.FlatAppearance.BorderSize = 1;
                 if ("primary".Equals(b.Tag)) { b.BackColor = b.Enabled ? Accent : BtnDisabled; b.FlatAppearance.BorderColor = b.BackColor; }
                 else { b.BackColor = BtnBg; b.ForeColor = Fg; b.FlatAppearance.BorderColor = BtnBorder; }
+                // syns tydligt när muspekaren är över knappen och när den trycks ned
+                bool prim = "primary".Equals(b.Tag);
+                b.FlatAppearance.MouseOverBackColor = prim ? AccentHover : BtnHover;
+                b.FlatAppearance.MouseDownBackColor = prim ? AccentDown : BtnDown;
             }
             else
             {

@@ -2,6 +2,13 @@
 
 Nyast först.
 
+## 2026-11-09 – Synligt när muspekaren är över rader och knappar
+- **Område:** GUI
+- **Önskemål (ägaren):** man ska se när man håller muspekaren över saker.
+- **Beslut:** raden under muspekaren i listan får en ljus bakgrund (ljust läge 229,241,251, mörkt 52,52,52), och radens egen färg (röd, blå, grå) behålls. De platta knapparna får en tydlig färg när muspekaren är över dem och när de trycks ned, i båda lägena. Listan ritas därför av programmet (OwnerDraw) i båda lägena utom högkontrast, men bara rubrikerna i mörkt läge, den markerade raden i mörkt läge och raden under muspekaren. Allt annat ritas av Windows. Rullistor, kryssrutor, menyer och länkar visade redan detta.
+- **Product-check:** Claude granskade själv (liten GUI-ändring). Listraderna kontrollerades på skärmbilder i båda lägena. Knapparnas färg sätts med WinForms `FlatAppearance.MouseOverBackColor` men gick inte att visa på en skärmbild utan riktig mus.
+- **Nivå:** LIVE
+
 ## 2026-11-09 – Mörkt läge: vita kolumnrubriker och tydlig markerad rad
 - **Område:** GUI
 - **Problem (ägaren):** kolumnrubrikerna i listan var grå i mörkt läge. Windows mörka tema för rubriker (`DarkMode_ItemsView`) ritar texten grå, och färgen går inte att ändra.
