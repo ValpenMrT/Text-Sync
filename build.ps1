@@ -1,4 +1,7 @@
 ﻿# Bygger TextSync.exe med C#-kompilatorn som finns i Windows (.NET Framework 4.8)
+#   build.ps1          bygger TextSync.exe
+#   build.ps1 -Test    bygger dessutom testprogrammen i test\bin\ och kör Tests
+param([switch]$Test)
 $ErrorActionPreference = 'Stop'
 $root = $PSScriptRoot
 $csc = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
@@ -46,8 +49,29 @@ if (-not (Test-Path $ico)) {
     [System.IO.File]::WriteAllBytes($ico, $out.ToArray())
 }
 
+$refs = '/r:System.dll', '/r:System.Core.dll', '/r:System.Drawing.dll', '/r:System.Windows.Forms.dll', '/r:System.IO.Compression.dll', '/r:System.IO.Compression.FileSystem.dll'
 $src = Get-ChildItem (Join-Path $root 'src') -Filter *.cs | ForEach-Object { $_.FullName }
-& $csc /nologo /optimize+ /target:winexe /codepage:65001 "/out:$(Join-Path $root 'TextSync.exe')" "/win32icon:$ico" `
-    /r:System.dll /r:System.Core.dll /r:System.Drawing.dll /r:System.Windows.Forms.dll /r:System.IO.Compression.dll /r:System.IO.Compression.FileSystem.dll $src
+& $csc /nologo /optimize+ /target:winexe /codepage:65001 "/out:$(Join-Path $root 'TextSync.exe')" "/win32icon:$ico" @refs $src
 if ($LASTEXITCODE -ne 0) { throw "Bygget misslyckades" }
 Write-Host "Klart: $(Join-Path $root 'TextSync.exe')"
+
+if ($Test) {
+    # Varje testprogram byggs med alla källfiler i src\ plus testfilen; /main väljer testets Main i stället för Program.Main.
+    $bin = Join-Path $root 'test\bin'
+    New-Item -ItemType Directory -Force $bin | Out-Null
+    foreach ($t in Get-ChildItem (Join-Path $root 'test') -Filter *.cs) {
+        & $csc /nologo /target:exe /codepage:65001 "/main:TextSync.$($t.BaseName)" "/out:$(Join-Path $bin "$($t.BaseName).exe")" @refs $src $t.FullName
+        if ($LASTEXITCODE -ne 0) { throw "Bygget av $($t.Name) misslyckades" }
+    }
+    Write-Host "Testprogram: $bin"
+
+    # Tests körs inifrån PowerShell, eftersom Smart App Control ofta blockerar nybyggda exe-filer en stund.
+    $tmp = Join-Path $env:TEMP 'TextSyncTests'
+    New-Item -ItemType Directory -Force $tmp | Out-Null
+    $asm = [Reflection.Assembly]::Load([IO.File]::ReadAllBytes((Join-Path $bin 'Tests.exe')))
+    $main = $asm.GetType('TextSync.Tests').GetMethod('Main', [Reflection.BindingFlags]'Static,NonPublic,Public')
+    $rc = $main.Invoke($null, @(, [string[]]@($tmp)))
+    # Tests avgör själv om kontrollerna gick igenom och returnerar 1 om någon misslyckades (raderna som börjar med FEL).
+    if ($rc -ne 0) { throw "Testerna misslyckades. Se raderna som börjar med FEL ovan." }
+    Write-Host "Testerna gick igenom."
+}

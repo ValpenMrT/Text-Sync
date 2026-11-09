@@ -4,16 +4,27 @@
 ```
 powershell -ExecutionPolicy Bypass -File build.ps1
 ```
-Resultat: `TextSync.exe` (~80 kB). Inga beroenden utöver .NET Framework 4.8, som finns i Windows 10/11.
+Resultat: `TextSync.exe` (cirka 165 kB). Inga beroenden utöver .NET Framework 4.8, som finns i Windows 10/11.
 
 ## Testa
-Testprogrammen kompileras med samma `csc.exe` (se `build.ps1`) med `/target:exe` och källorna `src/Engine.cs src/Mkv.cs src/Log.cs` plus `test/Tests.cs` eller `test/Diag.cs`. Om Smart App Control blockerar det nybyggda testprogrammet kan det köras inifrån PowerShell via `[Reflection.Assembly]::Load(...)`.
+```
+powershell -ExecutionPolicy Bypass -File build.ps1 -Test
+```
+Bygger `TextSync.exe`, bygger alla testprogram i `test\bin\` och kör `Tests` med `%TEMP%\TextSyncTests` som arbetsmapp. Varje testprogram byggs av alla filer i `src\` plus testfilen, och `/main:TextSync.<Testnamn>` väljer testets `Main`. `Tests` körs inifrån PowerShell, eftersom Smart App Control ofta blockerar nybyggda exe-filer en stund.
 
-- `Tests.exe <tempmapp>`: syntetiska scenarier. Alla rader för Smart ska ha `100 % <300ms`.
-- `Diag.exe <film.mkv> <undertext.srt> <från s> <till s> <spårnr>`: riktiga filer. Visar rader utan referens (`NO-REF`).
+`Tests.cs` avgör själv om testerna gick igenom:
+- Sista raden är `RESULTAT: alla … kontroller gick igenom.` eller `RESULTAT: N av M kontroller MISSLYCKADES.`
+- Varje misslyckad kontroll skriver en rad som börjar med `FEL:` direkt under raden den gäller. `Tests` returnerar då 1, och `build.ps1 -Test` avslutas med ett fel.
+- Alla rader för **Smart** och **Advanced** måste ha `100,0% <300ms`. **Simple** bedöms inte i scenarierna med klipp (C, F, G), eftersom den bara gör linjär synk.
+- Saknas mkvmerge hoppas testet av "Lägg in i MKV" över. Det står då på en rad som börjar med `OBS:` före resultatet.
+- En ny kontroll läggs till med `Check("vad som ska gälla", villkor)` i `Tests.cs`.
+
+Felsökningsprogrammen i `test\bin\` körs för hand mot riktiga filer, till exempel:
+- `Diag.exe <film.mkv> <undertext.srt> <från s> <till s> <spårnr>`: visar rader utan referens (`NO-REF`).
+- Övriga program och deras argument står i [structure.md](structure.md) och överst i varje testfil.
 
 Testerna (`Tests.cs`) täcker:
-- synk i 6 scenarier
+- synk i 7 scenarier (A–G) × 3 metoder (Smart, Simple, Advanced)
 - SRT-specialfall och teckenkodningar
 - fördelning av filer vid dra-och-släpp
 - sparande med säkerhetskopia
@@ -29,7 +40,7 @@ powershell -STA -Command "$a=[Reflection.Assembly]::Load([IO.File]::ReadAllBytes
 ```
 
 ## Dela ut
-Kopiera `TextSync.exe` till USB. Programmet är osignerat (se beslutsloggen):
+Kopiera `TextSync.exe` till USB. Ingen hjälpfil följer med (se beslutsloggen 2026-11-09), så berätta om Windows-varningen när du lämnar över programmet: den visas innan programmet har startat, och då går det inte att nå hjälpen. Programmet är osignerat (se beslutsloggen):
 - Från USB visas normalt ingen SmartScreen-varning.
 - Har mottagaren *Smart App Control* påslaget kan Windows blockera programmet helt. Då finns ingen gratis lösning.
 

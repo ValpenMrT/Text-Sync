@@ -49,7 +49,18 @@ namespace TextSync
             return c.Select(x => new Cue(f(x.Start), f(x.Start) + (x.End - x.Start), x.Text)).ToList();
         }
 
-        static void Eval(string name, List<Cue> refc, List<Cue> tgt, SyncMode mode)
+        // Testerna avgör själva om de gick igenom: varje kontroll räknas, och Main returnerar 1 om någon misslyckades.
+        static int checks = 0, failed = 0;
+        static void Check(string what, bool ok)
+        {
+            checks++;
+            if (ok) return;
+            failed++;
+            Console.WriteLine("    FEL: " + what);
+        }
+
+        // require = false: resultatet skrivs ut men bedöms inte (Simple klarar inte klipp, eftersom den bara synkar linjärt)
+        static void Eval(string name, List<Cue> refc, List<Cue> tgt, SyncMode mode, bool require = true)
         {
             var sw = System.Diagnostics.Stopwatch.StartNew();
             var r = SyncEngine.Sync(refc, tgt, new SyncOptions { Mode = mode }, null);
@@ -68,6 +79,7 @@ namespace TextSync
                 name, mode, med, p95, within, r.ScoreBefore, r.ScoreAfter, r.Method, sw.ElapsedMilliseconds, r.Segments.Count, r.OffsetMs, r.DriftMsPerHour);
             if (r.FpsText != "") Console.WriteLine("    " + r.FpsText);
             foreach (var n in r.Notes) Console.WriteLine("    NOTE " + n);
+            if (require) Check(name + " (" + mode + "): alla rader ska ligga inom 300 ms", errs.All(e => e < 300));
         }
 
         // ---------------- MKV-skrivare (för test)
@@ -152,12 +164,13 @@ namespace TextSync
             {
                 Eval("A offset +3.7s", refc, Distort(other, t => t + 3700), m);
                 Eval("B 25fps-version (-1.2s)", refc, Distort(other, t => t * 23.976 / 25 - 1200), m);
-                Eval("C cuts (+2s, +10s@40m, +5s@70m)", refc, Distort(other, t => t + 2000 + (t > 2400000 ? 8000 : 0) - (t > 4200000 ? 5000 : 0)), m);
+                bool cutsOk = m != SyncMode.Simple;   // Simple får vara sämre i scenarierna med klipp (C, F, G)
+                Eval("C cuts (+2s, +10s@40m, +5s@70m)", refc, Distort(other, t => t + 2000 + (t > 2400000 ? 8000 : 0) - (t > 4200000 ? 5000 : 0)), m, cutsOk);
                 Eval("D drift 0.08% + 600ms", refc, Distort(other, t => t * 1.0008 + 600), m);
                 Eval("E big offset -95s", refc, Distort(other, t => t - 95000), m);
-                Eval("F fps + cut", refc, Distort(other, t => t * 25 / 23.976 + 1500 + (t > 3000000 ? 12000 : 0)), m);
+                Eval("F fps + cut", refc, Distort(other, t => t * 25 / 23.976 + 1500 + (t > 3000000 ? 12000 : 0)), m, cutsOk);
                 // korta klipp: +1 s i bara 60 s, och ett avsnitt på 20 s före nästa hopp (som Blacklist S04E01 03:29 och 07:18)
-                Eval("G korta klipp (60 s, 20 s)", refc, Distort(other, t => t + 2000 + (t > 600000 && t < 660000 ? 1000 : 0) + (t > 1200000 ? 1800 : 0) + (t > 1220000 ? 4600 : 0)), m);
+                Eval("G korta klipp (60 s, 20 s)", refc, Distort(other, t => t + 2000 + (t > 600000 && t < 660000 ? 1000 : 0) + (t > 1200000 ? 1800 : 0) + (t > 1220000 ? 4600 : 0)), m, cutsOk);
             }
             {   // tiden före synk följer med varje rad (visas i listan), även efter extra förskjutning
                 var inp = Distort(other, t => t * 25 / 23.976 + 1500 + (t > 3000000 ? 12000 : 0));
@@ -166,6 +179,7 @@ namespace TextSync
                 var got = outp.Select(c => c.OrigStart).OrderBy(x => x).ToList();
                 bool sameText = outp.All(c => inp.Any(q => q.Text == c.Text && q.Start == c.OrigStart));
                 Console.WriteLine("OrigStart: count={0} allSet={1} same={2} textMatch={3}", got.Count, !got.Any(double.IsNaN), want.SequenceEqual(got), sameText);
+                Check("OrigStart: varje rad ska behålla sin tid före synk", !got.Any(double.IsNaN) && want.SequenceEqual(got) && sameText);
             }
 
             int n = 0;
@@ -176,11 +190,13 @@ namespace TextSync
             var withText = refc.Take(20).Select(c => new Cue(c.Start, c.End, "Hej åäö\nrad 2")).ToList();
             Srt.Save(p, withText);
             var back = Srt.Load(p);
-            Console.WriteLine("SRT roundtrip: {0} cues, first '{1}', time ok {2}", back.Count, back[0].Text.Replace("\n", "/"),
-                back.Zip(withText, (a, b) => Math.Abs(a.Start - Math.Round(b.Start)) < 1.01).All(x => x));
+            bool timeOk = back.Zip(withText, (a, b) => Math.Abs(a.Start - Math.Round(b.Start)) < 1.01).All(x => x);
+            Console.WriteLine("SRT roundtrip: {0} cues, first '{1}', time ok {2}", back.Count, back[0].Text.Replace("\n", "/"), timeOk);
+            Check("SRT sparad och inläst igen: 20 rader, samma text och tider", back.Count == 20 && back[0].Text == "Hej åäö\nrad 2" && timeOk);
             File.WriteAllText(p, "1\r\n00:00:01,500 --> 00:00:03,000\r\nRad ett\r\n2\r\n00:00:04,000 --> 00:00:05,000\r\nRad två\r\n", Encoding.GetEncoding(1252));
             back = Srt.Load(p);
             Console.WriteLine("Sloppy 1252 SRT: {0} cues, '{1}' '{2}'", back.Count, back[0].Text, back[1].Text);
+            Check("SRT utan tomrader i Windows-1252: 2 rader med rätt text", back.Count == 2 && back[0].Text == "Rad ett" && back[1].Text == "Rad två");
 
             // Dra-och-släpp: vilken fil blir referens/mål
             {
@@ -198,6 +214,7 @@ namespace TextSync
                 MainForm.PlanRoute(new[] { @"C:\a\bild.jpg" }, "sv", out rf, out tf, out note);
                 bool r6 = rf == null && tf == null && note != null;
                 Console.WriteLine("Route: mkv+srt={0} sv+en={1} 3letter={2} oneUnknown={3} bothUnknown={4} unsupported={5}", r1, r2, r3, r4, r5, r6);
+                Check("Dra-och-släpp med en eller två filer: rätt fil ska bli referens och mål", r1 && r2 && r3 && r4 && r5 && r6);
                 // film + två SRT: den svenska synkas, den andra blir originaltext som kontrolleras mot ljudet
                 string of;
                 MainForm.PlanRoute(new[] { @"C:\a\Film.en.srt", @"C:\a\Film.mkv", @"C:\a\Film.sv.srt" }, "sv", out rf, out tf, out of, out note);
@@ -209,6 +226,7 @@ namespace TextSync
                 MainForm.PlanRoute(new[] { @"C:\a\Film.mkv", @"C:\a\Film.sv.srt" }, "sv", out rf, out tf, out of, out note);
                 bool o4 = of == null && tf == @"C:\a\Film.sv.srt";
                 Console.WriteLine("Route3: mkv+en+sv={0} oneUnknown={1} bothUnknown={2} noOrig={3}", o1, o2, o3, o4);
+                Check("Dra-och-släpp med film och två SRT: rätt fil ska bli originaltext", o1 && o2 && o3 && o4);
             }
 
             // Whispers ord → fraser (referens för originaltextens grova synk)
@@ -217,22 +235,26 @@ namespace TextSync
                 var ph = TextCheck.Phrases(w);
                 bool ok = ph.Count == 3 && ph[0].Text == "Hello there." && ph[0].End == 1700 && ph[1].Text == "Bye" && ph[2].Start == 9000;
                 Console.WriteLine("Phrases: {0}", ok);
+                Check("Whispers ord ska slås ihop till fraser", ok);
             }
 
             // SRT-specialfall och teckenkodningar
             {
                 var c1 = Srt.Parse("1\n00:00:01.500 --> 00:00:02.000\nPunkt som decimal\n2\n00:00:03,000 --> 00:00:04,000\nUtan tomrad\n\n3\n99999999999:00:00,000 --> 99999999999:00:01,000\nOrimlig\n");
                 Console.WriteLine("SRT edge: count={0} firstStart={1} secondText='{2}'", c1.Count, c1[0].Start, c1.Count > 1 ? c1[1].Text : "");
+                Check("SRT-specialfall: punkt som decimal, saknad tomrad, orimlig tid hoppas över", c1.Count == 2 && c1[0].Start == 1500 && c1[1].Text == "Utan tomrad");
                 string p1 = Path.Combine(dir, "ru.srt");
                 File.WriteAllBytes(p1, Encoding.GetEncoding(1251).GetBytes("1\r\n00:00:01,000 --> 00:00:02,000\r\nПривет, как дела? Это проверка кириллицы.\r\n"));
                 string p2 = Path.Combine(dir, "pl.srt");
                 File.WriteAllBytes(p2, Encoding.GetEncoding(1250).GetBytes("1\r\n00:00:01,000 --> 00:00:02,000\r\nZażółć gęślą jaźń. Łódź, źródło, świat, będę.\r\n"));
                 string p3 = Path.Combine(dir, "bom.srt");
                 File.WriteAllBytes(p3, new byte[] { 0xEF, 0xBB, 0xBF }.Concat(Encoding.UTF8.GetBytes("1\n00:00:01,000 --> 00:00:02,000\nÅäö med BOM\n")).ToArray());
-                Console.WriteLine("Encodings: ru='{0}' pl='{1}' bom='{2}' forced1251='{3}'",
-                    Srt.Load(p1)[0].Text.Substring(0, 6), Srt.Load(p2)[0].Text.Substring(0, 12), Srt.Load(p3)[0].Text, Srt.Load(p1, 1251)[0].Text.Substring(0, 6));
+                string eRu = Srt.Load(p1)[0].Text.Substring(0, 6), ePl = Srt.Load(p2)[0].Text.Substring(0, 12), eBom = Srt.Load(p3)[0].Text, eForced = Srt.Load(p1, 1251)[0].Text.Substring(0, 6);
+                Console.WriteLine("Encodings: ru='{0}' pl='{1}' bom='{2}' forced1251='{3}'", eRu, ePl, eBom, eForced);
+                Check("Teckenkodningar: kyrillisk, centraleuropeisk, UTF-8 med BOM och manuellt vald", eRu == "Привет" && ePl == "Zażółć gęślą" && eBom == "Åäö med BOM" && eForced == "Привет");
                 double tm; bool okT = Srt.TryParseTime("00:01:23,456", out tm) && tm == 83456 && !Srt.TryParseTime("1:99:00,000", out tm) && !Srt.TryParseTime("abc", out tm);
                 Console.WriteLine("TryParseTime ok={0}", okT);
+                Check("Tolkning av tider: giltig tid godkänns, ogiltiga avvisas", okT);
             }
 
             // Spara med säkerhetskopia
@@ -253,6 +275,7 @@ namespace TextSync
                 bool ok3 = MainForm.SaveWithBackup(otherFile, orig, b) == null && File.Exists(otherFile);
                 bool noTmp = Directory.GetFiles(sd, "*.textsync-tmp").Length == 0;
                 Console.WriteLine("Save+backup: first={0} keepsOriginal={1} noBackupForOther={2} noTempLeft={3}", ok1, ok2, ok3, noTmp);
+                Check("Spara med säkerhetskopia: originalet kopieras en gång och skrivs aldrig över", ok1 && ok2 && ok3 && noTmp);
             }
 
             // MKV
@@ -268,6 +291,7 @@ namespace TextSync
                     bool ok = subs.Count == refc.Count && subs.Zip(refc, (a, b) => Math.Abs(a.Start - Math.Round(b.Start)) <= 1 && a.Text == b.Text).All(x => x);
                     Console.WriteLine("MKV zlib={0} unknownCluster={1}: tracks={2} '{3}' subs={4}/{5} ok={6} size={7}MB {8}ms",
                         cfg[0], cfg[1], f.Tracks.Count, tr[0], subs.Count, refc.Count, ok, new FileInfo(mp).Length / 1048576, sw.ElapsedMilliseconds);
+                    Check("MKV (zlib=" + cfg[0] + ", okänd klusterstorlek=" + cfg[1] + "): 3 spår och alla undertextrader lästa", ok && f.Tracks.Count == 3);
                 }
             }
             // Avkortad MKV (t.ex. halvt nedladdad): ska ge det som gick att läsa + flagga
@@ -280,15 +304,17 @@ namespace TextSync
                 {
                     var subs = f.ReadSubtitles(f.Tracks[2], x => { }, null);
                     Console.WriteLine("Truncated MKV: truncated={0} read {1}/{2} cues", f.Truncated, subs.Count, refc.Count);
+                    Check("Avkortad MKV: flaggas som avkortad och ger de rader som gick att läsa", f.Truncated && subs.Count > 0 && subs.Count < refc.Count);
                 }
-                try { File.WriteAllBytes(mp, bytes.Take(30).ToArray()); using (var f = new MkvFile(mp)) { } Console.WriteLine("Tiny MKV: no error?!"); }
-                catch (InvalidDataException ex) { Console.WriteLine("Tiny MKV: '" + ex.Message + "'"); }
+                try { File.WriteAllBytes(mp, bytes.Take(30).ToArray()); using (var f = new MkvFile(mp)) { } Console.WriteLine("Tiny MKV: no error?!"); Check("Trasig MKV på 30 byte ska ge ett fel", false); }
+                catch (InvalidDataException ex) { Console.WriteLine("Tiny MKV: '" + ex.Message + "'"); Check("Trasig MKV på 30 byte ska ge ett fel", true); }
             }
+            bool muxSkipped = false;
 
             // Lägg in i MKV med riktig mkvmerge
             {
                 string exe = MainForm.FindMkvMergePublic();
-                if (exe == null) Console.WriteLine("Mux: mkvmerge saknas – hoppar över");
+                if (exe == null) { muxSkipped = true; Console.WriteLine("Mux: mkvmerge saknas – hoppar över"); }
                 else
                 {
                     string src = Path.Combine(dir, "muxsrc.mkv"), outp = Path.Combine(dir, "muxout.mkv"), srt = Path.Combine(dir, "mux.srt");
@@ -300,7 +326,7 @@ namespace TextSync
                     var psi = new System.Diagnostics.ProcessStartInfo(exe, MainForm.BuildMuxArgs(tr, src, outp, "sv", srt)) { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true };
                     int code; string outText;
                     using (var proc = System.Diagnostics.Process.Start(psi)) { outText = proc.StandardOutput.ReadToEnd(); proc.WaitForExit(); code = proc.ExitCode; }
-                    if (code > 1) Console.WriteLine("Mux FAILED code " + code + ": " + outText);
+                    if (code > 1) { Console.WriteLine("Mux FAILED code " + code + ": " + outText); Check("Lägg in i MKV: mkvmerge ska lyckas (kod 0 eller 1)", false); }
                     else using (var f = new MkvFile(outp))
                     {
                         var subsT = f.Tracks.Where(t => t.IsSubtitle).ToList();
@@ -308,6 +334,8 @@ namespace TextSync
                         var cues = f.ReadSubtitles(nt, x => { }, null);
                         Console.WriteLine("Mux: code={0} subtitleTracks={1} old.default={2} new='{3}' new.default={4} cues={5}/{6} firstText='{7}'",
                             code, subsT.Count, subsT[0].Default, nt, nt.Default, cues.Count, few.Count, cues[0].Text);
+                        Check("Lägg in i MKV: den nya svenska undertexten är standardspår, den gamla är det inte, alla rader finns med",
+                            subsT.Count == 2 && !subsT[0].Default && nt.Default && nt.ToString() == "Spår 2: svenska – Svenska (SRT)" && cues.Count == few.Count && cues[0].Text == "Svensk Ref line 0");
                     }
                 }
             }
@@ -316,9 +344,17 @@ namespace TextSync
                 string mp = Path.Combine(dir, "nolang.mkv");
                 WriteMkv(mp, refc.Take(10).ToList(), false, false, true);
                 using (var f = new MkvFile(mp))
+                {
                     Console.WriteLine("MKV without language element: '{0}'  audio: '{1}'", f.Tracks[2], MkvTrack.LanguageName(f.Tracks[1].Language));
+                    Check("MKV-spår utan språk ska tolkas som engelska", f.Tracks[2].ToString() == "Spår 3: engelska (SRT)" && MkvTrack.LanguageName(f.Tracks[1].Language) == "svenska");
+                }
             }
-            return 0;
+
+            Console.WriteLine();
+            if (muxSkipped) Console.WriteLine("OBS: testet av \"Lägg in i MKV\" hoppades över, eftersom mkvmerge (MKVToolNix) inte är installerat.");
+            if (failed == 0) Console.WriteLine("RESULTAT: alla {0} kontroller gick igenom.", checks);
+            else Console.WriteLine("RESULTAT: {0} av {1} kontroller MISSLYCKADES. Se raderna som börjar med FEL ovan.", failed, checks);
+            return failed == 0 ? 0 : 1;
         }
     }
 }

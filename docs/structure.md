@@ -2,6 +2,10 @@
 
 ```
 build.ps1          Bygger TextSync.exe med csc.exe från .NET Framework (finns i Windows). Skapar ikonen första gången.
+                   -Test bygger också testprogrammen i test/bin/ och kör Tests (misslyckas om en kontroll gör det).
+README.md          Snabbstart, sedan bygga/testa/dela ut för utvecklare. Delas inte ut på USB.
+CLAUDE.md          Instruktioner för Claude: allt på svenska, var dokumentationen finns
+CLAUDE.local.md    Sökvägar som bara gäller den här datorn (testfilmen). Inte i git.
 src/
   Program.cs       Start, globala felhanterare (visar svenskt felmeddelande och skriver loggen)
   MainForm.cs      Hela gränssnittet: inläsning, synk, förhandsvisning, redigering med ångra, sparande, MKV-inbäddning, tidslinje
@@ -22,8 +26,19 @@ test/
   TextCheckDiag.cs Testar Whisper-kontrollen: orört spår och med flit förskjutet spår
   VadTune.cs       Justerar taldetekteringens gräns mot facit
   OrigSrtDiag.cs   Separat engelsk SRT (förstörd med flit) → ljud → svensk synk, mot facit
+  bin/             Byggda testprogram (skapas av build.ps1 -Test, inte i git)
 docs/              Beslut, drift, FAQ, nästa fas (next.md)
 ```
+
+## Användarhjälp finns på tre ställen
+
+| Var | Omfång |
+|---|---|
+| `docs/faq.md` | Fullständig hjälp. Här beskrivs allt först. |
+| `README.md`, avsnittet "Snabbstart" | Kort snabbstart: Windows-varningen, de tre stegen, ljudsynk i en mening och "klicka Hjälp". Den följer inte med på USB, utan är det ägaren berättar vid överlämningen. |
+| `ShowHelp()` i `MainForm.cs` | Kort hjälp i programmet och länk till loggmappen. |
+
+När en funktion ändras eller läggs till som användaren märker: uppdatera faq.md, och kontrollera att snabbstarten i README.md och `ShowHelp()` inte säger emot den. Lägg inte till detaljer i snabbstarten, så hålls den aktuell.
 
 ## Synkmotorn (Engine.cs) i korthet
 

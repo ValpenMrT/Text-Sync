@@ -18,13 +18,8 @@ Blockerande fynd är rättade: inget undantag kastas i processernas utdatahände
 - **ffmpeg och Whisper** lägger till engelsk teknisk text i felmeddelanden, under rubriken "Teknisk information".
 - **Sökvägar med tecken utanför västeuropeiska** i användarnamnet kan få whisper-cli att misslyckas. Det är inte verifierat.
 
-## Frågor till ägaren (från granskningen)
-1. Vänner med Smart App Control: ska ljudsynken döljas, eller räcker det svenska felmeddelandet som finns nu?
-2. Är cirka 1,3 GB nedladdning okej för NVIDIA-användare, eller ska man kunna välja ett mindre paket (processor + small)?
-3. Behövs val av ljudspår?
-4. ~~Körtid på processorn~~ Besvarad 1.7: programmet varnar före start. Kvar: ska programmet rekommendera A när det inte finns något grafikkort?
-5. Behövs en knapp eller hjälptext för att ta bort nedladdade verktyg?
-6. Ska rättningar från Whisper-kontrollen markeras i listan så att man kan granska dem?
+## Frågor till ägaren
+Obesvarade frågor står i README.md under "Obesvarade frågor (tas upp vid nästa körning)". Flytta svaren hit eller till beslutsloggen när de är besvarade.
 
 ## Kända begränsningar
 - **Korta klipp med ljud som referens** (t.ex. 10 minuter) kan hitta fel startpunkt, eftersom det pratas nästan hela tiden och den globala sökningen då blir tvetydig. Hela filmer och avsnitt fungerar (mediafel 0,18 s i test).

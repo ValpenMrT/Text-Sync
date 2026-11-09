@@ -1,6 +1,9 @@
 # byggutdata
 *.exe
 *.pdb
+test/bin/
+# lokala instruktioner för Claude (sökvägar på den här datorn)
+CLAUDE.local.md
 # tillfälliga filer
 *.part
 *.textsync-tmp

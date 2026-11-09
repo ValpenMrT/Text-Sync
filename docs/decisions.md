@@ -2,6 +2,22 @@
 
 Nyast först.
 
+## 2026-11-09 – Bara exe-filen på USB, testerna avgör själva, lokala sökvägar utanför git
+- **Område:** Distribution / test / struktur
+- **Beslut (product-check före commit):**
+  - **Bara `TextSync.exe` delas ut på USB.** Ingen hjälpfil följer med. Ägaren berättar om Windows-varningen vid överlämningen. Snabbstarten står kvar överst i README.md.
+  - **`Tests.cs` avgör själv om testerna gick igenom.** Varje kontroll går via `Check(...)`. En misslyckad kontroll skriver `FEL: …`, sista raden är `RESULTAT: …`, och `Tests` returnerar 1 så att `build.ps1 -Test` avslutas med ett fel. Simple bedöms inte i scenarierna med klipp (C, F, G). Första körningen: 35 av 35 kontroller gick igenom.
+  - **Sökvägen till testfilmen ligger i `CLAUDE.local.md`**, som står i `.gitignore`. Resten av `CLAUDE.md` checkas in.
+- **Varför:** Windows 11 har inget program kopplat till `.md`-filer, så en vän som dubbelklickar på README.md får rutan "Välj en app" och ser sedan rå markdown och utvecklardelen. Testerna returnerade alltid 0, så ett synkfel syntes bara om någon läste cirka 40 rader utdata. Sökvägen innehåller användarnamnet och ska inte följa med om förrådet publiceras.
+- **Invändning:** Claude rekommenderade att `build.ps1` skapar en `LÄS MIG.txt` ur snabbstarten, eftersom en vän som möter Windows-varningen annars inte har något skrivet att gå efter. Ägaren valde bara exe-filen.
+- **Nivå:** LIVE
+
+## 2026-11-09 – README och LÄS MIG sammanslagna, testbygge i build.ps1, allt på svenska
+- **Område:** Struktur / dokumentation
+- **Beslut:** LÄS MIG.txt är borttagen. README.md börjar nu med en snabbstart för användare och har sedan ett avsnitt för utvecklare. `build.ps1 -Test` bygger testprogrammen i `test\bin\` och kör `Tests`. Det finns en `CLAUDE.md` med regeln att kommentarer, texter och dokumentation ska vara på svenska. (Först delades README.md ut på USB tillsammans med exe-filen. Det ändrades samma dag, se posten ovan.)
+- **Varför:** LÄS MIG.txt hade hunnit bli inaktuell, eftersom hjälpen fanns på tre ställen. Instruktionen för testbygget i operations.md gick inte att bygga med.
+- **Nivå:** LIVE
+
 ## 2026-11-09 – 1.9: listan visar alla rader i båda texterna
 - **Område:** GUI
 - **Problem (ägaren):** Listan visade inte alla rader i den engelska texten. Den hade en rad per svensk replik, med bara den engelska rad som överlappade mest bredvid. När en svensk rad täckte två engelska syntes bara den ena, och engelska rader utan svensk rad samtidigt syntes inte alls.
