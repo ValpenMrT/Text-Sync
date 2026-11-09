@@ -19,6 +19,7 @@ namespace TextSync
         // färger som sätts efter typ av kontroll eller används vid ritning
         public static Color Accent, Link, Input, BtnBg, BtnBorder, BtnDisabled, RedRow, RefOnly, Prop;
         public static Color Grid, TlRef, TlOrig, TlSynced, TlHighlight;
+        public static readonly Color SelBg = Color.FromArgb(0, 95, 170);   // markerad rad i listan i mörkt läge (vit text)
 
         static Theme() { Set(false); }
 
@@ -96,6 +97,9 @@ namespace TextSync
             if (c is TextBoxBase || c is ComboBox || c is NumericUpDown || c is ListView)
             {
                 c.BackColor = Input; c.ForeColor = Fg;
+                // listrubrikerna ritas av programmet i mörkt läge (vit text), annars av Windows
+                var lv = c as ListView;
+                if (lv != null && lv.OwnerDraw != Dark) { lv.OwnerDraw = Dark; lv.Invalidate(); }
                 Native(c);
             }
             else if (c is Button && ((Button)c).FlatStyle == FlatStyle.Flat || c is Button && Dark)

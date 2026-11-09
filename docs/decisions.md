@@ -2,6 +2,13 @@
 
 Nyast först.
 
+## 2026-11-09 – Mörkt läge: vita kolumnrubriker och tydlig markerad rad
+- **Område:** GUI
+- **Problem (ägaren):** kolumnrubrikerna i listan var grå i mörkt läge. Windows mörka tema för rubriker (`DarkMode_ItemsView`) ritar texten grå, och färgen går inte att ändra.
+- **Beslut:** i mörkt läge ritar programmet själv rubrikerna (vit text, `ListView.OwnerDraw`). Det gjorde den markerade raden grå på grå, så den ritas också själv, med blå bakgrund (0,95,170) och vit text. Övriga rader, ljust läge och högkontrast ritas av Windows som förut.
+- **Product-check:** Claude granskade själv (liten GUI-ändring). Kontrast på den markerade raden cirka 6,5:1.
+- **Nivå:** LIVE
+
 ## 2026-11-09 – Commit efter varje ändring, product-check före varje commit
 - **Område:** Arbetssätt
 - **Beslut (ägaren):** Claude committar efter varje ändring, när bygget och testerna går igenom. Product-check körs före varje commit, men inte före push. Bara egna ändringar committas, eftersom en annan session kan arbeta i samma filer samtidigt.

@@ -244,6 +244,34 @@ namespace TextSync
             // --- förhandsvisning
             var split = new SplitContainer { Dock = DockStyle.Fill, Orientation = Orientation.Horizontal, SplitterWidth = 6, BackColor = Bg };
             list = new ListView { Dock = DockStyle.Fill, View = View.Details, FullRowSelect = true, GridLines = false, HideSelection = false, BorderStyle = BorderStyle.None };
+            // Mörkt läge: Windows mörka tema ritar kolumnrubrikerna med grå text, så de ritas här i stället (Theme.Apply slår på OwnerDraw).
+            // Raderna ritas som vanligt av Windows.
+            list.DrawColumnHeader += (s, e) =>
+            {
+                if (!Theme.Dark) { e.DrawDefault = true; return; }
+                using (var bg = new SolidBrush(Theme.Card)) e.Graphics.FillRectangle(bg, e.Bounds);
+                using (var pen = new Pen(Theme.BtnBorder))
+                {
+                    e.Graphics.DrawLine(pen, e.Bounds.Right - 1, e.Bounds.Top + 4, e.Bounds.Right - 1, e.Bounds.Bottom - 5);
+                    e.Graphics.DrawLine(pen, e.Bounds.Left, e.Bounds.Bottom - 1, e.Bounds.Right, e.Bounds.Bottom - 1);
+                }
+                var flags = TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.SingleLine |
+                    (e.Header.TextAlign == HorizontalAlignment.Right && e.ColumnIndex > 0 ? TextFormatFlags.Right : TextFormatFlags.Left);   // Windows vänsterjusterar alltid första kolumnen
+                var r = new Rectangle(e.Bounds.X + 6, e.Bounds.Y, e.Bounds.Width - 12, e.Bounds.Height);
+                TextRenderer.DrawText(e.Graphics, e.Header.Text, list.Font, r, Theme.Title, flags);
+            };
+            // Raderna ritas av Windows, utom den markerade raden i mörkt läge, som annars blir grå på grå
+            list.DrawItem += (s, e) => e.DrawDefault = !(Theme.Dark && e.Item.Selected);
+            list.DrawSubItem += (s, e) =>
+            {
+                if (!Theme.Dark || !e.Item.Selected) { e.DrawDefault = true; return; }
+                // första kolumnen får hela radens yta: begränsa till kolumnens bredd
+                var b = e.ColumnIndex == 0 ? new Rectangle(e.Bounds.X, e.Bounds.Y, e.Header.Width, e.Bounds.Height) : e.Bounds;
+                using (var bg = new SolidBrush(Theme.SelBg)) e.Graphics.FillRectangle(bg, b);
+                var flags = TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix |
+                    (e.Header.TextAlign == HorizontalAlignment.Right && e.ColumnIndex > 0 ? TextFormatFlags.Right : TextFormatFlags.Left);   // Windows vänsterjusterar alltid första kolumnen
+                TextRenderer.DrawText(e.Graphics, e.SubItem.Text, list.Font, new Rectangle(b.X + 6, b.Y, b.Width - 12, b.Height), Color.White, flags);
+            };
             float k = 1f;
             using (var gr = CreateGraphics()) k = gr.DpiX / 96f;
             list.Columns.Add("#", (int)(85 * k), HorizontalAlignment.Right);   // "Dela? 12" / "Ihop? 12" på förslagsrader
