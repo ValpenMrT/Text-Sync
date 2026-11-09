@@ -17,6 +17,15 @@ namespace TextSync
         public override string ToString() { return Track + "  + Whisper-kontroll"; }
     }
 
+    // Val i referenslistan: separat SRT på filmens originalspråk (t.ex. engelska) + kontroll med Whisper
+    public class OrigSrtOption
+    {
+        public string Path;
+        public List<Cue> Cues;
+        public int AudioIndex;
+        public override string ToString() { return "Separat SRT: " + System.IO.Path.GetFileName(Path) + "  + Whisper-kontroll"; }
+    }
+
     public class CheckedRegion { public double FromMs, ToMs, OffsetMs; public int Lines; }
 
     public class TextCheckResult
@@ -26,12 +35,13 @@ namespace TextSync
         public List<CheckedRegion> Regions = new List<CheckedRegion>();
         public double MedianAbsMs;            // typisk avvikelse där det stämde
         public List<KeyValuePair<double, double>> Anchors = new List<KeyValuePair<double, double>>(); // (tid, avvikelse) för felsökning
-        public string Summary()
+        public string Summary() { return Summary("textspåret"); }
+        public string Summary(string what)
         {
-            if (Anchored < 10) return "Whisper hittade för få gemensamma ord för att kunna kontrollera textspåret (annat språk?) – textspåret används oförändrat.";
+            if (Anchored < 10) return "Whisper hittade för få gemensamma ord för att kunna kontrollera " + what + " (annat språk?) – " + what + " används oförändrat.";
             var sb = new StringBuilder();
             sb.Append("Whisper-kontroll: " + Anchored + " av " + Lines + " rader jämförda, " + Math.Round(100.0 * Confirmed / Anchored) + " % inom 1 s");
-            if (Regions.Count == 0) sb.Append(" – textspåret går i takt med ljudet.");
+            if (Regions.Count == 0) sb.Append(" – " + what + " går i takt med ljudet.");
             else
             {
                 sb.Append(" – " + Regions.Sum(r => r.Lines) + " rader rättade i " + Regions.Count + " avsnitt: ");
@@ -131,6 +141,40 @@ namespace TextSync
                 else cur = null;
             }
             res.Regions = res.Regions.Where(r => r.Lines >= 2).ToList();
+            return res;
+        }
+
+        // Whispers ord → fraser (ord med kortare paus än 400 ms emellan), som referens för den grova synken
+        public static List<Cue> Phrases(List<Cue> words)
+        {
+            var res = new List<Cue>();
+            Cue cur = null;
+            foreach (var w in words.OrderBy(c => c.Start))
+            {
+                if (Words(w.Text).Length == 0) continue;
+                if (cur != null && w.Start - cur.End < 400 && w.End - cur.Start < 8000)
+                { cur.End = Math.Max(cur.End, w.End); cur.Text += " " + w.Text.Trim(); }
+                else { cur = new Cue(w.Start, Math.Max(w.End, w.Start + 100), w.Text.Trim()); res.Add(cur); }
+            }
+            return res;
+        }
+
+        // Separat SRT på originalspråket: 1) grov synk mot Whispers fraser (förskjutning, bildfrekvens, klipp),
+        // 2) ord för ord-kontroll som rättar det som fortfarande avviker. Coarse = resultatet av steg 1.
+        // speech = taldetekteringens avsnitt (A) eller null. A ger skarpast tider; Whispers fraser rensar bort musik och effekter (A+B).
+        public static TextCheckResult AlignToAudio(List<Cue> srt, List<Cue> words, List<Iv> speech, SyncOptions opt, Action<int, string> progress, out SyncResult coarse)
+        {
+            var phrases = Phrases(words);
+            if (phrases.Count < 20)
+                throw new UserMessageException("Whisper hörde nästan inget tal i ljudet, så undertexten på originalspråket kan inte kontrolleras. Välj ett annat alternativ i listan Referens.");
+            var refc = speech != null ? Audio.Combine(speech, phrases) : phrases;
+            if (refc.Count < 20) refc = phrases;
+            coarse = SyncEngine.Sync(refc, srt, opt, (p, s) => progress(p, "Synkar originaltexten mot ljudet… " + p + " %"));
+            var res = Check(coarse.Output, words);
+            res.Corrected = res.Corrected.OrderBy(c => c.Start).ToList();   // rättade avsnitt kan hamna i fel ordning
+            if (res.Anchored < 10)
+                throw new UserMessageException("Undertexten på originalspråket och det Whisper hörde har nästan inga ord gemensamt (" + res.Anchored + " rader). " +
+                    "Är det rätt språk? Den ska vara på samma språk som filmens ljud, t.ex. engelska.");
             return res;
         }
 

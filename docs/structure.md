@@ -8,7 +8,7 @@ src/
   CueDialog.cs     Dialog för att ändra eller lägga till en rad (start, slut, text)
   Audio.cs         Ljudreferens: ffmpeg → 16 kHz mono WAV (mittkanal), taldetektering (A), Whisper (B), kombination (A+B), cache
   Tools.cs         Hittar/laddar ner ffmpeg, whisper.cpp, språkmodell och Silero (fasta URL:er + SHA-256), grafikkort, inställningar
-  TextCheck.cs     Kontroll av textspår mot Whisper ord för ord (ankare, utjämning, rättning)
+  TextCheck.cs     Kontroll av textspår mot Whisper ord för ord (ankare, utjämning, rättning); separat SRT på originalspråket synkas först grovt mot ljudet
   Engine.cs        SRT läs/skriv och synkmotorn
   Mkv.cs           Minimal Matroska-läsare: spårlista och textundertexter (SRT/ASS/WebVTT, även zlib-komprimerade)
   Log.cs           Loggfil i %LOCALAPPDATA%\TextSync\log.txt
@@ -21,6 +21,7 @@ test/
   ToolsDl.cs       Hämtar ljudverktygen med programmets egen nedladdningskod
   TextCheckDiag.cs Testar Whisper-kontrollen: orört spår och med flit förskjutet spår
   VadTune.cs       Justerar taldetekteringens gräns mot facit
+  OrigSrtDiag.cs   Separat engelsk SRT (förstörd med flit) → ljud → svensk synk, mot facit
 docs/              Beslut, drift, FAQ, nästa fas (next.md)
 ```
 

@@ -2,6 +2,38 @@
 
 Nyast först.
 
+## 2026-11-09 – Varning innan Whisper körs på processorn
+- **Område:** GUI
+- **Beslut:** Är processorn vald och Whisper-resultatet för filmen inte redan sparat i cachen, frågar programmet innan det startar: det tar ungefär lika lång tid som filmen. Det gäller Ljud B, A+B, Whisper-kontrollen och originaltexten.
+- **Varför:** Vänner utan NVIDIA-kort skulle annars vänta 1–2 timmar och bara se en procentsiffra. Ägaren valde varningen i product-check.
+- **Nivå:** LIVE
+
+## 2026-11-09 – Product-check av 1.7 (originaltext)
+- **Område:** GUI / synk
+- **Beslut:** Följande rättades efter en oberoende granskning:
+  - Ligger filmen redan i fält 1 och man drar in två SRT-filer, behålls filmen och den andra SRT-filen blir originaltext.
+  - Programmet säger till när fler än två SRT-filer dras in, och när originaltexten inte kunde användas.
+  - Den sparade originaltexten får språkkod från filnamnet, annars från det språk Whisper hörde, annars en.
+  - Steget med originaltexten körs alltid i Smart-läge med bildfrekvensdetektering, oavsett valen för den svenska synken.
+  - Väljer man samma fil som i fält 2 får man ett tydligt fel.
+  - Info-raden följer valet i listan, och länken byter namn till "Byt …".
+  - De rättade raderna sorteras.
+- **Ägarens val:** Den synkade engelska texten räknas inte som osparad när fönstret stängs, eftersom cachen gör en ny körning snabb.
+- **Nivå:** LIVE
+
+## 2026-11-09 – Separat SRT på originalspråket + Whisper-kontroll
+- **Område:** Synk / GUI
+- **Beslut:** Har filmen inget eget engelskt textspår kan man lägga till en separat SRT på filmens originalspråk. Det görs med länken "Lägg till undertext på filmens originalspråk (SRT)…", eller genom att dra in filmen och två SRT-filer. Kedjan:
+  1. Den engelska SRT-filen synkas grovt mot ljudet, med taldetektering (A) som tider och Whispers fraser som rensning, alltså samma idé som A+B. Det hanterar förskjutning, bildfrekvens och klipp.
+  2. Whisper-kontrollen rättar ord för ord det som fortfarande avviker.
+  3. Den svenska texten synkas mot den rättade engelska.
+
+  Den rättade engelska texten kan sparas med "Spara synkad originaltext…" (Film.en.srt).
+- **Varför:** Ägarens önskemål nr 1 i docs/next.md. Ord för ord-kontrollen söker bara ±60 s, så en SRT med fel bildfrekvens (cirka 5 min drift på 2 timmar) måste först synkas grovt.
+- **Test (Blacklist S04E01, engelska spåret förstört med flit, test/OrigSrtDiag.cs):** +7 s, 25→23,976 fps −3 s, klipp vid 20:00 och 10–15 min +3 s gav 88–100 % av de engelska raderna inom 0,3 s. Den svenska texten hamnade inom 0,3 s på 95–100 % av raderna, med 0 rader över 1 s. Direkt svensk synk mot ljudet (A+B) gav 94 % och 8 rader över 1 s. Med bara Whispers fraser som tider blev det sämre: 0,29 s fast avvikelse, och klippfallet blev fel.
+- **Kvar:** En fast avvikelse på cirka 0,24 s mot facit, som vid all synk mot ljudet. Ljudet läses ur filmen två gånger (taldetektering och Whisper), men båda resultaten sparas i cachen.
+- **Nivå:** LIVE
+
 ## 2026-11-09 – Textspår + Whisper-kontroll
 - **Område:** Synk
 - **Beslut:** Ett eget val i referenslistan, "Spår N + Whisper-kontroll", för varje textspår som inte är tvingat. Whisper körs i ordläge. Varje engelsk rads första ord letas upp i det Whisper hörde (±60 s), och varje träff blir en ankarpunkt. Där minst 6 av de 9 närmaste ankarpunkterna är överens och avviker mer än 1 s från den typiska nivån rättas textspåret innan den svenska texten synkas mot det.

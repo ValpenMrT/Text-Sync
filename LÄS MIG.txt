@@ -4,6 +4,8 @@ TEXT SYNC – synka undertexter mot en annan undertext
 Så här gör du
 1. Dra in filmen (MKV) och den svenska SRT-filen i fönstret
    (eller använd Bläddra…). Referensen kan också vara en engelsk SRT.
+   Saknar filmen engelsk text men du har en engelsk SRT som inte går i takt:
+   dra in filmen + båda SRT-filerna, så synkas den engelska mot ljudet först.
 2. Klicka "Synka". Titta på några rader i listan – den engelska texten
    bredvid ska betyda samma sak.
 3. "Spara SRT…" – sparas som  Filmnamn.sv.srt  bredvid filmen, så hittar

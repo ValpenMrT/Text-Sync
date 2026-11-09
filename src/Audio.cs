@@ -369,6 +369,13 @@ namespace TextSync
                 return BitConverter.ToString(sha.ComputeHash(Encoding.UTF8.GetBytes(raw))).Replace("-", "").Substring(0, 20);
         }
 
+        // Finns Whisper-resultatet redan i cachen? (då går det snabbt även utan grafikkort)
+        public static bool HasWhisperCache(string file, int audioIndex, bool words)
+        {
+            try { return File.Exists(Path.Combine(CacheDir, CacheKey(file, audioIndex) + (words ? ".words.srt" : ".whisper.srt"))); }
+            catch { return false; }
+        }
+
         public static AudioRefResult GetReference(string file, AudioRefOption opt, Action<int, string> progress, CancellationToken ct)
         {
             Directory.CreateDirectory(CacheDir);

@@ -34,6 +34,9 @@ Första gången laddar Text Sync ner de gratisverktyg som behövs. Programmet fr
 **Kan Whisper kontrollera att filmens engelska textspår går i takt?**
 Ja. Välj "Spår N … + Whisper-kontroll" i listan **Referens**. Whisper lyssnar ord för ord, och delar av textspåret som ligger mer än ungefär 1 s fel rättas innan din svenska text synkas. I resultatet står hur mycket som kontrollerades och vad som rättades. Det tar ungefär 1 minut per avsnitt med NVIDIA-grafikkort. Välj grafikkort i listan bredvid.
 
+**Filmen har ingen engelsk text, men jag har en engelsk SRT som inte går i takt. Kan den användas?**
+Ja. Klicka **Lägg till undertext på filmens originalspråk (SRT)…** under fält 1, eller dra in filmen och båda SRT-filerna samtidigt. Den svenska texten hamnar i fält 2 och den engelska blir originaltext. Den engelska synkas först mot filmens ljud och kontrolleras ord för ord med Whisper. Sedan synkas den svenska mot den. Den synkade engelska texten kan du spara med **Spara synkad originaltext…**. SRT-filen måste vara på samma språk som filmens ljud.
+
 **Fungerar ljudsynk på korta klipp?**
 Bäst på hela filmer och avsnitt. På korta klipp, som 10 minuter, kan synken hamna fel, eftersom det pratas nästan hela tiden. Kontrollera resultatet i listan.
 

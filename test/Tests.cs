@@ -188,6 +188,25 @@ namespace TextSync
                 MainForm.PlanRoute(new[] { @"C:\a\bild.jpg" }, "sv", out rf, out tf, out note);
                 bool r6 = rf == null && tf == null && note != null;
                 Console.WriteLine("Route: mkv+srt={0} sv+en={1} 3letter={2} oneUnknown={3} bothUnknown={4} unsupported={5}", r1, r2, r3, r4, r5, r6);
+                // film + två SRT: den svenska synkas, den andra blir originaltext som kontrolleras mot ljudet
+                string of;
+                MainForm.PlanRoute(new[] { @"C:\a\Film.en.srt", @"C:\a\Film.mkv", @"C:\a\Film.sv.srt" }, "sv", out rf, out tf, out of, out note);
+                bool o1 = rf == @"C:\a\Film.mkv" && tf == @"C:\a\Film.sv.srt" && of == @"C:\a\Film.en.srt" && note == null;
+                MainForm.PlanRoute(new[] { @"C:\a\Film.mkv", @"C:\a\svensk.srt", @"C:\a\Film.eng.srt" }, "sv", out rf, out tf, out of, out note);
+                bool o2 = tf == @"C:\a\svensk.srt" && of == @"C:\a\Film.eng.srt" && note == null;
+                MainForm.PlanRoute(new[] { @"C:\a\Film.mkv", @"C:\a\A.srt", @"C:\a\B.srt" }, "sv", out rf, out tf, out of, out note);
+                bool o3 = tf == @"C:\a\B.srt" && of == @"C:\a\A.srt" && note != null;
+                MainForm.PlanRoute(new[] { @"C:\a\Film.mkv", @"C:\a\Film.sv.srt" }, "sv", out rf, out tf, out of, out note);
+                bool o4 = of == null && tf == @"C:\a\Film.sv.srt";
+                Console.WriteLine("Route3: mkv+en+sv={0} oneUnknown={1} bothUnknown={2} noOrig={3}", o1, o2, o3, o4);
+            }
+
+            // Whispers ord → fraser (referens för originaltextens grova synk)
+            {
+                var w = new List<Cue> { new Cue(1000, 1300, "Hello"), new Cue(1400, 1700, "there."), new Cue(3000, 3300, "Bye"), new Cue(3350, 3360, " "), new Cue(9000, 9200, "Again") };
+                var ph = TextCheck.Phrases(w);
+                bool ok = ph.Count == 3 && ph[0].Text == "Hello there." && ph[0].End == 1700 && ph[1].Text == "Bye" && ph[2].Start == 9000;
+                Console.WriteLine("Phrases: {0}", ok);
             }
 
             // SRT-specialfall och teckenkodningar
