@@ -350,6 +350,60 @@ namespace TextSync
                 }
             }
 
+            // Matcha raderna mot referensen: slå ihop 2 ↔ 1 och dela 1 ↔ 2
+            {
+                var er = new List<Cue> {
+                    new Cue(1000, 3000, "Hello there."),
+                    new Cue(10000, 12000, "Where were you?"),
+                    new Cue(12200, 14000, "At the office."),
+                    new Cue(20000, 24000, "I told you I'd be late, so don't wait up."),
+                    new Cue(30000, 32000, "Okay."),
+                    new Cue(32100, 34000, "Fine."),
+                    new Cue(40000, 42000, "- Where are you?\n- Home."),
+                    new Cue(50000, 52000, "(tal)") };
+                var sv = new List<Cue> {
+                    new Cue(1050, 2950, "Hej på dig."),
+                    new Cue(10100, 14000, "- Var var du?\n- På kontoret."),
+                    new Cue(20000, 22000, "Jag sa att jag skulle bli sen,"),
+                    new Cue(22100, 24000, "så vänta inte uppe."),
+                    new Cue(30000, 34000, "okej då bra då"),
+                    new Cue(40000, 41000, "Var är du?"),
+                    new Cue(41100, 42000, "Hemma."),
+                    new Cue(50000, 52000, "Hallå?") };
+                var props = LineAligner.Propose(sv, er);
+                foreach (var q in props) Console.WriteLine("Matchning: " + q.Describe() + "  [" + Srt.FormatTime(q.NewCues[0].Start) + "–" + Srt.FormatTime(q.NewCues[q.NewCues.Count - 1].End) + "]");
+                Check("Matchning: tre förslag (en delning, två sammanslagningar)", props.Count == 3);
+                var sp = props.FirstOrDefault(q => !q.IsMerge);
+                Check("Matchning: \"- Var var du? / - På kontoret.\" delas vid frågetecknet och får referensens tider",
+                    sp != null && sp.First == 1 && sp.NewCues[0].Text == "Var var du?" && sp.NewCues[1].Text == "På kontoret." &&
+                    sp.NewCues[0].Start == 10000 && sp.NewCues[0].End == 12000 && sp.NewCues[1].Start == 12200 && sp.NewCues[1].End == 14000);
+                var mg = props.FirstOrDefault(q => q.IsMerge && q.First == 2);
+                Check("Matchning: två svenska rader slås ihop till en med den engelska radens tid",
+                    mg != null && mg.NewCues[0].Text == "Jag sa att jag skulle bli sen,\nså vänta inte uppe." && mg.NewCues[0].Start == 20000 && mg.NewCues[0].End == 24000);
+                var dl = props.FirstOrDefault(q => q.IsMerge && q.First == 5);
+                Check("Matchning: replikstreck läggs till när referensen visar två personer",
+                    dl != null && dl.NewCues[0].Text == "- Var är du?\n- Hemma.");
+                Check("Matchning: en rad utan skiljetecken eller radbrytning delas inte", !props.Any(q => q.First == 4));
+                Check("Matchning: rader som redan motsvarar en referensrad rörs inte", !props.Any(q => q.First == 0 || q.First == 7));
+
+                Check("Matchning: delar inte mitt i en mening när referensens första rad slutar med punkt",
+                    LineAligner.SplitText("Jag iscensatte min död för att få ett\nnormalt liv, men jag hålls som fånge.",
+                        "I faked my death to have a normal life.", "There's nothing normal about being held prisoner.") == null);
+                var mid = LineAligner.SplitText("Det är så ofta folk överskattar sig\nsjälva och missbrukar sina förmågor.",
+                    "So often people overestimate themselves...", "...misapply their gifts.");
+                Check("Matchning: delar mitt i en mening när referensen också gör det (\"...\")",
+                    mid != null && mid[0] == "Det är så ofta folk överskattar sig" && mid[1] == "själva och missbrukar sina förmågor.");
+                Check("Matchning: inga förslag mot en gles referens (t.ex. bara tvingad text)",
+                    LineAligner.Propose(sv, er.Take(3).ToList()).Count == 0);
+
+                string lay = LineAligner.Layout("Det här är en ganska lång mening som inte får plats på en enda rad alls");
+                Console.WriteLine("Matchning, radbrytning: " + (lay ?? "(null)").Replace("\n", " / "));
+                Check("Matchning: lång text bryts på två rader med högst 42 tecken",
+                    lay != null && lay.Split('\n').Length == 2 && lay.Split('\n').All(l => l.Length <= LineAligner.MaxChars));
+                Check("Matchning: sammanslagning som blir längre än två rader à 42 tecken föreslås inte",
+                    LineAligner.MergeText("Det här är en rad som är ganska så lång,\noch här kommer en till som är lång", "och sedan en tredje rad som inte får plats.", "x") == null);
+            }
+
             Console.WriteLine();
             if (muxSkipped) Console.WriteLine("OBS: testet av \"Lägg in i MKV\" hoppades över, eftersom mkvmerge (MKVToolNix) inte är installerat.");
             if (failed == 0) Console.WriteLine("RESULTAT: alla {0} kontroller gick igenom.", checks);

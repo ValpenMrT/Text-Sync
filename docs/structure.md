@@ -10,6 +10,8 @@ src/
   Program.cs       Start, globala felhanterare (visar svenskt felmeddelande och skriver loggen)
   MainForm.cs      Hela gränssnittet: inläsning, synk, förhandsvisning, redigering med ångra, sparande, MKV-inbäddning, tidslinje
   CueDialog.cs     Dialog för att ändra eller lägga till en rad (start, slut, text)
+  Align.cs         Förslag om att slå ihop (2↔1) eller dela (1↔2) rader efter referensens radindelning (dynamisk programmering på tider)
+  Theme.cs         Ljust/mörkt läge: paletter, färgbyte på kontrollerna, mörka Windows-delar (rullister, rubriker, titelrad)
   Audio.cs         Ljudreferens: ffmpeg → 16 kHz mono WAV (mittkanal), taldetektering (A), Whisper (B), kombination (A+B), cache
   Tools.cs         Hittar/laddar ner ffmpeg, whisper.cpp, språkmodell och Silero (fasta URL:er + SHA-256), grafikkort, inställningar
   TextCheck.cs     Kontroll av textspår mot Whisper ord för ord (ankare, utjämning, rättning); separat SRT på originalspråket synkas först grovt mot ljudet
@@ -19,7 +21,8 @@ src/
   TextSync.ico     Programikon
 test/
   Tests.cs         Tester: synk i 7 scenarier × 3 metoder (G = korta klipp), tid före synk, SRT/teckenkodningar, dra-och-släpp-fördelning,
-                   spara med säkerhetskopia, MKV-läsning (egen MKV-skrivare, avkortade filer), mkvmerge-inbäddning
+                   spara med säkerhetskopia, MKV-läsning (egen MKV-skrivare, avkortade filer), mkvmerge-inbäddning,
+                   matchning av rader (dela, slå ihop, radlängd, mitt i mening, gles referens)
   Diag.cs          Felsökning mot riktiga filer: skriver ut avsnitt, träffsäkerhet och rader utan referens
   AudioDiag.cs     Jämför ljudsynk A, B och A+B mot facit (synk mot filmens undertextspår)
   ToolsDl.cs       Hämtar ljudverktygen med programmets egen nedladdningskod

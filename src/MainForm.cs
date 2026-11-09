@@ -12,21 +12,25 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using Microsoft.Win32;
 
 namespace TextSync
 {
     public class MainForm : Form
     {
-        // Högkontrastläge i Windows: använd systemets färger i stället för egna
-        public static readonly bool HC = SystemInformation.HighContrast;
-        static readonly Color Accent = HC ? SystemColors.Highlight : Color.FromArgb(0, 103, 192);
-        static readonly Color Bg = HC ? SystemColors.Control : Color.FromArgb(243, 243, 243);
-        static readonly Color Card = HC ? SystemColors.Window : Color.White;
-        static readonly Color Muted = HC ? SystemColors.WindowText : Color.FromArgb(96, 96, 96);
-        static readonly Color ErrColor = HC ? SystemColors.WindowText : Color.Firebrick;
-        static readonly Color OkColor = HC ? SystemColors.WindowText : Color.FromArgb(16, 110, 40);
-        static readonly Color RedRow = HC ? SystemColors.GrayText : Color.FromArgb(170, 60, 60);
-        static readonly Color TitleColor = HC ? SystemColors.WindowText : Color.FromArgb(28, 28, 28);
+        // Högkontrastläge i Windows: använd systemets färger i stället för egna. Färgerna kommer från Theme (ljust/mörkt läge).
+        public static readonly bool HC = Theme.HC;
+        static Color Accent { get { return Theme.Accent; } }
+        static Color Bg { get { return Theme.Bg; } }
+        static Color Card { get { return Theme.Card; } }
+        static Color Muted { get { return Theme.Muted; } }
+        static Color ErrColor { get { return Theme.Err; } }
+        static Color OkColor { get { return Theme.Ok; } }
+        static Color RedRow { get { return Theme.RedRow; } }
+        static Color TitleColor { get { return Theme.Title; } }
+        static Color RefOnlyRow { get { return Theme.RefOnly; } }
+        static Color PropRow { get { return Theme.Prop; } }
+        ComboBox themeCombo;
         public const string BackupFolder = "Text Sync original";
         static readonly string Caption = "Text Sync " + Program.Version;
         readonly Stack<List<Cue>> undo = new Stack<List<Cue>>(); // för att ångra ändringar av rader
@@ -35,7 +39,15 @@ namespace TextSync
         int[] rowCue;                  // listrad -> index i synced, -1 = grå referensrad utan egen synkad rad
         int[] cueRow;                  // index i synced -> listrad
         Cue[] rowRef;                  // listrad -> referensraden som visas (eller null)
-        static readonly Color RefOnlyRow = HC ? SystemColors.GrayText : Color.FromArgb(110, 110, 110);
+        // vilka rader listan visar: 0 = alla, 1 = dölj grå rader, 2 = bara röda rader (sparas mellan körningar)
+        const int ViewAll = 0, ViewNoGray = 1, ViewOnlyRed = 2, ViewProposals = 3;
+        ComboBox viewCombo; Label viewInfo; LinkLabel acceptAllLink; CheckBox proposeCheck;
+        int refOnlyTotal;              // antal grå referensrader, även de som är dolda
+        // förslag på att slå ihop eller dela rader så att de följer referensens radindelning (blå rader)
+        List<AlignProposal> proposals = new List<AlignProposal>();
+        int[] cueProp;                 // index i synced -> index i proposals, -1 = inget förslag
+        readonly HashSet<string> rejected = new HashSet<string>();   // avvisade förslag (AlignProposal.Key)
+        bool refIsText;                // referensen är riktig text (inte ljud), så att raderna kan matchas
         LinkLabel undoLink;
         Label gpuLabel; ComboBox gpuCombo; List<int> gpuDevices; bool gpuFilling;
         List<Cue> transcript; string transcriptLang = ""; // Whisper-text från senaste ljudsynk
@@ -75,7 +87,8 @@ namespace TextSync
             AutoScaleMode = AutoScaleMode.Dpi;
             Text = "Text Sync " + Program.Version;
             Font = new Font("Segoe UI", 9.5F);
-            BackColor = Bg;
+            Theme.Set(Theme.WantDark(Theme.Mode));
+            BackColor = Bg; ForeColor = Theme.Fg;
             MinimumSize = new Size(940, 600);
             Size = new Size(1080, 1000);
             StartPosition = FormStartPosition.Manual;
@@ -101,7 +114,25 @@ namespace TextSync
             var sub = new Label { Text = "Synka en undertext mot en annan undertext (annat språk) som redan går i takt med filmen.", AutoSize = true, Location = new Point(3, 36), ForeColor = Muted };
             var ver = new Label { Text = "version " + Program.Version, AutoSize = true, ForeColor = Muted, Location = new Point(title.PreferredWidth + 8, 14) };
             head.Controls.Add(title); head.Controls.Add(ver); head.Controls.Add(sub);
-            head.Layout += (s, e) => { ver.Left = title.Right + 6; ver.Top = title.Bottom - ver.Height - (int)(title.Height * 0.12); };
+            // utseende: som Windows, ljust eller mörkt (döljs i högkontrastläge, där Windows färger alltid används)
+            var themeRow = new FlowLayoutPanel { AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, WrapContents = false, Visible = !HC };
+            themeRow.Controls.Add(new Label { Text = "&Utseende:", AutoSize = true, Margin = new Padding(0, 6, 6, 0) });
+            themeCombo = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 150, Margin = new Padding(0, 2, 0, 0), AccessibleName = "Utseende" };
+            themeCombo.Items.AddRange(new object[] { "Som Windows", "Ljust", "Mörkt" });
+            string tm = Theme.Mode;
+            themeCombo.SelectedIndex = tm == Theme.Light ? 1 : tm == Theme.Dark_ ? 2 : 0;
+            themeCombo.SelectedIndexChanged += (s, e) =>
+            {
+                Theme.Mode = themeCombo.SelectedIndex == 1 ? Theme.Light : themeCombo.SelectedIndex == 2 ? Theme.Dark_ : Theme.Auto;
+                ApplyTheme();
+            };
+            themeRow.Controls.Add(themeCombo);
+            head.Controls.Add(themeRow);
+            head.Layout += (s, e) =>
+            {
+                ver.Left = title.Right + 6; ver.Top = title.Bottom - ver.Height - (int)(title.Height * 0.12);
+                themeRow.Left = head.ClientSize.Width - themeRow.Width; themeRow.Top = 2;
+            };
             KeyPreview = true;
             KeyDown += (s, e) =>
             {
@@ -215,7 +246,7 @@ namespace TextSync
             list = new ListView { Dock = DockStyle.Fill, View = View.Details, FullRowSelect = true, GridLines = false, HideSelection = false, BorderStyle = BorderStyle.None };
             float k = 1f;
             using (var gr = CreateGraphics()) k = gr.DpiX / 96f;
-            list.Columns.Add("#", (int)(50 * k), HorizontalAlignment.Right);
+            list.Columns.Add("#", (int)(85 * k), HorizontalAlignment.Right);   // "Dela? 12" / "Ihop? 12" på förslagsrader
             list.Columns.Add("Före synk", (int)(95 * k));
             list.Columns.Add("Synkad start", (int)(95 * k));
             list.Columns.Add("Synkad slut", (int)(95 * k));
@@ -259,7 +290,11 @@ namespace TextSync
             var miDel = new ToolStripMenuItem("Ta bort markerade rader", null, (s, e) => DeleteSelected()) { ShortcutKeyDisplayString = "Delete" };
             var miNext = new ToolStripMenuItem("Gå till nästa röda rad", null, (s, e) => NextUnmatched()) { ShortcutKeyDisplayString = "F3" };
             var miUndo = new ToolStripMenuItem("Ångra", null, (s, e) => UndoChange()) { ShortcutKeyDisplayString = "Ctrl+Z" };
-            menu.Items.AddRange(new ToolStripItem[] { miEdit, miAdd, miDel, new ToolStripSeparator(), miNext, miUndo });
+            var miAccept = new ToolStripMenuItem("Godkänn förslaget", null, (s, e) => AcceptProposals(SelectedProposals()));
+            var miReject = new ToolStripMenuItem("Avvisa förslaget", null, (s, e) => RejectProposals(SelectedProposals()));
+            var miAcceptAll = new ToolStripMenuItem("Godkänn alla förslag", null, (s, e) => AcceptProposals(proposals));
+            var propSep = new ToolStripSeparator();
+            menu.Items.AddRange(new ToolStripItem[] { miEdit, miAdd, miDel, new ToolStripSeparator(), miNext, miUndo, propSep, miAccept, miReject, miAcceptAll });
             menu.Opening += (s, e) =>
             {
                 if (synced == null || busy) { e.Cancel = true; return; }
@@ -271,9 +306,46 @@ namespace TextSync
                 miDel.Text = n > 1 ? "Ta bort " + n + " markerade rader" : "Ta bort markerad rad";
                 miNext.Enabled = rowMatched != null && rowMatched.Any(m => !m);
                 miUndo.Enabled = undo.Count > 0;
+                int np = SelectedProposals().Count;
+                propSep.Visible = miAccept.Visible = miReject.Visible = miAcceptAll.Visible = proposals.Count > 0;
+                miAccept.Enabled = miReject.Enabled = np > 0;
+                miAccept.Text = np > 1 ? "Godkänn " + np + " markerade förslag" : "Godkänn förslaget";
+                miReject.Text = np > 1 ? "Avvisa " + np + " markerade förslag" : "Avvisa förslaget";
+                miAcceptAll.Text = "Godkänn alla förslag (" + proposals.Count + ")";
             };
             list.ContextMenuStrip = menu;
             split.Panel1.Controls.Add(list);
+            // val av vilka rader som visas (läggs till efter listan så att den dockas överst)
+            var vbar = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, WrapContents = true, Margin = new Padding(0), Padding = new Padding(0, 0, 0, 4) };
+            vbar.Controls.Add(new Label { Text = "&Visa:", AutoSize = true, Margin = new Padding(0, 7, 6, 0) });
+            viewCombo = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 340, Margin = new Padding(0, 3, 12, 0), AccessibleName = "Vilka rader listan visar" };
+            viewCombo.Items.AddRange(new object[] {
+                "Alla rader",
+                "Dölj grå rader (finns bara i referensen)",
+                "Bara röda rader (ingen referenstext samtidigt)",
+                "Bara förslag (blå rader att slå ihop eller dela)" });
+            int view; if (!int.TryParse(Tools.GetSetting("view", "0"), out view) || view < 0 || view >= viewCombo.Items.Count) view = ViewAll;
+            viewCombo.SelectedIndex = view;
+            viewCombo.SelectedIndexChanged += (s, e) =>
+            {
+                Tools.SetSetting("view", viewCombo.SelectedIndex.ToString());
+                if (result != null) RefreshPreview();
+            };
+            vbar.Controls.Add(viewCombo);
+            // förslag om att dela/slå ihop rader är avstängda från början (ägarens val) och sparas mellan körningar
+            proposeCheck = new CheckBox { Text = "Föreslå radindelning som referensen", AutoSize = true, Margin = new Padding(0, 6, 12, 0), Checked = Tools.GetSetting("propose", "0") == "1" };
+            proposeCheck.CheckedChanged += (s, e) =>
+            {
+                Tools.SetSetting("propose", proposeCheck.Checked ? "1" : "0");
+                if (result != null) RefreshPreview();
+            };
+            vbar.Controls.Add(proposeCheck);
+            viewInfo = new Label { AutoSize = true, ForeColor = Muted, Margin = new Padding(0, 7, 12, 0) };
+            vbar.Controls.Add(viewInfo);
+            acceptAllLink = new LinkLabel { AutoSize = true, Margin = new Padding(0, 7, 0, 0), Visible = false, LinkColor = Accent };
+            acceptAllLink.LinkClicked += (s, e) => AcceptProposals(proposals);
+            vbar.Controls.Add(acceptAllLink);
+            split.Panel1.Controls.Add(vbar);
             timeline = new TimelinePanel { Dock = DockStyle.Fill };
             split.Panel2.Controls.Add(timeline);
             split.FixedPanel = FixedPanel.Panel2;
@@ -314,7 +386,38 @@ namespace TextSync
             brow.Controls.Add(helpLink, ctrls.Count + 1, 0);
             root.Controls.Add(brow, 0, 6);
 
+            Theme.Apply(this, null);
+            Theme.ApplyMenu(list.ContextMenuStrip);
+            // "Som Windows": följ med när mörkt läge slås på eller av i Windows
+            SystemEvents.UserPreferenceChanged += OnUserPreferenceChanged;
             ResumeLayout(true);
+        }
+
+        void OnUserPreferenceChanged(object sender, UserPreferenceChangedEventArgs e)
+        {
+            if (e.Category != UserPreferenceCategory.General || Theme.Mode != Theme.Auto || IsDisposed || !IsHandleCreated) return;
+            BeginInvoke(new Action(ApplyTheme));
+        }
+
+        protected override void OnFormClosed(FormClosedEventArgs e)
+        {
+            SystemEvents.UserPreferenceChanged -= OnUserPreferenceChanged;
+            base.OnFormClosed(e);
+        }
+
+        // Byt mellan ljust och mörkt medan programmet körs
+        void ApplyTheme()
+        {
+            if (HC) return;
+            bool dark = Theme.WantDark(Theme.Mode);
+            if (dark == Theme.Dark) return;
+            var map = Theme.Set(dark);
+            SuspendLayout();
+            Theme.Apply(this, map);
+            Theme.ApplyMenu(list.ContextMenuStrip);
+            ResumeLayout(true);
+            if (result != null) RefreshPreview();   // radfärgerna i listan
+            Invalidate(true);
         }
 
         // Fönstret får aldrig bli större än skärmen (t.ex. laptop med 150 % skalning)
@@ -365,15 +468,16 @@ namespace TextSync
             var b = new Button { Text = text, AutoSize = false, Width = 100, Height = 30, FlatStyle = FlatStyle.Flat, Cursor = Cursors.Hand };
             if (HC) { b.FlatStyle = FlatStyle.System; b.UseVisualStyleBackColor = true; return b; }
             b.FlatAppearance.BorderSize = 1;
+            b.Tag = primary ? "primary" : "secondary";   // Theme.Apply färgar knappen efter detta
             if (primary)
             {
                 b.BackColor = Accent; b.ForeColor = Color.White; b.FlatAppearance.BorderColor = Accent;
                 b.Font = new Font("Segoe UI Semibold", 9.5F);
-                b.EnabledChanged += (s, e) => { b.BackColor = b.Enabled ? Accent : Color.FromArgb(200, 200, 200); };
+                b.EnabledChanged += (s, e) => { b.BackColor = b.Enabled ? Accent : Theme.BtnDisabled; b.FlatAppearance.BorderColor = b.BackColor; };
             }
             else
             {
-                b.BackColor = Color.White; b.FlatAppearance.BorderColor = Color.FromArgb(200, 200, 200);
+                b.BackColor = Theme.BtnBg; b.ForeColor = Theme.Fg; b.FlatAppearance.BorderColor = Theme.BtnBorder;
             }
             return b;
         }
@@ -692,7 +796,10 @@ namespace TextSync
         {
             result = null; synced = null; refCuesUsed = null; unsaved = false;
             if (list != null) list.Items.Clear();
-            rowCue = null; cueRow = null; rowRef = null;
+            rowCue = null; cueRow = null; rowRef = null; refOnlyTotal = 0;
+            proposals = new List<AlignProposal>(); cueProp = null; rejected.Clear();
+            if (viewInfo != null) viewInfo.Text = "";
+            if (acceptAllLink != null) acceptAllLink.Visible = false;
             if (resultLabel != null) resultLabel.Visible = false;
             if (openLink != null) openLink.Visible = false;
             undo.Clear(); rowMatched = null; transcript = null; origSynced = null; origUsed = null; if (saveTextBtn != null) saveTextBtn.Visible = false;
@@ -801,6 +908,46 @@ namespace TextSync
             }
         }
 
+        // Förslag som berör de markerade raderna
+        List<AlignProposal> SelectedProposals()
+        {
+            var r = new List<AlignProposal>();
+            if (cueProp == null) return r;
+            foreach (int ci in SelectedCues())
+                if (ci < cueProp.Length && cueProp[ci] >= 0 && !r.Contains(proposals[cueProp[ci]])) r.Add(proposals[cueProp[ci]]);
+            return r;
+        }
+
+        // Slå ihop eller dela raderna enligt förslagen. Ett enda steg att ångra, även för alla förslag på en gång.
+        void AcceptProposals(List<AlignProposal> ps)
+        {
+            if (busy || result == null || ps == null || ps.Count == 0) return;
+            ps = new List<AlignProposal>(ps);
+            double extra = (double)extraNum.Value;
+            var replaced = new HashSet<int>(); var added = new List<Cue>();
+            foreach (var p in ps)
+            {
+                for (int k = 0; k < p.Count; k++) replaced.Add(p.First + k);
+                foreach (var c in p.NewCues) added.Add(new Cue(c.Start - extra, c.End - extra, c.Text) { OrigStart = c.OrigStart });
+            }
+            var list2 = result.Output.Where((c, i) => !replaced.Contains(i)).Concat(added).ToList();
+            int merged = ps.Count(p => p.IsMerge), splits = ps.Count - merged;
+            var parts = new List<string>();
+            if (merged > 0) parts.Add(merged == 1 ? "1 sammanslagning" : merged + " sammanslagningar");
+            if (splits > 0) parts.Add(splits == 1 ? "1 delning" : splits + " delningar");
+            string what = string.Join(" och ", parts);
+            Changed(list2, added[0], "Godkände " + what + ". Ctrl+Z ångrar.", "Godkände förslag: " + what);
+        }
+
+        // Avvisade förslag visas inte igen förrän nästa synk
+        void RejectProposals(List<AlignProposal> ps)
+        {
+            if (busy || result == null || ps == null || ps.Count == 0) return;
+            foreach (var p in ps) rejected.Add(p.Key);
+            RefreshPreview();
+            SetStatus(ps.Count == 1 ? "Förslaget avvisat." : ps.Count + " förslag avvisade.", false);
+        }
+
         void UndoChange()
         {
             if (busy || result == null || undo.Count == 0) return;
@@ -826,7 +973,12 @@ namespace TextSync
             for (int k = 0; k < rowMatched.Length; k++)
             {
                 int i = (from + k) % rowMatched.Length;
-                if (!rowMatched[i]) { SelectRow(i); return; }
+                if (!rowMatched[i])
+                {
+                    // den röda raden är dold av valet i Visa: visa alla rader först
+                    if (cueRow != null && i < cueRow.Length && cueRow[i] < 0) viewCombo.SelectedIndex = ViewAll;
+                    SelectRow(i); return;
+                }
             }
             SetStatus("Alla rader har referenstext samtidigt.", true);
         }
@@ -1105,6 +1257,9 @@ namespace TextSync
                 saveTextBtn.Text = origSynced != null ? "Spara synkad originaltext…" : "Spara igenkänd text…";
                 saveTextBtn.Visible = transcript != null || origSynced != null;
                 refCuesUsed = refc;
+                // raderna kan bara matchas mot riktig text: textspår, SRT eller originaltext, inte ljudet
+                refIsText = mkvPath == null || !(trackCombo.SelectedItem is AudioRefOption);
+                rejected.Clear();
                 result = r;
                 undo.Clear();
                 unsaved = true;
@@ -1163,8 +1318,10 @@ namespace TextSync
             if (r.FpsText.Length > 0) sb.Append(r.FpsText + "\n");
             foreach (var n in r.Notes) sb.Append("⚠  " + n + "\n");
             if (!good) sb.Append("Under 95 % av raderna har referenstext samtidigt – granska de röda raderna (F3 hoppar till nästa).\n");
-            int refOnlyRows = rowCue != null ? rowCue.Count(x => x < 0) : 0;
-            if (refOnlyRows > 0) sb.Append("Listan visar alla rader i båda texterna. " + refOnlyRows + " grå rader är referensrader utan egen synkad rad och sparas inte.\n");
+            if (proposals.Count > 0)
+                sb.Append(proposals.Count + " förslag om att slå ihop eller dela rader så att de följer referensens radindelning och tider (blå i listan). " +
+                    "Högerklicka för att godkänna eller avvisa.\n");
+            if (refOnlyTotal > 0) sb.Append(refOnlyTotal + " grå rader finns bara i referensen och sparas inte" + (viewCombo.SelectedIndex == ViewAll ? "" : viewCombo.SelectedIndex == ViewProposals ? " (de flesta dolda just nu, se Visa ovanför listan)" : " (dolda just nu, se Visa ovanför listan)") + ".\n");
             sb.Append("Redigera i listan: dubbelklicka för att ändra text och tid, Insert lägger till, Delete tar bort, Ctrl+Z ångrar.");
             resultLabel.Text = sb.ToString().TrimEnd();
             resultLabel.ForeColor = good ? OkColor : ErrColor;
@@ -1208,8 +1365,25 @@ namespace TextSync
             // 2) referensrader som inte redan står bredvid en synkad rad får en egen grå rad i tidsordning,
             //    så att listan visar alla rader i båda texterna. "(tal)" från taldetekteringen är ingen text och visas inte.
             var extraRef = refc.Where(r => !shownRef.Contains(r) && r.Text != "(tal)").OrderBy(r => r.Start).ToList();
+            refOnlyTotal = extraRef.Count;
+
+            // 3) förslag på att slå ihop eller dela rader så att de följer referensens radindelning
+            proposals = refIsText && proposeCheck.Checked ? LineAligner.Propose(synced, refc).Where(p => !rejected.Contains(p.Key)).ToList() : new List<AlignProposal>();
+            cueProp = new int[synced.Count];
+            for (int i = 0; i < cueProp.Length; i++) cueProp[i] = -1;
+            var propRefs = new HashSet<Cue>();
+            for (int k = 0; k < proposals.Count; k++)
+            {
+                for (int t = 0; t < proposals[k].Count; t++) cueProp[proposals[k].First + t] = k;
+                foreach (var r in proposals[k].Refs) propRefs.Add(r);
+            }
+            acceptAllLink.Text = "Godkänn alla förslag (" + proposals.Count + ")";
+            acceptAllLink.Visible = proposals.Count > 0;
+
+            int view = viewCombo.SelectedIndex;
             int total = synced.Count + extraRef.Count;
             rowCue = new int[total]; rowRef = new Cue[total]; cueRow = new int[synced.Count];
+            for (int i = 0; i < cueRow.Length; i++) cueRow[i] = -1;   // -1 = raden är dold av valet i Visa
             var items = new List<ListViewItem>(total);
             int si = 0, ei = 0;
             while (si < synced.Count || ei < extraRef.Count)
@@ -1219,6 +1393,8 @@ namespace TextSync
                 if (takeRef)
                 {
                     var r = extraRef[ei++];
+                    // i "Bara förslag" visas de grå rader som ingår i ett förslag, så att man ser båda referensraderna
+                    if (view != ViewAll && !(view == ViewProposals && propRefs.Contains(r))) continue;
                     var it = new ListViewItem(new[] { "", "", "", "", "", "",
                         Srt.FormatTime(r.Start), r.Text.Replace("\n", " / ") });
                     it.ForeColor = RefOnlyRow;
@@ -1230,7 +1406,11 @@ namespace TextSync
                 {
                     int i = si++;
                     var c = synced[i]; var bc = best[i];
-                    var it = new ListViewItem(new[] { (i + 1).ToString(),
+                    if (view == ViewOnlyRed && bc != null) continue;
+                    if (view == ViewProposals && cueProp[i] < 0) continue;
+                    // förslagsrader märks med text också, inte bara med färg
+                    string mark = cueProp[i] < 0 ? "" : proposals[cueProp[i]].IsMerge ? "Ihop?  " : "Dela?  ";
+                    var it = new ListViewItem(new[] { mark + (i + 1),
                         double.IsNaN(c.OrigStart) ? "— (ny rad)" : Srt.FormatTime(c.OrigStart),
                         Srt.FormatTime(c.Start), Srt.FormatTime(c.End),
                         // flyttad efter bildfrekvensomräkning – samma tal som "Avsnitt" i resultatet
@@ -1239,10 +1419,23 @@ namespace TextSync
                         bc != null ? Srt.FormatTime(bc.Start) : "—",
                         bc != null ? bc.Text.Replace("\n", " / ") : "— (ingen referenstext samtidigt)" });
                     if (bc == null) it.ForeColor = RedRow;
+                    if (cueProp[i] >= 0)
+                    {
+                        it.ForeColor = PropRow;
+                        it.ToolTipText = proposals[cueProp[i]].Describe() + "\nHögerklicka för att godkänna eller avvisa.";
+                    }
                     rowCue[row] = i; rowRef[row] = bc; cueRow[i] = row;
                     items.Add(it);
                 }
             }
+            Array.Resize(ref rowCue, items.Count); Array.Resize(ref rowRef, items.Count);
+            if (view == ViewAll) viewInfo.Text = "";
+            else if (items.Count > 0) viewInfo.Text = "Visar " + items.Count + " av " + total + " rader.";
+            // tom lista: säg varför, så att det inte ser ut som att synken misslyckades
+            else if (view == ViewOnlyRed) viewInfo.Text = "Inga röda rader. Välj Alla rader i Visa för att se listan.";
+            else if (view == ViewProposals && !proposeCheck.Checked) viewInfo.Text = "Förslag är avstängda. Kryssa i rutan bredvid, eller välj Alla rader.";
+            else if (view == ViewProposals) viewInfo.Text = "Inga förslag" + (refIsText ? "" : " (görs bara mot text, inte mot ljud)") + ". Välj Alla rader i Visa.";
+            else viewInfo.Text = "Inga rader att visa. Välj Alla rader i Visa.";
             list.BeginUpdate();
             list.Items.Clear();
             list.Items.AddRange(items.ToArray());
@@ -1523,7 +1716,9 @@ namespace TextSync
                 "4. Spara SRT: sparas som Filmnamn.sv.srt bredvid filmen, så hittar spelaren den.\n\n" +
                 "Har filmen ingen engelsk text men du har en engelsk SRT som inte går i takt: klicka \"Lägg till undertext på filmens originalspråk\" " +
                 "(eller dra in filmen och båda SRT-filerna). Den engelska synkas då mot filmens ljud och kontrolleras med Whisper, och sedan synkas den svenska mot den.\n\n" +
-                "Tips: dra in båda filerna samtidigt. Rödmarkerade rader saknar engelsk text samtidigt – ofta helt i sin ordning (t.ex. utrop).\n\n" +
+                "Tips: dra in båda filerna samtidigt. Rödmarkerade rader saknar engelsk text samtidigt – ofta helt i sin ordning (t.ex. utrop).\n" +
+                "Kryssa i \"Föreslå radindelning som referensen\" så föreslår programmet att dela eller slå ihop rader som de engelska (blå, \"Dela?\"/\"Ihop?\") – högerklicka för att godkänna. " +
+                "Visa ovanför listan döljer grå rader eller visar bara röda eller blå. Utseende längst upp väljer ljust eller mörkt.\n\n" +
                 "Text Sync " + Program.Version + " · MIT-licens\n" +
                 "Loggfil (för felsökning): " + Log.FilePath + "\n\n" +
                 "Vill du öppna mappen med loggfilen?",
@@ -1568,7 +1763,7 @@ namespace TextSync
         {
             DoubleBuffered = true;
             SetStyle(ControlStyles.ResizeRedraw | ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.Selectable, true);
-            BackColor = HC ? SystemColors.Window : Color.White;
+            BackColor = Theme.Card;
             Cursor = Cursors.SizeWE;
             TabStop = true;
             AccessibleRole = AccessibleRole.Graphic;
@@ -1632,12 +1827,12 @@ namespace TextSync
             if (w <= 10) return;
             double t0 = Center - Span / 2, t1 = Center + Span / 2;
             Func<double, float> X = t => (float)(lw + (t - t0) / Span * w);
-            var muted = new SolidBrush(HC ? SystemColors.WindowText : Color.FromArgb(110, 110, 110));
+            var muted = new SolidBrush(HC ? SystemColors.WindowText : Theme.Dark ? Theme.Muted : Color.FromArgb(110, 110, 110));
             int fh = Font.Height;
             float rowH = Math.Max(fh, (Height - fh - 12) / 3f);
 
             double tick = Span <= 20000 ? 1000 : Span <= 90000 ? 5000 : Span <= 300000 ? 30000 : 60000;
-            using (var pen = new Pen(HC ? SystemColors.GrayText : Color.FromArgb(235, 235, 235)))
+            using (var pen = new Pen(Theme.Grid))
                 for (double t = Math.Ceiling(t0 / tick) * tick; t <= t1; t += tick)
                 {
                     float x = X(t);
@@ -1648,7 +1843,7 @@ namespace TextSync
             string[] names = { "Referens", "Original", "Synkad" };
             Color[] cols = HC
                 ? new[] { SystemColors.Highlight, SystemColors.GrayText, SystemColors.HotTrack }
-                : new[] { Color.FromArgb(0, 103, 192), Color.FromArgb(160, 160, 160), Color.FromArgb(16, 140, 60) };
+                : new[] { Theme.TlRef, Theme.TlOrig, Theme.TlSynced };
             List<Cue>[] data = { Ref, Orig, Synced };
             for (int r = 0; r < 3; r++)
             {
@@ -1664,7 +1859,7 @@ namespace TextSync
                         var rect = new RectangleF(x0, y + 3, x1 - x0, rowH - 8);
                         g.FillRectangle(br, rect);
                         if (r == 2 && c == Highlight)
-                            using (var hp = new Pen(HC ? SystemColors.WindowText : Color.Black, 2)) g.DrawRectangle(hp, rect.X, rect.Y, rect.Width, rect.Height);
+                            using (var hp = new Pen(Theme.TlHighlight, 2)) g.DrawRectangle(hp, rect.X, rect.Y, rect.Width, rect.Height);
                     }
             }
             if (Ref == null)

@@ -2,6 +2,33 @@
 
 Nyast först.
 
+## 2026-11-09 – 2.0: filter i listan, mörkt läge, förslag om att dela och slå ihop rader
+- **Område:** GUI / synk
+- **Önskemål (ägaren):** dölja grå rader, visa bara röda rader, mörkt läge, och matcha de svenska raderna mot de engelska (två svenska rader kan slås ihop till en, och en kan delas i två).
+- **Beslut (ägarens val i intervjun):**
+  - **Visa** ovanför listan: Alla rader, Dölj grå rader, Bara röda rader, Bara förslag. Sparas i `settings.txt` (`view`). Bredvid står "Visar X av Y rader.". I Bara förslag visas också de grå referensrader som ingår i ett förslag.
+  - **Utseende** längst upp till höger: Som Windows (förvalt, läser `AppsUseLightTheme` och följer ändringar direkt), Ljust, Mörkt. Sparas (`theme`). Högkontrast går alltid före, och då döljs valet.
+  - **Matchning ändrar den sparade filen** men ges som **förslag att granska**: blå rader, verktygstips, högerklick Godkänn/Avvisa, länken "Godkänn alla förslag (N)". Godkänn är ett steg för Ctrl+Z. Avvisade förslag visas inte igen förrän nästa synk.
+  - Nya rader får **referensradens tider**, men går aldrig in i grannraderna.
+  - Bara **2↔1 och 1↔2**. Sammanslagning som blir längre än **2 rader à 42 tecken** föreslås inte.
+  - Delning bara vid **radbrytning eller efter . ? !**, aldrig vid ett godtyckligt mellanslag.
+- **Claudes val (efter test på Blacklist S04E01):**
+  - Mitt i en mening (radbrytning utan . ? ! före) delas bara om referensens första rad också slutar mitt i en mening ("...", komma eller utan punkt). Utan regeln blev 49 av 164 delningar mitt i en mening, bland annat "…för att få ett / normalt liv…" mot en engelsk rad som slutade med punkt. Med regeln: 155 delningar, och de 38 som delar mitt i en mening följer engelskan.
+  - Minsta tidsöverlapp 60 %. 70 % prövades, men de 15 förslag som då försvann var nästan alla riktiga.
+  - Inga förslag om referensen har färre än hälften så många textrader som den synkade texten. Mot spåret med bara tvingad text (38 rader) blev förslagen annars fel. Inga förslag mot ljud (A, B, A+B), eftersom "(tal)" och Whisper-fraser inte är en radindelning.
+  - Ensamt replikstreck tas bort när en dialograd delas ("- Hem." blir "Hem."). Visar referensen två personer ("- … / - …") får en sammanslagning replikstreck.
+- **Teknik:** `Align.cs`, dynamisk programmering över (svensk rad, engelsk rad) med stegen hoppa över, 1↔1, 2↔1 och 1↔2. Poäng = antal rader × tidsöverlapp (gemensam tid / hela spannet). 2↔1 och 1↔2 kostar 0,5. Cirka 10 ms för ett avsnitt (367 × 577 rader). `Theme.cs`: två paletter, färgbyte på alla kontroller (gammal palettfärg → ny), `SetWindowTheme` (DarkMode_Explorer, DarkMode_CFD, DarkMode_ItemsView) och `DwmSetWindowAttribute` 20 för titelraden.
+- **Test:** 46 av 46 kontroller (11 nya för matchningen). Gränssnittet provades inifrån samma process mot Blacklist: alla fyra visningslägena, ljust → mörkt → ljust, Godkänn alla (367 → 522 rader) och Ctrl+Z (367), dialogrutan i mörkt läge.
+- **Kvar:** meddelanderutor (MessageBox), kryssrutans ruta och pilarna i talrutan förblir ljusa i mörkt läge.
+- **Product-check (oberoende granskning + ägaren):**
+  - Ägaren förstod inte vad en blå rad var. Därför är **förslagen avstängda från början** ("Föreslå radindelning som referensen", sparas som `propose`), och kolumnen **#** visar **Dela?** eller **Ihop?**, så att förslagen inte bara märks med färg.
+  - "Godkänn alla" frågar inte först, eftersom Ctrl+Z räcker. Att spara med förslag som inte är godkända frågar inte heller, eftersom förslagen är frivilliga.
+  - F3 och "Nej" vid låg matchning byter till Alla rader när den röda raden är dold. Tidigare hände ingenting.
+  - En tom lista säger varför den är tom ("Inga röda rader …", "Förslag är avstängda …").
+  - Rättat: tiden "Före synk" för andra delen efter en delning, nyckeln för avvisade förslag (nu med radens tid, så att två likadana rader inte avvisas tillsammans) och resultattexten i Bara förslag.
+  - Kan vänta (docs/next.md): tabellen för matchningen räknas om helt vid varje uppdatering. Det tar cirka 10 ms för ett avsnitt och uppskattningsvis 100 ms för en långfilm.
+- **Nivå:** LIVE
+
 ## 2026-11-09 – Bara exe-filen på USB, testerna avgör själva, lokala sökvägar utanför git
 - **Område:** Distribution / test / struktur
 - **Beslut (product-check före commit):**

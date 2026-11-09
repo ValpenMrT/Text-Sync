@@ -17,6 +17,26 @@ Röda rader har ingen engelsk text samtidigt. Det är ofta helt rätt, till exem
 **Vad betyder grå rader?**
 Listan visar alla rader i både den svenska och den engelska texten. En grå rad är en engelsk rad som inte står bredvid någon svensk rad, till exempel när en svensk rad täcker två engelska. Grå rader sparas aldrig. Dubbelklicka på en grå rad om du vill lägga till en svensk rad på samma tid.
 
+**Kan jag dölja de grå raderna, eller bara se de röda?**
+Ja, välj i **Visa** ovanför listan: **Alla rader**, **Dölj grå rader**, **Bara röda rader** eller **Bara förslag**. Bredvid står hur många rader som visas, eller varför listan är tom. Valet sparas till nästa gång. Det påverkar bara listan, inte filen du sparar. Trycker du **F3** när de röda raderna är dolda, byter listan till **Alla rader**.
+
+**Kan programmet dela eller slå ihop svenska rader så att de blir som de engelska?**
+Ja. Kryssa i **Föreslå radindelning som referensen** ovanför listan. Rutan är avstängd från början, och valet sparas till nästa gång. Programmet föreslår då ändringar, men ändrar ingenting förrän du godkänner. Förslagsraderna har blå text, och i kolumnen **#** står **Dela?** eller **Ihop?**:
+- **Dela:** en svensk rad som täcker två engelska rader delas i två, till exempel "- Vart då? / - Hem." blir "Vart då?" och "Hem.".
+- **Slå ihop:** två svenska rader som tillsammans motsvarar en engelsk rad blir en.
+
+De nya raderna får den engelska radens tider. Håll muspekaren över en blå rad för att se förslaget. Högerklicka (eller tryck **Skift+F10**) för att **godkänna** eller **avvisa** det, eller klicka **Godkänn alla förslag** ovanför listan. Förslag som du inte godkänner påverkar inte filen du sparar. **Ctrl+Z** ångrar, även om du godkände alla på en gång.
+
+Programmet föreslår bara det som går att göra säkert:
+- En rad delas bara vid en radbrytning eller efter . ? !. Mitt i en mening delas den bara om den engelska raden också slutar mitt i en mening.
+- Två rader slås inte ihop om texten då blir längre än två rader à 42 tecken.
+- Förslag görs bara mot engelsk text (textspår eller SRT), inte mot ljudet, och inte mot ett spår med bara tvingad text.
+
+Det är vanligt med många delningar men få sammanslagningar, eftersom svensk text ofta slår ihop två engelska repliker.
+
+**Kan programmet vara mörkt?**
+Ja. Välj **Utseende** längst upp till höger: **Som Windows** (förvalt), **Ljust** eller **Mörkt**. Som Windows följer inställningen *Välj appläge* under Inställningar → Anpassning → Färger och byter direkt när du ändrar den. Meddelanderutor (till exempel Hjälp) är alltid ljusa, eftersom Windows ritar dem. Med högkontrast i Windows används alltid Windows färger.
+
 **Kan jag ändra, lägga till eller ta bort rader?**
 Ja, i listan:
 - **Dubbelklick** eller **Enter** ändrar text och tid.
