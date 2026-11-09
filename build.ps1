@@ -1,9 +1,27 @@
-﻿# Bygger TextSync.exe med C#-kompilatorn som finns i Windows (.NET Framework 4.8)
-#   build.ps1          bygger TextSync.exe
-#   build.ps1 -Test    bygger dessutom testprogrammen i test\bin\ och kör Tests
+﻿# Bygger Text Sync med C#-kompilatorn som finns i Windows (.NET Framework 4.8)
+#   build.ps1          bygger Build\TextSync-<version>.exe (versionen läses ur Program.Version i src\Program.cs)
+#   build.ps1 -Test    bygger dessutom testprogrammen i Build\test\ och kör Tests
+# Äldre versioner i Build\ ligger kvar, så att en tidigare version går att dela ut igen.
 param([switch]$Test)
 $ErrorActionPreference = 'Stop'
 $root = $PSScriptRoot
+$build = Join-Path $root 'Build'
+
+# Versionen anges bara i Program.Version. AssemblyVersion och AssemblyFileVersion måste stämma med den.
+$prog = [IO.File]::ReadAllText((Join-Path $root 'src\Program.cs'))
+$m = [regex]::Match($prog, 'const\s+string\s+Version\s*=\s*"(\d+(?:\.\d+){0,3})"')
+if (-not $m.Success) { throw "Hittade inte versionen i src\Program.cs. Där ska det stå till exempel: public const string Version = `"2.1`";" }
+$version = $m.Groups[1].Value
+$parts = @($version.Split('.')); while ($parts.Count -lt 4) { $parts += '0' }
+$full = $parts -join '.'
+foreach ($attr in 'AssemblyVersion', 'AssemblyFileVersion') {
+    $a = [regex]::Match($prog, $attr + '\("([^"]*)"\)')
+    if (-not $a.Success -or $a.Groups[1].Value -ne $full) {
+        throw "$attr i src\Program.cs ska vara `"$full`", eftersom Program.Version är `"$version`"."
+    }
+}
+$exe = Join-Path $build "TextSync-$version.exe"
+New-Item -ItemType Directory -Force $build | Out-Null
 $csc = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
 $ico = Join-Path $root 'src\TextSync.ico'
 
@@ -51,13 +69,13 @@ if (-not (Test-Path $ico)) {
 
 $refs = '/r:System.dll', '/r:System.Core.dll', '/r:System.Drawing.dll', '/r:System.Windows.Forms.dll', '/r:System.IO.Compression.dll', '/r:System.IO.Compression.FileSystem.dll'
 $src = Get-ChildItem (Join-Path $root 'src') -Filter *.cs | ForEach-Object { $_.FullName }
-& $csc /nologo /optimize+ /target:winexe /codepage:65001 "/out:$(Join-Path $root 'TextSync.exe')" "/win32icon:$ico" @refs $src
+& $csc /nologo /optimize+ /target:winexe /codepage:65001 "/out:$exe" "/win32icon:$ico" @refs $src
 if ($LASTEXITCODE -ne 0) { throw "Bygget misslyckades" }
-Write-Host "Klart: $(Join-Path $root 'TextSync.exe')"
+Write-Host "Klart: $exe"
 
 if ($Test) {
     # Varje testprogram byggs med alla källfiler i src\ plus testfilen; /main väljer testets Main i stället för Program.Main.
-    $bin = Join-Path $root 'test\bin'
+    $bin = Join-Path $build 'test'
     New-Item -ItemType Directory -Force $bin | Out-Null
     foreach ($t in Get-ChildItem (Join-Path $root 'test') -Filter *.cs) {
         & $csc /nologo /target:exe /codepage:65001 "/main:TextSync.$($t.BaseName)" "/out:$(Join-Path $bin "$($t.BaseName).exe")" @refs $src $t.FullName

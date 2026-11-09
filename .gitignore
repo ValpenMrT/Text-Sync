@@ -1,7 +1,7 @@
 # byggutdata
 *.exe
 *.pdb
-test/bin/
+Build/
 # lokala instruktioner för Claude (sökvägar på den här datorn)
 CLAUDE.local.md
 # tillfälliga filer

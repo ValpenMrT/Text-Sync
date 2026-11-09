@@ -2,6 +2,18 @@
 
 Nyast först.
 
+## 2026-11-09 – 2.1: versionsnummer i filnamnet och mappen Build
+- **Område:** Bygge / distribution
+- **Önskemål (ägaren):** det ska synas vilken version som ligger på ett USB-minne, och det som byggs ska hamna i en egen mapp.
+- **Beslut (ägarens svar på frågorna 9–11):**
+  - Programmet heter `TextSync-<version>.exe`, med **bindestreck** (t.ex. `TextSync-2.1.exe`), så att sökvägen inte behöver citattecken i kommandon.
+  - Det byggs i **`Build\`**, och testprogrammen i **`Build\test\`**, så att allt som byggs hamnar i samma mapp. `Build/` står i `.gitignore`. Den gamla `TextSync.exe` i roten och `test\bin\` är borttagna.
+  - **Äldre versioner ligger kvar** i `Build\`, så att en tidigare version går att dela ut igen.
+- **Teknik:** `build.ps1` läser versionen ur `Program.Version` i `src/Program.cs`. Bygget avbryts med ett svenskt felmeddelande om versionen inte hittas, eller om `AssemblyVersion`/`AssemblyFileVersion` inte är samma version med fyra delar (2.1 → 2.1.0.0). Inget i programmet beror på filnamnet: inställningar, verktyg och logg ligger i `%LOCALAPPDATA%\TextSync`, och ikonen hämtas via `Application.ExecutablePath`.
+- **Test:** bygget ger `Build\TextSync-2.1.exe` och testprogrammen i `Build\test\`, 46 av 46 kontroller. Med `AssemblyFileVersion` satt till 2.0.0.0 avbröts bygget med meddelandet "AssemblyFileVersion i src\Program.cs ska vara "2.1.0.0" …".
+- **Product-check:** Claude granskade själv (liten ändring i bygget). Inga blockerande fynd. Bör: en vän som får en ny version med nytt filnamn kan få två versioner bredvid varandra, och en genväg eller "Öppna med" pekar då på den gamla. Därför står det i docs/operations.md under "Dela ut" att den gamla ska tas bort.
+- **Nivå:** LIVE
+
 ## 2026-11-09 – Synligt när muspekaren är över rader och knappar
 - **Område:** GUI
 - **Önskemål (ägaren):** man ska se när man håller muspekaren över saker.

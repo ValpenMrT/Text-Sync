@@ -1,8 +1,8 @@
 # Struktur
 
 ```
-build.ps1          Bygger TextSync.exe med csc.exe från .NET Framework (finns i Windows). Skapar ikonen första gången.
-                   -Test bygger också testprogrammen i test/bin/ och kör Tests (misslyckas om en kontroll gör det).
+build.ps1          Bygger Build/TextSync-<version>.exe (version ur Program.Version) med csc.exe från .NET Framework (finns i Windows). Skapar ikonen första gången.
+                   -Test bygger också testprogrammen i Build/test/ och kör Tests (misslyckas om en kontroll gör det).
 README.md          Snabbstart, sedan bygga/testa/dela ut för utvecklare. Delas inte ut på USB.
 CLAUDE.md          Instruktioner för Claude: allt på svenska, var dokumentationen finns
 CLAUDE.local.md    Sökvägar som bara gäller den här datorn (testfilmen). Inte i git.

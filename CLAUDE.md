@@ -7,7 +7,7 @@
 
 ## Projektet
 - C# WinForms, byggs med `csc.exe` som finns i Windows (.NET Framework 4.8) via `build.ps1`. Inget Visual Studio, ingen NuGet.
-- Användarna är ägaren och vänner: icke-tekniska Windows 11-användare. Programmet delas via USB (bara `TextSync.exe`, ingen hjälpfil), är osignerat och MIT-licensierat. Gränssnittet är bara på svenska.
+- Användarna är ägaren och vänner: icke-tekniska Windows 11-användare. Programmet delas via USB (bara exe-filen `Build\TextSync-<version>.exe`, ingen hjälpfil), är osignerat och MIT-licensierat. Gränssnittet är bara på svenska.
 - Nästa arbete börjar med att gå igenom **"Obesvarade frågor"** i `README.md` med ägaren, och sedan `docs/next.md` (önskemål och kvarstående fynd). Stryk en fråga ur README när den är besvarad och för in svaret i `docs/decisions.md`.
 
 ## Arbetssätt
@@ -18,7 +18,7 @@
 - Python finns inte på datorn. Ändra filer med Edit eller PowerShell.
 
 ## Testa
-- `powershell -ExecutionPolicy Bypass -File build.ps1 -Test` bygger testprogrammen i `test\bin\` och kör `Tests`. Testerna avgör själva om de gick igenom: sista raden börjar med `RESULTAT:`, och kommandot misslyckas om någon kontroll gör det (se `docs/operations.md`). Lägg till ett `Check(...)` för varje ny kontroll i `test/Tests.cs`.
+- `powershell -ExecutionPolicy Bypass -File build.ps1 -Test` bygger programmet i `Build\` och testprogrammen i `Build\test\` och kör `Tests`. Testerna avgör själva om de gick igenom: sista raden börjar med `RESULTAT:`, och kommandot misslyckas om någon kontroll gör det (se `docs/operations.md`). Lägg till ett `Check(...)` för varje ny kontroll i `test/Tests.cs`.
 - Smart App Control är påslaget och blockerar ofta nybyggda exe-filer en stund. Kör dem inifrån PowerShell med `[Reflection.Assembly]::Load(...)`. Smart App Control får inte stängas av: det gäller hela Windows och går inte att slå på igen.
 - Var testfilmen ligger står i `CLAUDE.local.md`, som inte checkas in.
 - Whisper och annat GPU-arbete körs på NVIDIA RTX A2000, aldrig på Intel Iris Xe.
