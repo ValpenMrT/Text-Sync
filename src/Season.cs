@@ -513,7 +513,7 @@ namespace TextSync
                     }
                     if (File.Exists(e.Path))
                     {
-                        string now = HashFile(e.Path);
+                        string now = IsStamp(e.Hash) ? FileStamp(e.Path) : HashFile(e.Path);
                         if (string.Equals(now, e.Hash, StringComparison.OrdinalIgnoreCase))
                         {
                             if (e.Kept != null)
@@ -624,6 +624,31 @@ namespace TextSync
         public static string HashBytes(byte[] bytes)
         {
             using (var sha = SHA256.Create()) return Hex(sha.ComputeHash(bytes));
+        }
+
+        // En stor fil som programmet har skapat (en MKV-kopia på flera GB) känns igen på storlek och ändringstid i stället för SHA-256,
+        // som skulle ta en halv minut per film. "size-<byte>-<ticks>".
+        static bool IsStamp(string h) { return h != null && System.Text.RegularExpressions.Regex.IsMatch(h, @"^size-\d{1,19}-\d{1,19}$"); }
+        static string FileStamp(string path)
+        {
+            var fi = new FileInfo(path);
+            return "size-" + fi.Length.ToString(CultureInfo.InvariantCulture) + "-" + fi.LastWriteTimeUtc.Ticks.ToString(CultureInfo.InvariantCulture);
+        }
+
+        // Lägger till en fil som programmet just har skapat på en plats där ingen fil fanns (t.ex. en MKV-kopia med undertexten inlagd).
+        // Återställningen tar bort den, om den inte har ändrats sedan dess. Kastar om filen saknas eller manifestet inte går att skriva.
+        public static UndoEntry RegisterCreated(UndoRun run, string path, string label)
+        {
+            if (run == null) throw new ArgumentNullException("run");
+            lock (Lock)
+            {
+                string full = System.IO.Path.GetFullPath(path);
+                var e = new UndoEntry { Path = full, Hash = FileStamp(full), Label = label };
+                run.Entries.Add(e);
+                try { Save(run); }
+                catch { run.Entries.Remove(e); throw; }
+                return e;
+            }
         }
 
         // ------------------------------------------------------------ hjälpare
@@ -813,6 +838,7 @@ namespace TextSync
 
         static bool IsHash(string h)
         {
+            if (IsStamp(h)) return true;
             if (h == null || h.Length != 64) return false;
             foreach (char c in h) if (!Uri.IsHexDigit(c)) return false;
             return true;

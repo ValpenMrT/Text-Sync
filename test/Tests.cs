@@ -1022,6 +1022,40 @@ namespace TextSync
                     SeasonUndo.RestoreAll(runB);
                     Check("Återställning: en fil som ändrades för hand mellan två synkar får en egen kopia och kommer tillbaka",
                         runB.Entries.Count == 2 && File.ReadAllText(fb) == "ändrad för hand" && File.ReadAllText(runB.Entries[0].Kept) == "original");
+                    // ägarens val 2026-11-11: osäkra avsnitt kan sparas ändå, och undertexten kan också läggas in i en kopia av filmen
+                    var runE = SeasonUndo.Begin("val");
+                    var rU = SeasonSync.SyncOne(plan[2], new SeasonOptions { Lang = "sv", SaveUnsure = true }, () => runE, (a, b) => { }, System.Threading.CancellationToken.None);
+                    Check("Hel säsong: med Spara även osäkra avsnitt sparas ett osäkert avsnitt, med ett besked som säger det",
+                        rU.State == EpisodeState.Unsure && rU.Saved && rU.Text.Contains("sparad ändå") && !File.ReadAllBytes(t3).SequenceEqual(orig3));
+                    Check("Hel säsong: det osäkra avsnittet går att återställa", SeasonUndo.Restore(runE, rU.Entry).Outcome == RestoreOutcome.Restored && File.ReadAllBytes(t3).SequenceEqual(orig3));
+                    string big = Path.Combine(sd, "Serie.S01E09 (Text Sync).mkv");
+                    File.WriteAllText(big, "kopia av filmen");
+                    var eBig = SeasonUndo.RegisterCreated(runE, big, "S01E09");
+                    var reread = SeasonUndo.List().First(x => x.Dir == runE.Dir);
+                    Check("Återställning: en skapad kopia av filmen känns igen på storlek och tid, och står i listan på disken",
+                        eBig.Hash.StartsWith("size-") && reread.Entries.Any(x => x.Path == big && x.Hash == eBig.Hash && x.Kept == null));
+                    File.AppendAllText(big, " som någon har ändrat");
+                    Check("Återställning: en kopia av filmen som har ändrats tas inte bort", SeasonUndo.Restore(runE, eBig).Outcome == RestoreOutcome.Changed && File.Exists(big));
+                    string big2 = Path.Combine(sd, "Serie.S01E08 (Text Sync).mkv");
+                    File.WriteAllText(big2, "kopia av filmen");
+                    var eBig2 = SeasonUndo.RegisterCreated(runE, big2, "S01E08");
+                    Check("Återställning: en orörd kopia av filmen tas bort", SeasonUndo.Restore(runE, eBig2).Outcome == RestoreOutcome.Removed && !File.Exists(big2));
+                    if (MainForm.FindMkvMergePublic() != null)
+                    {
+                        byte[] film1 = File.ReadAllBytes(plan[0].RefPath);
+                        var rM = SeasonSync.SyncOne(plan[0], new SeasonOptions { Lang = "sv", MakeMkv = true }, () => runE, (a, b) => { }, System.Threading.CancellationToken.None);
+                        string copy = SeasonSync.MkvCopyPath(plan[0].RefPath);
+                        bool hasTrack = false;
+                        if (File.Exists(copy)) using (var mf = new MkvFile(copy)) hasTrack = mf.Tracks.Count(x => x.IsSubtitle) == 2;
+                        Console.WriteLine("Hel säsong MKV: {0}", rM.Text);
+                        Check("Hel säsong: MKV-kopian skapas bredvid filmen med undertexten inlagd, och originalfilmen är orörd",
+                            rM.MkvEntry != null && hasTrack && rM.Text.Contains("SRT och MKV") && File.ReadAllBytes(plan[0].RefPath).SequenceEqual(film1));
+                        var rM2 = SeasonSync.SyncOne(plan[0], new SeasonOptions { Lang = "sv", MakeMkv = true }, () => runE, (a, b) => { }, System.Threading.CancellationToken.None);
+                        Check("Hel säsong: en MKV-kopia som redan finns skrivs inte över, och raden säger det", rM2.MkvEntry == null && rM2.State == EpisodeState.Check && rM2.Detail.Contains("finns redan"));
+                        SeasonUndo.RestoreAll(runE);
+                        Check("Hel säsong: Återställ tar bort MKV-kopian och lägger tillbaka undertexten", !File.Exists(copy) && File.ReadAllBytes(t1).SequenceEqual(orig1) && File.Exists(plan[0].RefPath));
+                    }
+                    else Console.WriteLine("OBS: testet av MKV-kopior i Hel säsong hoppades över, eftersom mkvmerge (MKVToolNix) inte är installerat.");
                     var runC = SeasonUndo.Begin("tom");
                     SeasonUndo.PruneFinished(null);
                     Check("Återställning: omgångar utan något kvar att återställa rensas, de med något kvar står kvar",

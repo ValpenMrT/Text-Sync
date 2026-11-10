@@ -2,6 +2,27 @@
 
 Nyast först.
 
+## 2026-11-11 – 2.4.3: Hel säsong – ägarens svar: välja om osäkra sparas, välja ljudmetod, MKV-kopior
+- **Område:** GUI / filer
+- **Frågor och svar** (frågorna stod i README efter 2.4.2):
+  - *Osäkra avsnitt sparas inte. Ska de sparas ändå?* **Svar:** "Låt mig välja."
+  - *Film utan textspår synkas mot ljud A, och A+B bara om Whisper redan finns och ett NVIDIA-kort är valt. Rätt?* **Svar:** "Ja men informera användaren och ge alternativ att ladda ner det som behövs."
+  - *Räcker det att de tio senaste säsongssynkarna går att återställa?* **Svar:** en motfråga, "Menar du hela säsonger eller episoder?" Hela säsonger. Frågan står kvar i README.
+  - *Står knappen Hel säsong… på rätt plats?* **Svar:** ja.
+  - *Behövs Lägg in i MKV… för en hel säsong?* **Svar:** "Ja det behövs. Både SRT och mkv."
+- **Beslut:**
+  - **Kryssrutan "Spara även osäkra avsnitt"** ovanför listan, av från början, sparas till nästa gång (`seasonunsure`). Med kryss sparas avsnittet med beskedet "✖ Osäkert – sparad ändå". Kryssar man i rutan efter en kö hamnar de osäkra avsnitten i kön igen.
+  - **Fråga före kön när avsnitt saknar textspår** och A+B inte går att använda direkt: rutan säger hur många avsnitt det gäller och har knapparna "Ladda ner och använd A+B" (eller "Använd A+B"), "Använd A" och "Avbryt". Den säger också om A+B blir långsamt utan NVIDIA-kort. Själva nedladdningen frågar som förut, med storleken.
+  - **Kryssrutan "Lägg också in undertexten i en kopia av filmen (MKV)"**, av från början (`seasonmkv`). Varje avsnitt får då SRT-filen och `Filmnamn (Text Sync).mkv` bredvid filmen, samma namn och spårinställningar som Lägg in i MKV… i huvudfönstret. Originalfilmen ändras aldrig.
+  - **En MKV-kopia som redan finns skrivs aldrig över.** En kopia på flera GB kan inte sparas undan för återställning, så raden säger att den finns och att man tar bort den själv.
+  - **Plats:** före kön jämförs filmernas sammanlagda storlek med ledigt utrymme, och varje avsnitt kontrolleras igen. Får kopian inte plats får avsnittet bara SRT-filen, med beskedet Kontrollera.
+  - **Återställ… tar bort MKV-kopiorna.** De känns igen på storlek och ändringstid (SHA-256 av en film tar en halv minut). En kopia som har ändrats rörs inte. Bekräftelserutan säger hur många kopior som tas bort.
+- **Teknik:** `SeasonOptions.SaveUnsure` och `MakeMkv`, `SeasonSync.Mux` och `MkvCopyPath`, `SeasonUndo.RegisterCreated`, `ConfirmDialog.Choose` (två val och Avbryt).
+- **Test:** 205 av 205 kontroller (8 nya), bland annat en riktig MKV-kopia med mkvmerge: skapad med undertexten inlagd, originalet orört, inte överskriven andra gången, borttagen av Återställ. Fönstret provkört i samma process med de nya kryssrutorna (skärmbild, 200 %, mörkt läge).
+- **Ej provat:** rutan med de tre knapparna (bara koden är läst), nedladdning efter valet A+B, MKV-kopior av riktiga filmer på flera GB, Avbryt medan en kopia skapas, och varningen om för lite plats.
+- **Product-check:** Claude granskade själv (ägarens svar på ställda frågor, båda valen är av från början så att 2.4.2 beter sig som förut).
+- **Nivå:** LIVE
+
 ## 2026-11-11 – 2.4.2: Hel säsong – synka alla avsnitt i kö, med återställning
 - **Område:** GUI / filer
 - **Önskemål (ägaren):** "göra så jag kan synka en hel säsong av en serie istället för att behöva göra det avsnitt för avsnitt. Gör så det går att återställa om något inte blir bra." Punkt 5 i `docs/next.md`.

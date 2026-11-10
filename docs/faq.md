@@ -20,10 +20,17 @@ Ja. Klicka **Hel säsong…** längst upp till höger, eller dra in mappen med s
 Efteråt står ett besked på varje rad:
 - **✔ Bra – sparad:** texten går i takt.
 - **⚠ Kontrollera – sparad:** synken är inte helt säker. Markera raden för att se varför: förklaringen står under listan. Klicka **Öppna i huvudfönstret** för att granska raderna och spela upp ställen i filmen.
-- **✖ Osäkert – inte sparad:** texten verkar inte passa filmen, så ingenting sparades för det avsnittet. Byt undertext och klicka **Synka resten**.
+- **✖ Osäkert – inte sparad:** texten verkar inte passa filmen, så ingenting sparades för det avsnittet. Byt undertext och klicka **Synka resten**. Vill du att osäkra avsnitt sparas ändå kryssar du i **Spara även osäkra avsnitt** ovanför listan. Då står det **✖ Osäkert – sparad ändå** på raden, och **Återställ avsnittet** tar bort filen igen.
 - **✖ Misslyckades:** något gick fel, till exempel att filen inte gick att läsa. Ingenting sparades för det avsnittet.
 
-Som referens används filmens engelska textspår. Har filmen inget textspår används filmens ljud. Du kan välja ljudet för alla avsnitt i listan **Referens** i fönstret. Metod och det du har valt i Inställningar (bildfrekvensfel, text för hörselskadade, formatering) gäller också här.
+Som referens används filmens engelska textspår. Har filmen inget textspår används filmens ljud. Programmet frågar då före kön hur du vill göra: **ljud A+B** (säkrast, med taligenkänningen Whisper) eller **ljud A** (snabbt). Saknas verktygen för A+B erbjuder programmet att ladda ner dem, och visar hur stort det är innan något hämtas. Finns Whisper redan och ett NVIDIA-grafikkort är valt används A+B utan fråga. Du kan också välja ljudet för alla avsnitt i listan **Referens** i fönstret.
+
+**Kan undertexten läggas in i själva filmen för en hel säsong?**
+Ja. Kryssa i **Lägg också in undertexten i en kopia av filmen (MKV)** ovanför listan. Då får varje avsnitt både SRT-filen och en kopia av filmen med undertexten inlagd, `Filmnamn (Text Sync).mkv`, bredvid originalet.
+- Originalfilmen ändras aldrig. Kopian är lika stor som filmen, så en hel säsong behöver mycket plats. Räcker inte platsen säger programmet det före kön, och de avsnitt som inte får plats får bara SRT-filen.
+- Gratisprogrammet MKVToolNix behövs, som för **Lägg in i MKV…** i huvudfönstret.
+- Finns kopian redan skrivs den inte över. Ta bort den själv om den ska göras om.
+- **Återställ…** tar bort kopiorna igen, om de inte har ändrats sedan de skapades. Metod och det du har valt i Inställningar (bildfrekvensfel, text för hörselskadade, formatering) gäller också här.
 
 **Avbryt** stannar när avsnittet som pågår är klart. Det som redan är sparat ligger kvar, och **Synka resten** fortsätter där du slutade. **Avbryt nu** avbryter direkt.
 
@@ -36,7 +43,7 @@ Extra justering i huvudfönstret gäller inte här. Finns ingen film för ett av
 **Säsongssynken blev inte bra. Kan jag ångra den?**
 Ja. Klicka **Hel säsong…** och sedan **Återställ…**. Då byts varje undertext tillbaka mot filen som fanns före synken, och undertexter som inte fanns före tas bort. Filmerna rörs aldrig.
 - Det går även efter att programmet har stängts. Rutan som frågar säger vilken dag och vilken mapp det gäller, och hur många filer som byts tillbaka och tas bort.
-- Varje mapp du synkar är en egen omgång. Återställ… ångrar den senaste. Finns det en äldre omgång kvar säger programmet det efteråt, och då ångrar nästa klick på Återställ… den. De tio senaste omgångarna sparas.
+- Varje mapp du synkar är en egen omgång, alltså en hel säsong med alla sina avsnitt. Återställ… ångrar den senaste. Finns det en äldre omgång kvar säger programmet det efteråt, och då ångrar nästa klick på Återställ… den. De tio senaste omgångarna sparas.
 - **Återställ avsnittet** ångrar bara det markerade avsnittet. Den knappen fungerar så länge programmet är öppet. Efter en omstart ångrar du hela omgången med Återställ….
 - En undertext som du har ändrat efter synken rörs inte. Programmet säger vilka filer det gäller.
 - En fil som skrevs över finns dessutom kvar i mappen `Text Sync original` bredvid filen, som när du sparar i huvudfönstret.

@@ -36,6 +36,7 @@ namespace TextSync
         Label intro, info, status;
         ProgressBar progress;
         ComboBox refCombo;
+        CheckBox mkvCheck, unsureCheck;
         Button addFolderBtn, addFilesBtn, clearBtn, swapBtn, skipBtn, openBtn, undoOneBtn, runBtn, restoreBtn, closeBtn;
         readonly float k;
 
@@ -98,10 +99,26 @@ namespace TextSync
             {
                 Tools.SetSetting("seasonref", refCombo.SelectedIndex.ToString());
                 // en annan referens kan ge ett annat besked: osäkra avsnitt får en ny chans
-                foreach (var r in rows) if (r.Out.State == EpisodeState.Unsure) { r.Out = new EpisodeOutcome(); UpdateRow(r); }
+                foreach (var r in rows) if (r.Out.State == EpisodeState.Unsure && !r.Out.Saved) { r.Out = new EpisodeOutcome(); UpdateRow(r); }
                 UpdateButtons();
             };
             top.Controls.Add(refCombo);
+            top.SetFlowBreak(refCombo, true);
+            // två val som sparas till nästa gång. Båda är av från början.
+            mkvCheck = new CheckBox { Text = "Lägg också in undertexten i en &kopia av filmen (MKV)", AutoSize = true, Margin = new Padding(0, 8, 24, 0), Checked = Tools.GetSetting("seasonmkv", "0") == "1" };
+            mkvCheck.CheckedChanged += (s, e) => { Tools.SetSetting("seasonmkv", mkvCheck.Checked ? "1" : "0"); UpdateIntro(); };
+            tips.SetToolTip(mkvCheck, "Utöver SRT-filen skapas Filmnamn (Text Sync).mkv bredvid varje film, med undertexten inlagd. Originalfilmen ändras inte.\nKopian är lika stor som filmen, så en säsong behöver mycket plats. Kräver gratisprogrammet MKVToolNix.");
+            unsureCheck = new CheckBox { Text = "Spara även &osäkra avsnitt", AutoSize = true, Margin = new Padding(0, 8, 0, 0), Checked = Tools.GetSetting("seasonunsure", "0") == "1" };
+            unsureCheck.CheckedChanged += (s, e) =>
+            {
+                Tools.SetSetting("seasonunsure", unsureCheck.Checked ? "1" : "0");
+                UpdateIntro();
+                // osäkra avsnitt som inte sparades får en ny chans
+                if (unsureCheck.Checked) foreach (var r in rows) if (r.Out.State == EpisodeState.Unsure && !r.Out.Saved) { r.Out = new EpisodeOutcome(); UpdateRow(r); }
+                UpdateButtons();
+            };
+            tips.SetToolTip(unsureCheck, "Osäkert betyder att texten inte verkar passa filmen. Utan kryss sparas ingenting för de avsnitten.\nMed kryss sparas de ändå, och du kan ångra med Återställ avsnittet.");
+            top.Controls.Add(mkvCheck); top.Controls.Add(unsureCheck);
             root.Controls.Add(top, 0, 1);
 
             // --- listan: ett avsnitt per rad
@@ -231,8 +248,9 @@ namespace TextSync
         void UpdateIntro()
         {
             intro.Text = "Dra in mappen med säsongens filmer och undertexter hit, eller klicka Lägg till mapp…. Programmet parar ihop dem efter avsnittsnumret i filnamnen (S04E01, 4x01). " +
-                "Kontrollera listan och klicka Synka alla. Varje undertext sparas som Filmnamn." + Options.Lang + ".srt bredvid sitt avsnitt, så att spelaren hittar den. " +
-                "Osäkra avsnitt sparas inte. Allt går att ångra efteråt med Återställ….";
+                "Kontrollera listan och klicka Synka alla. Varje undertext sparas som Filmnamn." + Options.Lang + ".srt bredvid sitt avsnitt, så att spelaren hittar den" +
+                (mkvCheck != null && mkvCheck.Checked ? ", och läggs också in i en kopia av filmen (Filmnamn (Text Sync).mkv). " : ". ") +
+                (unsureCheck != null && unsureCheck.Checked ? "Osäkra avsnitt sparas också. " : "Osäkra avsnitt sparas inte. ") + "Allt går att ångra efteråt med Återställ….";
         }
 
         // ------------------------------------------------------------ lägga till filer
@@ -436,7 +454,7 @@ namespace TextSync
             var sel = Selected;
             int pending = rows.Count(Pending);
             bool anyDone = rows.Any(r => r.Out.State != EpisodeState.Waiting);
-            foreach (Control c in new Control[] { addFolderBtn, addFilesBtn, refCombo }) c.Enabled = !busy;
+            foreach (Control c in new Control[] { addFolderBtn, addFilesBtn, refCombo, mkvCheck, unsureCheck }) c.Enabled = !busy;
             clearBtn.Enabled = !busy && rows.Count > 0;
             swapBtn.Enabled = !busy && sel != null && !sel.Out.Saved;
             skipBtn.Enabled = !busy && sel != null && Paired(sel.Item) && !sel.Out.Saved;
@@ -604,7 +622,7 @@ namespace TextSync
                     await main.PrepareGpu();
                     Options.WhisperOk = Tools.WhisperReady() && Audio.WhisperDevice >= 0;
                     var mode = Options.Ref; bool wok = Options.WhisperOk;
-                    bool needAudio = false, needWhisper = false;
+                    bool needAudio = false, needWhisper = false; int nAudio = 0;
                     await Task.Run(() =>
                     {
                         foreach (var f in films)
@@ -613,18 +631,63 @@ namespace TextSync
                             try
                             {
                                 var c = SeasonSync.ChooseRef(f, mode, wok);
-                                if (c.Audio) { needAudio = true; if (c.Mode != AudioMode.Speech) needWhisper = true; }
+                                if (c.Audio) { needAudio = true; nAudio++; if (c.Mode != AudioMode.Speech) needWhisper = true; }
                             }
                             catch { }   // en film som inte går att läsa får sitt felbesked i kön
                         }
                     });
                     token.ThrowIfCancellationRequested();
+                    // Filmer utan textspår synkas mot ljudet. Finns inte Whisper (eller inget NVIDIA-kort) väljer användaren själv:
+                    // A+B, som kan behöva en nedladdning eller ta lång tid, eller A som går fort (ägarens svar 2026-11-11).
+                    bool asked = false;
+                    if (mode == SeasonRefMode.Auto && needAudio && !wok)
+                    {
+                        bool ready = Tools.WhisperReady(), gpu = Audio.WhisperDevice >= 0;
+                        int pick = ConfirmDialog.Choose(this, MainForm.Caption,
+                            (nAudio == 1 ? "1 avsnitt har" : nAudio + " avsnitt har") + " inget engelskt textspår och synkas mot filmens ljud. Välj hur:\n\n" +
+                            "•  Ljud A+B (säkrast): taligenkänningen Whisper hör vad som sägs." +
+                            (ready ? "" : " Verktygen behöver laddas ner först. Programmet visar hur stort det är och frågar innan något hämtas.") +
+                            (gpu ? " Tar ungefär en minut per avsnitt." : " Utan NVIDIA-grafikkort tar det ungefär lika lång tid som att se avsnitten.") + "\n\n" +
+                            "•  Ljud A (snabbt): hittar var det pratas. Tar ungefär en minut per avsnitt" + (Tools.IsInstalled(Tools.Ffmpeg) ? "." : ", och behöver bara det lilla verktyget ffmpeg."),
+                            ready ? "Använd A+B" : "Ladda ner och använd A+B", "Använd A", "Avbryt");
+                        if (pick == 0) { endNote = "Avbrutet."; return; }
+                        if (pick == 1) { Options.WhisperOk = true; needWhisper = true; asked = true; }
+                        Log.Info("Säsong: " + nAudio + " avsnitt utan textspår, valt " + (pick == 1 ? "A+B" : "A"));
+                    }
                     // frågan kommer före nedladdningen, som i huvudfönstret
-                    if (needWhisper && Audio.WhisperDevice < 0 && !ConfirmDialog.Ask(this, MainForm.Caption,
+                    if (!asked && needWhisper && Audio.WhisperDevice < 0 && !ConfirmDialog.Ask(this, MainForm.Caption,
                         "Taligenkänningen (Whisper) körs på processorn, eftersom inget NVIDIA-grafikkort är valt.\n\n" +
                         "Det tar ungefär lika lång tid som att se avsnitten (" + films.Count + " st). Välj \"Filmens ljud A – taldetektering\" i listan Referens om det ska gå fort.",
                         "Fortsätt", "Avbryt")) { endNote = "Avbrutet."; return; }
                     if (needAudio && !await main.EnsureTools(needWhisper, token, this, Progress)) { endNote = "Avbrutet – verktygen för synk mot ljudet hämtades inte."; return; }
+                }
+                // MKV-kopior: MKVToolNix måste finnas, och kopiorna är lika stora som filmerna
+                Options.SaveUnsure = unsureCheck.Checked;
+                Options.MakeMkv = mkvCheck.Checked && films.Count > 0;
+                if (Options.MakeMkv)
+                {
+                    if (MainForm.FindMkvMergePublic() == null)
+                    {
+                        var a = MessageBox.Show(this,
+                            "För att lägga in undertexten i en kopia av filmen behövs det kostnadsfria programmet MKVToolNix.\n\n" +
+                            "Vill du öppna nedladdningssidan?\n\n(Kryssa ur rutan \"Lägg också in undertexten i en kopia av filmen\" om det räcker med SRT-filerna. De flesta spelare hittar dem automatiskt.)",
+                            MainForm.Caption, MessageBoxButtons.YesNo, MessageBoxIcon.Information);
+                        if (a == DialogResult.Yes) { try { System.Diagnostics.Process.Start("https://mkvtoolnix.download/downloads.html#windows"); } catch { } }
+                        endNote = "Avbrutet – MKVToolNix behövs för MKV-kopiorna. Installera det och klicka Synka alla igen, eller kryssa ur rutan.";
+                        return;
+                    }
+                    long need = 0, free = -1; string drv = "";
+                    try
+                    {
+                        foreach (var f in films) if (!File.Exists(SeasonSync.MkvCopyPath(f))) need += new FileInfo(f).Length;
+                        var d = new DriveInfo(Path.GetPathRoot(Path.GetFullPath(films[0])));
+                        if (d.IsReady) { free = d.AvailableFreeSpace; drv = d.Name; }
+                    }
+                    catch { }   // t.ex. nätverkssökväg: kontrollen görs då bara per avsnitt
+                    if (free >= 0 && free < need && !ConfirmDialog.Ask(this, MainForm.Caption,
+                        "Kopiorna av filmerna behöver cirka " + MainForm.Fmt(need / 1073741824.0, "0.0") + " GB, men bara " + MainForm.Fmt(free / 1073741824.0, "0.0") + " GB är ledigt på " + drv + "\n\n" +
+                        "Alla avsnitt får sin SRT-fil. De avsnitt som inte får plats får ingen MKV-kopia, och det står då på raden.",
+                        "Fortsätt", "Avbryt")) { endNote = "Avbrutet."; return; }
                 }
                 // En omgång per mapp: en annan mapp (en annan säsong) blir en egen omgång, som återställs för sig
                 string folder = "";
@@ -687,10 +750,15 @@ namespace TextSync
         void Summarize(List<Row> todo)
         {
             int good = todo.Count(r => r.Out.State == EpisodeState.Good), check = todo.Count(r => r.Out.State == EpisodeState.Check);
-            int unsure = todo.Count(r => r.Out.State == EpisodeState.Unsure), failed = todo.Count(r => r.Out.State == EpisodeState.Failed);
+            int unsure = todo.Count(r => r.Out.State == EpisodeState.Unsure && !r.Out.Saved), failed = todo.Count(r => r.Out.State == EpisodeState.Failed);
+            int kept = todo.Count(r => r.Out.State == EpisodeState.Unsure && r.Out.Saved);   // osäkra som sparades ändå (ägarens val)
+            int mkv = todo.Count(r => r.Out.MkvEntry != null);
             int left = todo.Count(r => r.Out.State == EpisodeState.Waiting);
             var parts = new List<string>();
-            if (good + check > 0) parts.Add(good + check + (good + check == 1 ? " undertext sparad" : " undertexter sparade") + (check > 0 ? " (" + check + " bör kontrolleras)" : ""));
+            check += kept;
+            if (good + check > 0) parts.Add(good + check + (good + check == 1 ? " undertext sparad" : " undertexter sparade") +
+                (check > 0 ? " (" + check + " bör kontrolleras" + (kept > 0 ? ", varav " + kept + (kept == 1 ? " osäker" : " osäkra") : "") + ")" : ""));
+            if (Options.MakeMkv) parts.Add(mkv + (mkv == 1 ? " MKV-kopia skapad" : " MKV-kopior skapade"));
             if (unsure > 0) parts.Add(unsure + (unsure == 1 ? " osäker och inte sparad" : " osäkra och inte sparade"));
             if (failed > 0) parts.Add(failed + " misslyckades");
             if (left > 0) parts.Add(left + " inte synkade (avbrutet)");
@@ -719,7 +787,16 @@ namespace TextSync
         {
             var r = Selected;
             if (busy || r == null || !r.Out.Saved || r.Run == null) return;
+            // MKV-kopian först, om avsnittet har en
+            string mkvNote = "";
+            if (r.Out.MkvEntry != null && !r.Out.MkvEntry.Restored)
+            {
+                var mr = SeasonUndo.Restore(r.Run, r.Out.MkvEntry);
+                Log.Info("Säsong: återställning av " + r.Out.MkvEntry.Path + " → " + mr.Outcome);
+                mkvNote = "  " + (mr.Message ?? "");
+            }
             var res = SeasonUndo.Restore(r.Run, r.Out.Entry);
+            res.Message = (res.Message ?? "") + mkvNote;
             Log.Info("Säsong: återställning av " + r.Out.Entry.Path + " → " + res.Outcome + (res.Message != null ? " (" + res.Message + ")" : ""));
             if (res.Outcome == RestoreOutcome.Restored || res.Outcome == RestoreOutcome.Removed) MarkRestored(r, res);
             SetStatus(res.Message ?? "", false);
@@ -741,11 +818,14 @@ namespace TextSync
             var target = restorable;
             if (busy || target == null) { UpdateButtons(); return; }
             var todo = target.Entries.Where(en => !en.Restored).ToList();
-            int back = todo.Count(en => en.Kept != null), gone = todo.Count - back;
+            int back = todo.Count(en => en.Kept != null);
+            int copies = todo.Count(en => en.Kept == null && en.Path != null && en.Path.EndsWith(".mkv", StringComparison.OrdinalIgnoreCase));
+            int gone = todo.Count - back - copies;
             string msg = "Vill du ångra säsongssynken från " + target.When.ToString("yyyy-MM-dd HH:mm") + "?\n" + (string.IsNullOrEmpty(target.Title) ? "" : target.Title + "\n") + "\n" +
                 (back > 0 ? "•  " + back + (back == 1 ? " undertext byts" : " undertexter byts") + " tillbaka mot filen som fanns före synken.\n" : "") +
                 (gone > 0 ? "•  " + gone + (gone == 1 ? " ny undertext tas bort" : " nya undertexter tas bort") + " (det fanns ingen fil där före synken).\n" : "") +
-                "\nFilmerna rörs inte. En undertext som du har ändrat efter synken rörs inte heller.";
+                (copies > 0 ? "•  " + copies + (copies == 1 ? " kopia av en film" : " kopior av filmer") + " med undertexten inlagd tas bort (… (Text Sync).mkv).\n" : "") +
+                "\nOriginalfilmerna rörs inte. En fil som du har ändrat efter synken rörs inte heller.";
             if (!ConfirmDialog.Ask(this, MainForm.Caption, msg, "Återställ", "Avbryt")) return;
             SetBusy(true);
             runBtn.Enabled = false;

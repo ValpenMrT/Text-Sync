@@ -52,12 +52,8 @@ Kopiera den senaste `TextSync-<version>.exe` från `Build\` till ett USB-minne. 
 Programmet är inte signerat (se [docs/decisions.md](docs/decisions.md)). Versionen står i filnamnet och i fönstrets rubrik, och sätts bara i `Program.Version` i [src/Program.cs](src/Program.cs) (plus de två `Assembly…Version`-raderna, som bygget kontrollerar).
 
 ### Obesvarade frågor (tas upp vid nästa körning)
-Om Hel säsong (2.4.2). Claude valde det som står först, eftersom ägaren inte hade svarat:
-1. **Osäkra avsnitt sparas inte.** Ska de sparas ändå, eftersom allt går att återställa?
-2. **Film utan textspår synkas mot ljud A** (taldetektering). A+B används bara om Whisper redan är nedladdat och ett NVIDIA-kort är valt, så att kön aldrig börjar med en stor nedladdning eller timmar på processorn. Är det rätt förval?
-3. **De tio senaste säsongssynkarna går att återställa.** Räcker det, och ska äldre tas bort automatiskt som nu?
-4. **Knappen Hel säsong…** står bredvid Inställningar…. Är det rätt plats?
-5. **Lägg in i MKV… finns inte för en hel säsong**, bara Spara SRT bredvid filmen. Behövs det?
+Om Hel säsong:
+1. **De tio senaste omgångarna går att återställa.** En omgång är en hel säsong (en mapp) med alla sina avsnitt, inte ett avsnitt. Räcker tio, och ska äldre tas bort automatiskt som nu? (Ägaren frågade 2026-11-11 vad som menades. Svaret väntar.)
 
 ### Dokumentation
 

@@ -8,7 +8,7 @@ namespace TextSync
     public class ConfirmDialog : Form
     {
         // Avbryt är förvald knapp, så att Enter aldrig går vidare av misstag
-        public ConfirmDialog(string title, string message, string okText, string cancelText)
+        public ConfirmDialog(string title, string message, string okText, string cancelText, string altText = null)
         {
             SuspendLayout();
             AutoScaleDimensions = new SizeF(96F, 96F);
@@ -31,7 +31,10 @@ namespace TextSync
             var ok = new Button { Text = okText, AutoSize = true, MinimumSize = new Size(110, 30), DialogResult = DialogResult.OK };
             var cancel = new Button { Text = cancelText, AutoSize = true, MinimumSize = new Size(110, 30), DialogResult = DialogResult.Cancel };
             var btns = new FlowLayoutPanel { FlowDirection = FlowDirection.RightToLeft, AutoSize = true, Anchor = AnchorStyles.Right, Margin = new Padding(0) };
-            btns.Controls.Add(cancel); btns.Controls.Add(ok); cancel.TabIndex = 0; ok.TabIndex = 1;
+            btns.Controls.Add(cancel);
+            // ett andra val (t.ex. "Använd ljud A"), mellan det första valet och Avbryt
+            if (altText != null) btns.Controls.Add(new Button { Text = altText, AutoSize = true, MinimumSize = new Size(110, 30), DialogResult = DialogResult.Yes, TabIndex = 2 });
+            btns.Controls.Add(ok); cancel.TabIndex = 0; ok.TabIndex = 1;
             t.Controls.Add(btns, 0, 1); t.SetColumnSpan(btns, 2);
 
             Controls.Add(t);
@@ -39,6 +42,16 @@ namespace TextSync
             Theme.Apply(this, null);
             ResumeLayout(true);
             Shown += (s, e) => cancel.Focus();
+        }
+
+        // Två val och Avbryt. Returnerar 1 för det första valet, 2 för det andra och 0 för Avbryt.
+        public static int Choose(IWin32Window owner, string title, string message, string firstText, string secondText, string cancelText)
+        {
+            using (var d = new ConfirmDialog(title, message, firstText, cancelText, secondText))
+            {
+                var r = d.ShowDialog(owner);
+                return r == DialogResult.OK ? 1 : r == DialogResult.Yes ? 2 : 0;
+            }
         }
 
         public static bool Ask(IWin32Window owner, string title, string message, string okText, string cancelText)

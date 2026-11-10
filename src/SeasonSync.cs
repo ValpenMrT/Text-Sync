@@ -15,6 +15,8 @@ namespace TextSync
         public string Lang = "sv";
         public SyncMode Mode = SyncMode.Smart;
         public bool DetectFramerate = true, RemoveHi, StripFormatting;
+        public bool SaveUnsure;  // spara även avsnitt som får beskedet Osäkert (ägarens val, från början av)
+        public bool MakeMkv;     // lägg också in undertexten i en kopia av filmen: "Filmnamn (Text Sync).mkv" bredvid filmen
         public SeasonRefMode Ref = SeasonRefMode.Auto;
         public bool WhisperOk;   // Whisper finns på datorn och ett NVIDIA-kort är valt (då används A+B i Auto när filmen saknar text)
     }
@@ -29,6 +31,7 @@ namespace TextSync
         public string Detail = "";    // mer i tipsrutan
         public UndoEntry Entry;       // filen som sparades (null = inget sparat)
         public UndoRun Run;           // omgången som Entry hör till
+        public UndoEntry MkvEntry;    // MKV-kopian med undertexten inlagd (null = ingen skapad)
         public bool Saved { get { return Entry != null && !Entry.Restored; } }
     }
 
@@ -73,6 +76,10 @@ namespace TextSync
         public static EpisodeOutcome SyncOne(SeasonItem it, SeasonOptions o, Func<UndoRun> getRun, Action<int, string> progress, CancellationToken ct)
         {
             var notes = new List<string>();
+            // med MKV-kopia är synken första halvan av förloppet och kopian den andra
+            bool wantMkv = o.MakeMkv && it.RefIsVideo;
+            var report = progress;
+            if (wantMkv) progress = (p, s) => report(p / 2, s);
             progress(0, "Läser undertexten…");
             var tgt = Markup.FixAll(Srt.Load(it.TargetPath));
             if (tgt.Count == 0) throw new InvalidDataException("Hittade inga repliker i undertexten – är det en SRT-fil?");
@@ -140,7 +147,8 @@ namespace TextSync
 
             var res = new EpisodeOutcome();
             var detail = new List<string>();
-            if (q.Verdict == Verdict.Unsure || output.Count(c => c.End > 0) == 0)
+            bool unsure = q.Verdict == Verdict.Unsure;
+            if ((unsure && !o.SaveUnsure) || output.Count(c => c.End > 0) == 0)
             {
                 res.State = EpisodeState.Unsure;
                 res.Text = "✖ Osäkert – inte sparad";
@@ -165,21 +173,109 @@ namespace TextSync
                 res.Run = getRun();   // omgången skapas först när något ska sparas
                 res.Entry = SeasonUndo.Write(res.Run, outPath, bytes, it.Title);
                 bool good = q.Verdict == Verdict.Good && wrongEp == null && wrongLen == null && !truncated;
-                res.State = good ? EpisodeState.Good : EpisodeState.Check;
-                res.Text = good ? "✔ Bra – sparad" : "⚠ Kontrollera – sparad";
+                res.State = unsure ? EpisodeState.Unsure : good ? EpisodeState.Good : EpisodeState.Check;
+                res.Text = unsure ? "✖ Osäkert – sparad ändå" : good ? "✔ Bra – sparad" : "⚠ Kontrollera – sparad";
                 detail.Add("Sparad: " + outPath);
-                if (!good)
+                if (unsure) detail.Add("Texten verkar inte passa " + (it.RefIsVideo ? "filmen" : "referensen") + ". Den kan höra till ett annat avsnitt eller en annan version. " +
+                    "Den sparades ändå, eftersom Spara även osäkra avsnitt är ikryssad. Återställ avsnittet tar bort den.");
+                else if (!good)
                     detail.Add(q.Sparse ? "Referensen har för lite text för att synken ska kunna bedömas. Öppna avsnittet i huvudfönstret och kontrollera några rader."
                         : "Synken är inte helt säker. Öppna avsnittet i huvudfönstret för att se de svaga ställena." + (refIsText ? "" : " Filmens ljud A+B i listan Referens är säkrare än A."));
                 Log.Info("Säsong " + it.Title + ": sparad " + outPath + (res.Entry.Kept != null ? " (den gamla filen finns i " + res.Entry.Kept + ")" : ""));
+            }
+            if (wantMkv && res.Entry != null)
+            {
+                string mkvOut = MkvCopyPath(it.RefPath);
+                string err = Mux(it.RefPath, output, o.Lang, mkvOut, (p, s) => report(50 + p / 2, s), ct);
+                if (err == null)
+                {
+                    res.MkvEntry = SeasonUndo.RegisterCreated(res.Run, mkvOut, it.Title);
+                    res.Text = res.Text.Replace("– sparad", "– SRT och MKV sparade");
+                    detail.Add("MKV-kopia med undertexten inlagd: " + mkvOut);
+                    Log.Info("Säsong " + it.Title + ": MKV skapad " + mkvOut);
+                }
+                else
+                {
+                    if (res.State == EpisodeState.Good) res.State = EpisodeState.Check;
+                    res.Text = res.Text.Replace("– sparad", "– SRT sparad, ingen MKV");
+                    detail.Add(err);
+                    Log.Info("Säsong " + it.Title + ": ingen MKV: " + err);
+                }
             }
             detail.AddRange(notes);
             detail.Add("Referens: " + how + ".");
             detail.Add(r.Segments.Count > 1 ? "Flyttad olika mycket i " + r.Segments.Count + " delar." : "Förskjutning " + MainForm.FmtOffset(r.OffsetMs) + ".");
             detail.Add(MainForm.Fmt(Math.Floor(q.Matched * 1000) / 10, "0.#") + " % av raderna " + (refIsText ? "har referenstext samtidigt." : "ligger på tal i ljudet."));
             res.Detail = string.Join("\n", detail);
-            progress(100, "Klar");
+            report(100, "Klar");
             return res;
+        }
+
+        // Kopian av filmen med undertexten inlagd: "Filmnamn (Text Sync).mkv" bredvid filmen, samma namn som Lägg in i MKV… föreslår
+        public static string MkvCopyPath(string film)
+        {
+            return Path.Combine(Path.GetDirectoryName(film), Path.GetFileNameWithoutExtension(film) + " (Text Sync).mkv");
+        }
+
+        // Lägger in undertexten i en kopia av filmen med mkvmerge (MKVToolNix). Originalfilmen ändras aldrig, och en fil som redan finns skrivs aldrig över.
+        // Returnerar null när kopian är skapad, annars en mening om varför den inte skapades. Avbrott kastar OperationCanceledException.
+        static string Mux(string film, List<Cue> cues, string lang, string outPath, Action<int, string> progress, CancellationToken ct)
+        {
+            string exe = MainForm.FindMkvMergePublic();
+            if (exe == null) return "MKV-kopian skapades inte: MKVToolNix är inte installerat.";
+            if (MainForm.SamePath(film, outPath) || Path.GetFileNameWithoutExtension(film).EndsWith(" (Text Sync)", StringComparison.OrdinalIgnoreCase))
+                return "MKV-kopian skapades inte: filmen är redan en kopia från Text Sync.";
+            if (File.Exists(outPath)) return "MKV-kopian finns redan och skrevs inte över: " + Path.GetFileName(outPath) + ". Ta bort den filen om den ska göras om.";
+            long size = new FileInfo(film).Length;
+            try
+            {
+                var drive = new DriveInfo(Path.GetPathRoot(Path.GetFullPath(outPath)));
+                long need = size + 200L * 1024 * 1024;
+                if (drive.IsReady && drive.AvailableFreeSpace < need)
+                    return "MKV-kopian skapades inte: det finns för lite plats på " + drive.Name + " (behövs " + MainForm.Fmt(need / 1073741824.0, "0.0") + " GB, ledigt " + MainForm.Fmt(drive.AvailableFreeSpace / 1073741824.0, "0.0") + " GB).";
+            }
+            catch { }   // t.ex. nätverkssökväg: hoppa över kontrollen
+            List<MkvTrack> tracks = new List<MkvTrack>();
+            if (MainForm.IsMkv(film)) using (var f = new MkvFile(film)) tracks = f.Tracks;
+            string tmp = Path.Combine(Path.GetTempPath(), "TextSync_" + Guid.NewGuid().ToString("N") + ".srt");
+            string part = outPath + ".part";
+            var log = new System.Text.StringBuilder();
+            int code = -1;
+            try
+            {
+                Srt.Save(tmp, cues);   // MKV kräver UTF-8, oavsett hur SRT-filen sparas
+                string args = MainForm.BuildMuxArgs(tracks, film, part, lang, tmp);
+                Log.Info("mkvmerge " + args);
+                var psi = new System.Diagnostics.ProcessStartInfo(exe, args) { UseShellExecute = false, RedirectStandardOutput = true, CreateNoWindow = true, StandardOutputEncoding = System.Text.Encoding.UTF8 };
+                using (var p = System.Diagnostics.Process.Start(psi))
+                using (ct.Register(() => { try { if (!p.HasExited) p.Kill(); } catch { } }))
+                {
+                    string line;
+                    while ((line = p.StandardOutput.ReadLine()) != null)
+                    {
+                        var m = System.Text.RegularExpressions.Regex.Match(line, @"#GUI#progress\s+(\d+)%");
+                        if (m.Success) progress(int.Parse(m.Groups[1].Value), "Lägger in undertexten i en kopia av filmen… " + m.Groups[1].Value + " %");
+                        else if (line.StartsWith("#GUI#error") || line.StartsWith("#GUI#warning")) log.AppendLine(line.Substring(5));
+                    }
+                    p.WaitForExit();
+                    code = p.ExitCode;
+                }
+                ct.ThrowIfCancellationRequested();
+                if (code != 0 && code != 1)
+                {
+                    Log.Error("mkvmerge misslyckades (kod " + code + "):\r\n" + log, null);
+                    return "MKV-kopian skapades inte: mkvmerge misslyckades. Mer står i loggen (Hjälp → loggmapp).";
+                }
+                if (code == 1) Log.Info("mkvmerge-varningar:\r\n" + log);
+                if (File.Exists(outPath)) return "MKV-kopian finns redan och skrevs inte över: " + Path.GetFileName(outPath) + ".";
+                File.Move(part, outPath);
+                return null;
+            }
+            finally
+            {
+                try { if (File.Exists(tmp)) File.Delete(tmp); } catch { }
+                try { if (File.Exists(part)) File.Delete(part); } catch { }   // bara programmets egen halvfärdiga fil
+            }
         }
     }
 }
