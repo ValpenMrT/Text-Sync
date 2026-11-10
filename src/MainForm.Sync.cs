@@ -22,6 +22,14 @@ namespace TextSync
         async Task DoSync()
         {
             if (busy || tgtCues == null) return;
+            // varna före synken om filnamnen pekar på olika avsnitt, eller om texterna är mycket olika långa
+            var warn = new List<string>();
+            warn.Add(EpisodeId.Mismatch(mkvPath ?? refLoadedPath, tgtLoadedPath, "Texten", mkvPath != null ? "filmen" : "referensen"));
+            var oo0 = mkvPath != null && refSrtCues == null ? trackCombo.SelectedItem as OrigSrtOption : null;
+            if (oo0 != null) warn.Add(EpisodeId.Mismatch(mkvPath, oo0.Path, "Undertexten på originalspråket", "filmen"));
+            if (refSrtCues != null) warn.Add(EpisodeId.LengthMismatch(refSrtCues, tgtCues, "referensen"));
+            bool warned = warn.Any(x => x != null);
+            if (!ConfirmWrongFile(warn)) return;
             var opt = new SyncOptions { Mode = (SyncMode)modeCombo.SelectedIndex, DetectFramerate = fpsCheck.Checked };
             var tgt = tgtCues;
             cts = new CancellationTokenSource();
@@ -95,6 +103,8 @@ namespace TextSync
                         if (!truncated) trackCache[key] = refc;
                     }
                     if (refc.Count < 5) throw new InvalidDataException("Spåret innehåller nästan inga repliker (" + refc.Count + "). Välj ett annat spår.");
+                    // inte om filmen är ofullständig (då är det filmen som är kort), och inte om man redan har valt "Synka ändå"
+                    if (!truncated && !warned && !ConfirmWrongFile(new List<string> { EpisodeId.LengthMismatch(refc, tgt, "filmens text") })) { finalStatus = "Avbrutet."; return; }
                     if (tco != null)
                     {
                         // Whisper lyssnar ord för ord och rättar de delar av textspåret som inte går i takt med ljudet
@@ -127,8 +137,8 @@ namespace TextSync
                 unsaved = true;
                 extraNum.Value = 0;
                 timeline.Highlight = null;
-                ShowResult();
-                RefreshPreview();
+                RefreshPreview();   // räknar beskedet och visar resultatet
+                if (quality != null) Log.Info("Synkens kvalitet: " + quality.LogText());
                 Log.Info("Synk: ref=" + (mkvPath ?? refLoadedPath) + (mkvPath != null ? " " + trackCombo.SelectedItem : "") +
                     ", mål=" + tgtLoadedPath + ", metod=" + opt.Mode + " → " + r.Method + ", matchning " + Fmt(r.ScoreBefore * 100, "0") + "→" + Fmt(r.ScoreAfter * 100, "0") + " %");
             }
@@ -148,11 +158,48 @@ namespace TextSync
             }
         }
 
+        // Varning för fel avsnitt eller fel version. Stoppar inte synken: man väljer "Synka ändå" eller "Avbryt".
+        // reasons får innehålla null (= ingen anmärkning). Returnerar true om synken ska fortsätta.
+        bool ConfirmWrongFile(List<string> reasons)
+        {
+            var r = reasons.Where(x => x != null).ToList();
+            if (r.Count == 0) return true;
+            string names = "\n\nReferens: " + Path.GetFileName(mkvPath ?? refLoadedPath ?? "") + "\nText: " + Path.GetFileName(tgtLoadedPath ?? "");
+            bool go = ConfirmDialog.Ask(this, Caption, string.Join("\n", r) + names +
+                "\n\nSynken kan bli fel om texten hör till ett annat avsnitt eller en annan version av filmen. Kontrollera att du har valt rätt filer.",
+                "Synka ändå", "Avbryt");
+            Log.Info("Varning för fel avsnitt: " + string.Join(" ", r) + " → " + (go ? "synkade ändå" : "avbröt"));
+            return go;
+        }
+
         void ShowResult()
         {
             var r = result;
             var sb = new StringBuilder();
             bool good = true;
+            // beskedet: inga siffror här, de står i detaljerna under och i loggen
+            var v = quality != null ? quality.Verdict : Verdict.Check;
+            bool anyRed = rowMatched != null && rowMatched.Any(m => !m);
+            if (v == Verdict.Good)
+            {
+                verdictLabel.Text = "✔  Bra"; verdictLabel.ForeColor = OkColor;
+                sb.Append(refIsText ? "Texten går i takt med referensen.\n" : "Raderna ligger på tal i filmens ljud. Mot ljud är beskedet mindre säkert än mot en text, så kontrollera några rader.\n");
+            }
+            else if (v == Verdict.Check)
+            {
+                verdictLabel.Text = weakStops.Count > 0 && !(quality != null && quality.Sparse) ? "⚠  Kontrollera de markerade ställena" : "⚠  Kontrollera resultatet"; verdictLabel.ForeColor = Theme.Warn;
+                if (quality != null && quality.Sparse) sb.Append("Referensen har för lite text för att synken ska kunna bedömas. Kontrollera några rader på olika ställen i filmen.\n");
+                else if (quality != null && quality.Weak.Count > 0) sb.Append((refIsText ? "På några ställen börjar få rader samtidigt som referensen" : "På några ställen ligger få rader på tal i ljudet") +
+                    " (märkta ⚠ i listan). Kontrollera att texten stämmer där. F4 hoppar till nästa ställe, Skift+F4 till föregående.\n");
+                else if (anyRed) sb.Append("Några rader saknar " + (refIsText ? "referenstext samtidigt" : "tal i ljudet samtidigt") + " (röda i listan). Det är ofta i sin ordning, t.ex. utrop. F4 hoppar till nästa.\n");
+                else sb.Append("Synken är inte helt säker. Kontrollera några rader i början, mitten och slutet av filmen.\n");
+            }
+            else
+            {
+                verdictLabel.Text = "✖  Osäkert"; verdictLabel.ForeColor = ErrColor;
+                sb.Append("Texten verkar inte passa referensen. Den kan höra till ett annat avsnitt eller en annan version av filmen. Kontrollera att du har valt rätt filer.\n");
+            }
+            prevWeakLink.Visible = nextWeakLink.Visible = v != Verdict.Good && weakStops.Count > 0 && !(quality != null && quality.Sparse);
             sb.Append(r.Method);
             if (rowMatched != null && rowMatched.Length > 0)
             {
@@ -161,7 +208,6 @@ namespace TextSync
                 var ao = trackCombo.SelectedItem as AudioRefOption;
                 sb.Append((ao != null && ao.Mode != AudioMode.Whisper ? "     Rader som ligger på tal i ljudet: " : "     Rader med referenstext samtidigt: ") + ok + " av " + n + " (" + Fmt(Math.Floor(1000.0 * ok / n) / 10, "0.#") + " %)");
             }
-            sb.Insert(0, good ? "✔  " : "⚠  ");
             sb.Append("\n");
             if (r.Segments.Count > 1)
             {
@@ -186,9 +232,9 @@ namespace TextSync
             if (refOnlyTotal > 0) sb.Append(refOnlyTotal + " grå rader finns bara i referensen och sparas inte" + (viewCombo.SelectedIndex == ViewAll ? "" : viewCombo.SelectedIndex == ViewProposals ? " (de flesta dolda just nu, se Visa ovanför listan)" : " (dolda just nu, se Visa ovanför listan)") + ".\n");
             sb.Append("Redigera i listan: dubbelklicka för att ändra text och tid, Insert lägger till, Delete tar bort, Ctrl+Z ångrar.");
             resultLabel.Text = sb.ToString().TrimEnd();
-            resultLabel.ForeColor = good ? OkColor : ErrColor;
+            resultLabel.ForeColor = Theme.Fg;
             resultLabel.MaximumSize = new Size(Math.Max(200, root.ClientSize.Width - 40), 0);
-            resultLabel.Visible = true;
+            resBox.Visible = true;
         }
 
         void RefreshPreview()
@@ -223,6 +269,21 @@ namespace TextSync
                 rowMatched[i] = best[i] != null;
                 if (best[i] != null) shownRef.Add(best[i]);
             }
+
+            // besked om hur säker synken är, och var de svaga ställena finns (räknas om efter varje ändring)
+            quality = Quality.Assess(refc, synced, result, refIsText);
+            cueWeak = new bool[synced.Count];
+            weakStops = new List<int>();
+            foreach (var w in quality.Weak)
+            {
+                bool first = true;
+                for (int i = 0; i < synced.Count; i++)
+                    if (synced[i].Start >= w.S && synced[i].Start <= w.E) { cueWeak[i] = true; if (first) { weakStops.Add(i); first = false; } }
+            }
+            // utan svaga ställen hoppar länkarna mellan de röda raderna
+            if (weakStops.Count == 0 && quality.Verdict != Verdict.Good && !quality.Sparse)
+                for (int i = 0; i < synced.Count; i++) if (!rowMatched[i]) weakStops.Add(i);
+            weakStops.Sort();
 
             // 2) referensrader som inte redan står bredvid en synkad rad får en egen grå rad i tidsordning,
             //    så att listan visar alla rader i båda texterna. "(tal)" från taldetekteringen är ingen text och visas inte.
@@ -271,7 +332,7 @@ namespace TextSync
                     if (view == ViewOnlyRed && bc != null) continue;
                     if (view == ViewProposals && cueProp[i] < 0) continue;
                     // förslagsrader märks med text också, inte bara med färg
-                    string mark = cueProp[i] < 0 ? "" : proposals[cueProp[i]].IsMerge ? "Ihop?  " : "Dela?  ";
+                    string mark = (cueWeak[i] ? "⚠ " : "") + (cueProp[i] < 0 ? "" : proposals[cueProp[i]].IsMerge ? "Ihop?  " : "Dela?  ");
                     var it = new ListViewItem(new[] { mark + (i + 1),
                         double.IsNaN(c.OrigStart) ? "— (ny rad)" : Srt.FormatTime(c.OrigStart),
                         Srt.FormatTime(c.Start), Srt.FormatTime(c.End),
@@ -281,6 +342,7 @@ namespace TextSync
                         bc != null ? Srt.FormatTime(bc.Start) : "—",
                         bc != null ? bc.Text.Replace("\n", " / ") : "— (ingen referenstext samtidigt)" });
                     if (bc == null) it.ForeColor = RedRow;
+                    if (cueWeak[i]) it.ToolTipText = "Svagt ställe: få rader här " + (refIsText ? "börjar samtidigt som referensen" : "ligger på tal i ljudet") + ". Kontrollera att texten stämmer med det som sägs.";
                     if (cueProp[i] >= 0)
                     {
                         it.ForeColor = PropRow;

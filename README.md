@@ -10,7 +10,7 @@ Text Sync får en undertext som inte går i takt med filmen, till exempel en sve
 
 ### Så här gör du
 1. Starta Text Sync-programmet och dra in filmen och den svenska SRT-filen i fönstret.
-2. Klicka **Synka** och titta på några rader i listan. Den engelska texten bredvid ska betyda samma sak som den svenska.
+2. Klicka **Synka**. Står det **✔ Bra** ovanför listan gick det bra. Titta ändå på några rader: den engelska texten bredvid ska betyda samma sak som den svenska.
 3. Klicka **Spara SRT…**. Filen sparas som `Filmnamn.sv.srt` bredvid filmen, så hittar VLC, Plex och Kodi den automatiskt.
 
 Har filmen ingen engelsk text kan Text Sync synka mot filmens ljud i stället. Första gången frågar programmet om det får hämta gratisverktyg som behövs för det. Utan NVIDIA-grafikkort tar det längre tid.

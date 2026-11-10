@@ -193,6 +193,22 @@ namespace TextSync
             SetStatus("Alla rader har referenstext samtidigt.", true);
         }
 
+        // Hoppa till föregående (-1) eller nästa (+1) svaga ställe. Börjar om från andra änden.
+        void JumpWeak(int dir)
+        {
+            if (weakStops == null || weakStops.Count == 0 || synced == null) return;
+            int cur = -1;
+            if (list.SelectedIndices.Count > 0 && rowCue != null)
+                for (int r = Math.Min(list.SelectedIndices[0], rowCue.Length - 1); r >= 0; r--) if (rowCue[r] >= 0) { cur = rowCue[r]; break; }
+            int idx = -1;
+            if (dir > 0) { for (int k = 0; k < weakStops.Count; k++) if (weakStops[k] > cur) { idx = k; break; } if (idx < 0) idx = 0; }
+            else { for (int k = weakStops.Count - 1; k >= 0; k--) if (weakStops[k] < cur) { idx = k; break; } if (idx < 0) idx = weakStops.Count - 1; }
+            int i = weakStops[idx];
+            // raden är dold av valet i Visa: visa alla rader först
+            if (cueRow != null && i < cueRow.Length && cueRow[i] < 0) viewCombo.SelectedIndex = ViewAll;
+            SelectRow(i);
+        }
+
         // Under 95 % matchade rader: fråga innan sparning
         bool ConfirmLowMatch()
         {

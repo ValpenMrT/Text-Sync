@@ -49,6 +49,9 @@ namespace TextSync
         readonly HashSet<string> rejected = new HashSet<string>();   // avvisade förslag (AlignProposal.Key)
         bool refIsText;                // referensen är riktig text (inte ljud), så att raderna kan matchas
         LinkLabel undoLink;
+        // besked om hur säker synken är (Bra / Kontrollera / Osäkert) och hopp mellan svaga ställen
+        QualityResult quality; List<int> weakStops = new List<int>(); bool[] cueWeak;
+        Label verdictLabel; LinkLabel prevWeakLink, nextWeakLink; TableLayoutPanel resBox;
         Label gpuLabel; ComboBox gpuCombo; List<int> gpuDevices; bool gpuFilling, gpuPending;
         // ljudspår för ljudsynk och Whisper (visas bara när filmen har mer än ett ljudspår)
         Label audioLabel; ComboBox audioCombo; FlowLayoutPanel audioRow; bool audioFilling;
@@ -141,6 +144,7 @@ namespace TextSync
                 if (e.Control && e.KeyCode == Keys.Z && !(ActiveControl is TextBoxBase) && !(ActiveControl is NumericUpDown) && undo.Count > 0)
                 { UndoChange(); e.Handled = true; }
                 else if (e.KeyCode == Keys.F3 && synced != null) { NextUnmatched(); e.Handled = true; }
+                else if (e.KeyCode == Keys.F4 && !e.Alt && synced != null) { JumpWeak(e.Shift ? -1 : 1); e.Handled = true; }
             };
             root.Controls.Add(head, 0, 0);
 
@@ -245,9 +249,19 @@ namespace TextSync
             root.Controls.Add(opts, 0, 3);
 
             // --- resultat
-            resultLabel = new Label { AutoSize = true, Dock = DockStyle.Top, Padding = new Padding(10, 8, 10, 8), Margin = new Padding(0, 2, 0, 6), BackColor = Card, Visible = false, MaximumSize = new Size(4000, 0) };
-            root.Controls.Add(resultLabel, 0, 4);
-            root.Resize += (s, e) => { if (resultLabel.Visible) resultLabel.MaximumSize = new Size(Math.Max(200, root.ClientSize.Width - 40), 0); };
+            // överst beskedet (Bra / Kontrollera / Osäkert) med länkar till svaga ställen, under det detaljerna
+            verdictLabel = new Label { AutoSize = true, Font = new Font("Segoe UI Semibold", 11.5F), Margin = new Padding(0, 0, 18, 0) };
+            prevWeakLink = new LinkLabel { Text = "◀ Föregående ställe", AutoSize = true, Margin = new Padding(0, 4, 14, 0), Visible = false, LinkColor = Accent };
+            nextWeakLink = new LinkLabel { Text = "Nästa ställe ▶", AutoSize = true, Margin = new Padding(0, 4, 0, 0), Visible = false, LinkColor = Accent };
+            prevWeakLink.LinkClicked += (s, e) => JumpWeak(-1);
+            nextWeakLink.LinkClicked += (s, e) => JumpWeak(1);
+            var vrow = new FlowLayoutPanel { AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, WrapContents = false, Margin = new Padding(10, 8, 10, 0) };
+            vrow.Controls.Add(verdictLabel); vrow.Controls.Add(prevWeakLink); vrow.Controls.Add(nextWeakLink);
+            resultLabel = new Label { AutoSize = true, Padding = new Padding(10, 4, 10, 8), Margin = new Padding(0), MaximumSize = new Size(4000, 0) };
+            resBox = new TableLayoutPanel { AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, Dock = DockStyle.Top, ColumnCount = 1, RowCount = 2, Margin = new Padding(0, 2, 0, 6), BackColor = Card, Visible = false };
+            resBox.Controls.Add(vrow, 0, 0); resBox.Controls.Add(resultLabel, 0, 1);
+            root.Controls.Add(resBox, 0, 4);
+            root.Resize += (s, e) => { if (resBox.Visible) resultLabel.MaximumSize = new Size(Math.Max(200, root.ClientSize.Width - 40), 0); };
 
             // --- förhandsvisning
             var split = new SplitContainer { Dock = DockStyle.Fill, Orientation = Orientation.Horizontal, SplitterWidth = 6, BackColor = Bg };
@@ -628,7 +642,8 @@ namespace TextSync
                 else if (note == null) note = "\"" + Path.GetFileName(of) + "\" användes inte – filmen kunde inte läsas.";
             }
             if (note != null) { statusLabel.Text = note; statusLabel.ForeColor = ErrColor; }
-            if (autoSync && syncBtn.Enabled && files.Length >= 2) await DoSync();
+            // startas efter att dra-och-släpp är klart, så att Utforskaren inte står låst om en varningsruta visas
+            if (autoSync && syncBtn.Enabled && files.Length >= 2) BeginInvoke(new Action(async () => await DoSync()));
         }
 
         static string Fmt(double v, string f) { return v.ToString(f, CultureInfo.GetCultureInfo("sv-SE")); }
@@ -718,7 +733,7 @@ namespace TextSync
                 "Så här gör du:\n" +
                 "1. Referens: välj filmen (MKV) – eller en SRT som redan går i takt.\n" +
                 "2. Välj undertexten som inte går i takt.\n" +
-                "3. Klicka Synka och kontrollera några rader i listan.\n" +
+                "3. Klicka Synka. Beskedet ovanför listan säger om synken blev bra. Står det \"Kontrollera\" hoppar du mellan ställena med länkarna bredvid (märkta ⚠ i listan).\n" +
                 "4. Spara SRT: sparas som Filmnamn.sv.srt bredvid filmen, så hittar spelaren den.\n\n" +
                 "Har filmen ingen engelsk text men du har en engelsk SRT som inte går i takt: klicka \"Lägg till undertext på filmens originalspråk\" " +
                 "(eller dra in filmen och båda SRT-filerna). Den engelska synkas då mot filmens ljud och kontrolleras med Whisper, och sedan synkas den svenska mot den.\n\n" +

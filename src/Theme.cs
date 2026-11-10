@@ -15,7 +15,7 @@ namespace TextSync
         public static bool Dark { get; private set; }
 
         // färger som byts ut på kontrollerna när läget ändras (gammal färg → ny färg)
-        public static Color Bg, Card, Fg, Muted, Err, Ok, Title;
+        public static Color Bg, Card, Fg, Muted, Err, Ok, Title, Warn;
         // färger som sätts efter typ av kontroll eller används vid ritning
         public static Color Accent, Link, Input, BtnBg, BtnBorder, BtnDisabled, RedRow, RefOnly, Prop;
         public static Color Grid, TlRef, TlOrig, TlSynced, TlHighlight;
@@ -30,12 +30,12 @@ namespace TextSync
         // Byter palett och returnerar vilken gammal färg som motsvarar vilken ny
         public static Dictionary<int, Color> Set(bool dark)
         {
-            var old = new[] { Bg, Card, Fg, Muted, Err, Ok, Title };
+            var old = new[] { Bg, Card, Fg, Muted, Err, Ok, Title, Warn };
             Dark = dark && !HC;
             if (HC)
             {
                 Bg = SystemColors.Control; Card = SystemColors.Window; Fg = SystemColors.ControlText; Muted = SystemColors.WindowText;
-                Err = SystemColors.WindowText; Ok = SystemColors.WindowText; Title = SystemColors.WindowText;
+                Err = SystemColors.WindowText; Ok = SystemColors.WindowText; Title = SystemColors.WindowText; Warn = SystemColors.WindowText;
                 Accent = SystemColors.Highlight; Link = SystemColors.HotTrack; Input = SystemColors.Window;
                 BtnBg = SystemColors.Control; BtnBorder = SystemColors.ControlDark; BtnDisabled = SystemColors.ControlDark;
                 RedRow = SystemColors.GrayText; RefOnly = SystemColors.GrayText; Prop = SystemColors.HotTrack;
@@ -45,7 +45,7 @@ namespace TextSync
             else if (Dark)
             {
                 Bg = C(32, 32, 32); Card = C(43, 43, 43); Fg = C(228, 228, 228); Muted = C(160, 160, 160);
-                Err = C(255, 125, 115); Ok = C(108, 203, 95); Title = C(245, 245, 245);
+                Err = C(255, 125, 115); Ok = C(108, 203, 95); Title = C(245, 245, 245); Warn = C(240, 190, 80);
                 Accent = C(0, 120, 212); Link = C(110, 175, 255); Input = C(25, 25, 25);
                 BtnBg = C(55, 55, 55); BtnBorder = C(85, 85, 85); BtnDisabled = C(70, 70, 70);
                 RedRow = C(255, 130, 130); RefOnly = C(135, 135, 135); Prop = C(105, 170, 255);
@@ -55,14 +55,14 @@ namespace TextSync
             else
             {
                 Bg = C(243, 243, 243); Card = C(255, 255, 255); Fg = C(0, 0, 0); Muted = C(96, 96, 96);
-                Err = Color.Firebrick; Ok = C(16, 110, 40); Title = C(28, 28, 28);
+                Err = Color.Firebrick; Ok = C(16, 110, 40); Title = C(28, 28, 28); Warn = C(138, 90, 0);
                 Accent = C(0, 103, 192); Link = Accent; Input = C(255, 255, 255);
                 BtnBg = C(255, 255, 255); BtnBorder = C(200, 200, 200); BtnDisabled = C(200, 200, 200);
                 RedRow = C(170, 60, 60); RefOnly = C(110, 110, 110); Prop = C(0, 90, 180);
                 Grid = C(235, 235, 235); TlRef = C(0, 103, 192); TlOrig = C(160, 160, 160); TlSynced = C(16, 140, 60); TlHighlight = C(0, 0, 0);
                 HotBg = C(229, 241, 251); BtnHover = C(229, 241, 251); BtnDown = C(204, 228, 247); AccentHover = C(0, 120, 215); AccentDown = C(0, 84, 153);
             }
-            var now = new[] { Bg, Card, Fg, Muted, Err, Ok, Title };
+            var now = new[] { Bg, Card, Fg, Muted, Err, Ok, Title, Warn };
             var map = new Dictionary<int, Color>();
             for (int i = 0; i < old.Length; i++)
                 if (!old[i].IsEmpty && !map.ContainsKey(old[i].ToArgb())) map[old[i].ToArgb()] = now[i];

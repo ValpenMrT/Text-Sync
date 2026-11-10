@@ -20,7 +20,7 @@
 6. **Granska i filmen** (önskemål 2026-11-09). Man klickar på en rad i listan och spelar upp filmen några sekunder runt repliken, med den synkade texten ovanpå. Det kontrollerar att texten stämmer med det som sägs, inte bara att tiderna har ändrats.
    - Undersök ffplay (från samma ffmpeg-källa som i dag, fast URL + SHA-256) mot att öppna en vanlig spelare (VLC/mpv) med tid och textfil. ffplay kräver ingen installation hos vännerna.
    - Texten ska visas från osparade ändringar (tillfällig SRT), så att man kan granska före sparandet.
-7. **Säg hur säker synken är** (önskemål 2026-11-09). Efter synken visas ett tydligt besked: grönt "Bra", gult "Kontrollera de markerade ställena" eller rött "Osäkert". Gult och rött har knappar för att hoppa till föregående och nästa svaga ställe i listan.
+7. ~~**Säg hur säker synken är.**~~ **Klart 2026-11-10**, se beslutsloggen. Planen var: Efter synken visas ett tydligt besked: grönt "Bra", gult "Kontrollera de markerade ställena" eller rött "Osäkert". Gult och rött har knappar för att hoppa till föregående och nästa svaga ställe i listan.
    - Bygg på det motorn redan räknar ut (hur väl varje mätpunkt passar, hopp mellan avsnitt). Gränserna sätts mot facit i testerna, så att "Bra" verkligen betyder bra.
    - Inga siffror i huvudbeskedet. Siffrorna kan finnas i loggen.
 8. **Läsbarhet** (önskemål 2026-11-09). Programmet hittar rader som visas för kort tid, går för fort att läsa (tecken per sekund), överlappar varandra eller är för långa (riktvärde cirka 42 tecken per rad), och föreslår rättningar. Förslagen granskas innan de används, som förslagen om att dela och slå ihop rader, och kan ångras.
@@ -32,7 +32,7 @@
     - Visa hur många rader som ändrades eller togs bort, och gör ändringen ångringsbar som annan redigering.
     - Tester: en `Check(...)` per mönster ovan, plus kontroller av att vanlig dialog med parenteser eller versaler (t.ex. "FBI" eller "Han (min bror) kom hem") inte förstörs.
     - Rutan är inte ikryssad från början (ägarens svar 2026-11-10).
-11. **Varna för fel avsnitt** (önskemål 2026-11-09). Programmet varnar innan det synkar om texten verkar höra till ett annat avsnitt eller en annan version av filmen. Ett exempel är S04E02.srt mot S04E01.mkv. Varningen stoppar inte synken: rutan har knapparna "Synka ändå" och "Avbryt".
+11. ~~**Varna för fel avsnitt.**~~ **Klart 2026-11-10**, se beslutsloggen. Planen var: Programmet varnar innan det synkar om texten verkar höra till ett annat avsnitt eller en annan version av filmen. Ett exempel är S04E02.srt mot S04E01.mkv. Varningen stoppar inte synken: rutan har knapparna "Synka ändå" och "Avbryt".
     - Kontroller: avsnittsnummer i filnamnen skiljer sig (samma tolkning som i punkt 5), textens längd skiljer sig mycket från filmens längd, eller synken hittar ingen tydlig matchning alls (den globala sökningen har ingen tydlig topp).
     - Meddelandet ska vara på svenska och säga vad som inte stämmer, t.ex. "Texten verkar höra till avsnitt 2, men filmen är avsnitt 1."
     - I kön för en hel säsong (punkt 5) blir varningen ett "osäkert"-besked för avsnittet i stället för en ruta som stoppar kön.
@@ -42,6 +42,14 @@
 - **Rekommendera Ljud A utan NVIDIA-grafikkort:** en kort förklaring bredvid valet när datorn saknar NVIDIA-kort.
 - **Markera rättningar från Whisper-kontrollen i listan**, så att man kan granska dem.
 - **Testutdata på svenska** ("offset", "cuts", "Route" m.fl.): översätts efter hand när testfilerna ändras.
+
+## Kvar från product-check 2026-11-10 (besked och varning för fel avsnitt, kan vänta)
+- **Beskedet mot ljud är inte mätt mot en riktig film.** Ett fel avsnitt ger där troligen Kontrollera eller Bra, inte Osäkert. Texten vid Bra säger därför att beskedet är mindre säkert mot ljud.
+- **Ett riktigt grannavsnitt** (t.ex. S04E02 mot S04E01) har inte provats. Gränserna bygger på Blacklist S04E01 med texten baklänges och på syntetiska data.
+- **Avsnittsnummer som inte tolkas** (ingen varning, inget falsklarm): "S04 - E01", "Season 4, Episode 1", "E05", "Avsnitt 5", "401". Dubbelavsnitt (`S04E01E02` mot `S04E02.srt`) ger falsklarm.
+- **Originaltexten** (separat SRT på filmens språk) kontrolleras på filnamn men inte på längd.
+- **Motorns poäng och anmärkningar räknas inte om** när man redigerar rader. Beskedet kan därför inte bli Bra efter en rättning om motorn lämnade en anmärkning.
+- **Kolumnen #** kan bli för smal för "⚠ Ihop? 1234".
 
 ## Kvar från product-check 2026-11-09
 Alla punkter är åtgärdade i 2.1 (se beslutsloggen 2026-11-09, "Rättningar från product-check"). Det som återstår:

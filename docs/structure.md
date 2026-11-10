@@ -22,6 +22,8 @@ src/
   Tools.cs         Hittar/laddar ner ffmpeg, whisper.cpp, språkmodell och Silero (fasta URL:er + SHA-256), grafikkort, inställningar
   TextCheck.cs     Kontroll av textspår mot Whisper ord för ord (ankare, utjämning, rättning); separat SRT på originalspråket synkas först grovt mot ljudet
   Engine.cs        SRT läs/skriv och synkmotorn
+  Quality.cs       Besked om hur säker synken är (Bra / Kontrollera / Osäkert, svaga ställen) och avsnittsnummer i filnamn (varning för fel avsnitt)
+  ConfirmDialog.cs Varningsruta med egna knapptexter ("Synka ändå" / "Avbryt")
   Mkv.cs           Minimal Matroska-läsare: spårlista och textundertexter (SRT/ASS/WebVTT, även zlib-komprimerade)
   Log.cs           Loggfil i %LOCALAPPDATA%\TextSync\log.txt
   TextSync.ico     Programikon
@@ -34,6 +36,7 @@ test/
   ToolsDl.cs       Hämtar ljudverktygen med programmets egen nedladdningskod
   TextCheckDiag.cs Testar Whisper-kontrollen: orört spår och med flit förskjutet spår
   VadTune.cs       Justerar taldetekteringens gräns mot facit
+  QualityDiag.cs   Mäter beskedet mot en riktig film: rätt text, texten baklänges (som ett annat avsnitt) och ett missat klipp
   OrigSrtDiag.cs   Separat engelsk SRT (förstörd med flit) → ljud → svensk synk, mot facit
   bin/             Byggda testprogram (skapas av build.ps1 -Test, inte i git)
 docs/              Beslut, drift, FAQ, nästa fas (next.md)

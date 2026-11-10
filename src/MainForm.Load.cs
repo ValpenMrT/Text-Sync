@@ -212,7 +212,8 @@ namespace TextSync
             proposals = new List<AlignProposal>(); cueProp = null; rejected.Clear();
             if (viewInfo != null) viewInfo.Text = "";
             if (acceptAllLink != null) acceptAllLink.Visible = false;
-            if (resultLabel != null) resultLabel.Visible = false;
+            if (resBox != null) resBox.Visible = false;
+            quality = null; weakStops = new List<int>(); cueWeak = null;
             if (openLink != null) openLink.Visible = false;
             undo.Clear(); rowMatched = null; transcript = null; origSynced = null; origUsed = null; if (saveTextBtn != null) saveTextBtn.Visible = false;
             if (undoLink != null) undoLink.Visible = false;

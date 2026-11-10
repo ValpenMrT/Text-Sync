@@ -455,6 +455,59 @@ namespace TextSync
                 Check("Diskutrymme: nedladdningen kräver mer än paketens storlek (zip + uppackat)", need > Tools.WhisperGpu.Size * 2 + Tools.ModelTurbo.Size);
             }
 
+            // ---- varning för fel avsnitt och besked om hur säker synken är
+            {
+                Func<string, string> ep = s => { var e = EpisodeId.Parse(s); return e == null ? "-" : e.Season + "/" + e.Episode; };
+                Check("Avsnittsnummer: S04E01, s4e1, 4x02 och Säsong 2 Avsnitt 5 tolkas",
+                    ep(@"C:\Film\The.Blacklist.S04E01.Esteban.2160p.NF.WEBRip.DDP5.1.x264-NTb.mkv") == "4/1" && ep("The blacklist - S04E01.srt") == "4/1" &&
+                    ep("serie s4e1.srt") == "4/1" && ep("Serie - 4x02 - Titel.srt") == "4/2" && ep("Serie Säsong 2 Avsnitt 5.srt") == "2/5" && ep("Show.S12E103.mkv") == "12/103");
+                Check("Avsnittsnummer: upplösning, kodek och årtal tolkas inte som avsnitt",
+                    ep("Film.1920x1080.x264.mkv") == "-" && ep("Film.2019.2160p.DDP5.1.x265.mkv") == "-" && ep("Filmen.srt") == "-" && ep("Glass 2x4 special.srt") == "-");
+                Check("Fel avsnitt: S04E02.srt mot S04E01.mkv ger en varning som säger vad som inte stämmer",
+                    EpisodeId.Mismatch("Serie.S04E01.mkv", "Serie.S04E02.srt", "Texten", "filmen") == "Texten verkar höra till avsnitt 2, men filmen är avsnitt 1.");
+                Check("Fel avsnitt: annan säsong nämner säsongen",
+                    EpisodeId.Mismatch("Serie.S04E01.mkv", "Serie.S03E01.srt", "Texten", "filmen") == "Texten verkar höra till säsong 3, avsnitt 1, men filmen är säsong 4, avsnitt 1.");
+                Check("Fel avsnitt: samma avsnitt, eller filnamn utan avsnittsnummer, ger ingen varning",
+                    EpisodeId.Mismatch("Serie.S04E01.mkv", "serie 4x01 sv.srt", "Texten", "filmen") == null && EpisodeId.Mismatch("Film.mkv", "Serie.S04E02.srt", "Texten", "filmen") == null);
+
+                var r1 = MakeRef(100); var o1 = MakeOther(r1);
+                var r2 = MakeRef(100); var o2 = MakeOther(r2);   // en helt annan "film"
+                Check("Olika längd: en text på 45 minuter mot en referens på 100 minuter ger en varning",
+                    EpisodeId.LengthMismatch(r1, o1.Where(c => c.Start < 45 * 60000).ToList(), "referensen") != null);
+                Check("Olika längd: annan bildfrekvens, förskjutning eller 8 minuter eftertexter ger ingen varning",
+                    EpisodeId.LengthMismatch(r1, Distort(o1, t => t * 25 / 23.976 + 5000), "referensen") == null &&
+                    EpisodeId.LengthMismatch(r1, o1.Where(c => c.Start < 92 * 60000).ToList(), "referensen") == null);
+
+                Func<string, List<Cue>, List<Cue>, SyncMode, QualityResult> Q = (name, rf, tg, mode) =>
+                {
+                    var sr = SyncEngine.Sync(rf, tg, new SyncOptions { Mode = mode }, null);
+                    var q = Quality.Assess(rf, sr.Output, sr, true);
+                    Console.WriteLine("Besked, {0,-38} {1}", name + ":", q.LogText());
+                    return q;
+                };
+                var qa = Q("rätt text (+3,7 s)", r1, Distort(o1, t => t + 3700), SyncMode.Smart);
+                var qf = Q("rätt text (bildfrekvens + klipp)", r1, Distort(o1, t => t * 25 / 23.976 + 1500 + (t > 3000000 ? 12000 : 0)), SyncMode.Smart);
+                Check("Besked: rätt text som synkas rätt ger Bra, utan svaga ställen", qa.Verdict == Verdict.Good && qf.Verdict == Verdict.Good && qa.Weak.Count == 0 && qf.Weak.Count == 0);
+                var qw = Q("text från en annan film", r1, o2, SyncMode.Smart);
+                var qw2 = Q("text från en annan film, avancerad", r1, Distort(o2, t => t + 20000), SyncMode.Advanced);
+                Check("Besked: text från en annan film ger Osäkert", qw.Verdict == Verdict.Unsure && qw2.Verdict == Verdict.Unsure);
+                var sparse = r1.Where((c, i) => i % 12 == 0).ToList();   // som ett spår med bara tvingad text
+                var qs = Quality.Assess(sparse, o1, null, true);
+                Check("Besked: mot en gles referens blir beskedet Kontrollera (för lite text att bedöma), inte Osäkert", qs.Sparse && qs.Verdict == Verdict.Check && qs.Weak.Count == 0);
+                var speech = r1.Select(c => new Cue(c.Start - 200, c.End + 300, "(tal)")).ToList();
+                var srA = SyncEngine.Sync(speech, Distort(o1, t => t + 3700), new SyncOptions(), null);
+                var qAudio = Quality.Assess(speech, srA.Output, srA, false);
+                Console.WriteLine("Besked, mot ljud (taldetektering):         " + qAudio.LogText());
+                Check("Besked: mot talavsnitt ur ljudet (syntetiska) ger rätt text Bra", qAudio.Verdict == Verdict.Good);
+                Check("Besked: tomma listor och rader före filmens början ger inget fel",
+                    Quality.Assess(r1, new List<Cue>(), null, true).Verdict == Verdict.Unsure && Quality.Assess(new List<Cue>(), o1, null, true).Verdict == Verdict.Unsure &&
+                    Quality.Assess(r1, o1.Select(c => new Cue(c.Start - 9000000, c.End - 9000000, c.Text)).ToList(), null, true).Verdict == Verdict.Unsure);
+                // ett klipp på 10 s efter 40 minuter som den enkla metoden inte kan rätta
+                var qc = Q("klipp som enkel synk missar", r1, Distort(o1, t => t + 2000 + (t > 2400000 ? 10000 : 0)), SyncMode.Simple);
+                Check("Besked: ett klipp som synken missar ger Kontrollera, med svaga ställen att hoppa till",
+                    qc.Verdict == Verdict.Check && qc.Weak.Count > 0);
+            }
+
             Console.WriteLine();
             if (muxSkipped) Console.WriteLine("OBS: testet av \"Lägg in i MKV\" hoppades över, eftersom mkvmerge (MKVToolNix) inte är installerat.");
             if (failed == 0) Console.WriteLine("RESULTAT: alla {0} kontroller gick igenom.", checks);

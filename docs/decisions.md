@@ -2,6 +2,21 @@
 
 Nyast först.
 
+## 2026-11-10 – Besked om hur säker synken är, och varning för fel avsnitt
+- **Område:** GUI / synk
+- **Önskemål (ägaren):** programmet ska säga hur säker synken är och varna för fel avsnitt.
+- **Beslut:**
+  - **Besked ovanför listan** efter synken: **✔ Bra** (grönt), **⚠ Kontrollera de markerade ställena** (gult) eller **✖ Osäkert** (rött). Beskedet har symbol och text, inte bara färg, och inga siffror. Siffrorna står i detaljerna under och i loggen. Det räknas om efter varje ändring i listan.
+  - **Svaga ställen** är avsnitt på 2 minuter där färre än 45 % av raderna börjar inom 0,5 s från en referensrad. Raderna märks **⚠** i kolumnen #, och länkarna **Föregående ställe** och **Nästa ställe** hoppar mellan dem. Finns inga svaga ställen hoppar länkarna mellan de röda raderna.
+  - **Varning före synken**, med knapparna **Synka ändå** och **Avbryt** (Avbryt är förvald): när filnamnen har olika avsnittsnummer (S04E01, s4e1, 4x01, "Säsong 4 Avsnitt 1"), eller när texterna slutar mer än 10 minuter och 30 % från varandra. Texter med färre än 50 rader bedöms inte på längd. Mot ljud finns ingen längdkontroll före synken, men beskedet Osäkert säger samma sak efteråt.
+- **Gränser (mätta):** Bra kräver att minst 95 % av raderna har referens samtidigt och att minst 65 % börjar inom 0,5 s, utan svaga ställen och utan anmärkningar från motorn. Osäkert är under 45 % och under 90 %, eller motorns poäng under 0,35. Mätt på Blacklist S04E01: rätt text 99,5 % / 83 % / poäng 0,92, samma text baklänges i tiden (beter sig som ett annat avsnitt) 79 % / 35 % / 0,62. Syntetiska tester: rätt 99 % / 93 %, annan film 79 % / 30 %.
+- **Mot ljud** (taldetektering) börjar raderna inte lika exakt samtidigt. Där bedöms bara överlappet (svagt ställe = under 60 % av raderna ligger på tal). **Det är inte mätt mot en riktig film**, eftersom ljudverktygen inte får köras i Claudes miljö.
+- **Gles referens** (färre än hälften så många rader som texten, t.ex. bara tvingad text): beskedet blir Kontrollera med förklaringen att referensen har för lite text för att bedöma synken.
+- **Product-check (oberoende granskning):** inget blockerande. Rättat: synken efter dra-och-släpp startas först när släppet är klart (annars kunde en varningsruta låsa Utforskaren), ingen längdvarning för en ofullständig MKV, egen förklaring för gles referens och för synk mot ljud, förklaring även när beskedet är Kontrollera utan markerade ställen, F4 och Skift+F4 hoppar mellan ställena, högst en varningsruta per synk, filnamnen står i varningsrutan. Kan vänta (docs/next.md): fler skrivsätt för avsnittsnummer, dubbelavsnitt, längdkontroll av originaltexten.
+- **Test:** 68 av 68 kontroller (13 nya). Gränssnittet provades inifrån samma process mot Blacklist: rätt text gav Bra, en kopia med S04E02 i namnet gav varningsrutan (Avbryt lämnade allt orört), och texten baklänges gav Osäkert med 9 ställen att hoppa mellan.
+- **Kvar:** gränserna bygger på en film och syntetiska data. Ett riktigt fel avsnitt av samma serie har inte provats.
+- **Nivå:** LIVE
+
 ## 2026-11-10 – MainForm.cs uppdelad i delar
 - **Område:** Struktur
 - **Beslut (ägaren, se svaren på frågorna samma dag):** `MainForm.cs` (cirka 2 000 rader) är uppdelad i `MainForm.cs`, `MainForm.Load.cs`, `MainForm.Edit.cs`, `MainForm.Audio.cs`, `MainForm.Sync.cs` och `MainForm.Save.cs` (partial class), och tidslinjen ligger i `Timeline.cs`. Ingen kod är ändrad, bara flyttad. `docs/structure.md` visar vad som ligger var.
