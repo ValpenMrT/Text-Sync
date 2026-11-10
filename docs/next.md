@@ -26,7 +26,7 @@
 8. **Läsbarhet** (önskemål 2026-11-09). Programmet hittar rader som visas för kort tid, går för fort att läsa (tecken per sekund), överlappar varandra eller är för långa (riktvärde cirka 42 tecken per rad), och föreslår rättningar. Förslagen granskas innan de används, som förslagen om att dela och slå ihop rader, och kan ångras.
 9. **Spara så att spelaren hittar texten** (önskemål 2026-11-09). När referensen är en film sparas texten redan som `Filmnamn.sv.srt` bredvid filmen (`DefaultSrtPath` i `MainForm.cs`). Det som återstår:
    - När referensen är en SRT föreslås i dag `Namn.synkad.srt`, som spelare inte hittar. Finns en film med samma avsnitt i mappen föreslås `Filmnamn.sv.srt` i stället.
-10. **Ta bort text för hörselskadade, som en inställning** (önskemål 2026-11-09). En kryssruta, till exempel "Ta bort text för hörselskadade ([MUSIK], (skrattar), talarnamn)", bredvid "Upptäck bildfrekvensfel". Valet sparas med `Tools.SetSetting` i `settings.txt`, så att det gäller nästa gång också.
+10. ~~**Ta bort text för hörselskadade, som en inställning.**~~ **Klart 2026-11-10**, se beslutsloggen. Planen var: En kryssruta, till exempel "Ta bort text för hörselskadade ([MUSIK], (skrattar), talarnamn)", bredvid "Upptäck bildfrekvensfel". Valet sparas med `Tools.SetSetting` i `settings.txt`, så att det gäller nästa gång också.
     - Det som tas bort: hela rader som bara är ljudbeskrivning (`[…]`, `(…)`, ♪/♫), ljudbeskrivning inuti en rad, och talarnamn i versaler först på raden (`JOHN:`, `- MARIA:`). Rader som blir tomma tas bort, och dialogstreck rättas när bara en talare blir kvar.
     - Gäller både texten som sparas och texten som synkas, eftersom ljudbeskrivningar inte motsvarar tal och kan störa ljudsynken.
     - Visa hur många rader som ändrades eller togs bort, och gör ändringen ångringsbar som annan redigering.
@@ -42,6 +42,12 @@
 - **Rekommendera Ljud A utan NVIDIA-grafikkort:** en kort förklaring bredvid valet när datorn saknar NVIDIA-kort.
 - **Markera rättningar från Whisper-kontrollen i listan**, så att man kan granska dem.
 - **Testutdata på svenska** ("offset", "cuts", "Route" m.fl.): översätts efter hand när testfilerna ändras.
+
+## Kvar från product-check 2026-11-10 (text för hörselskadade, kan vänta)
+- **Inte provat mot en riktig text för hörselskadade** (svensk eller engelsk). Prova en och se att rätt saker tas bort.
+- **Originaltexten** (separat SRT på filmens språk) rensas inte, så "Spara synkad originaltext" behåller `[MUSIC]`.
+- **Ingen förhandsvisning** av vad som tas bort före synken. Efter synken syns ändringen i listan och kan ångras.
+- **Namn med små bokstäver** ("John:") och `#` som musiktecken tas inte bort.
 
 ## Kvar från product-check 2026-11-10 (uppspelning, kan vänta)
 - **Uppspelningen är inte provad med riktiga verktyg.** Se beslutsloggen 2026-11-10 för vad ägaren ska prova.

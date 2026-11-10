@@ -32,6 +32,23 @@ namespace TextSync
             if (!ConfirmWrongFile(warn)) return;
             var opt = new SyncOptions { Mode = (SyncMode)modeCombo.SelectedIndex, DetectFramerate = fpsCheck.Checked };
             var tgt = tgtCues;
+            hiInfo = null;
+            if (hiCheck.Checked)
+            {
+                // tas bort före synken: ljudbeskrivningar motsvarar inte tal och kan störa synken mot ljudet
+                int ch, rm;
+                tgt = Sdh.Apply(tgtCues, out ch, out rm);
+                if (tgt.Count < 5)
+                {
+                    MessageBox.Show(this, "Nästan allt i texten ser ut som text för hörselskadade (" + (tgtCues.Count - tgt.Count) + " av " + tgtCues.Count + " rader skulle tas bort).\n\n" +
+                        "Kryssa ur rutan \"Ta bort text för hörselskadade\" och synka igen.", Caption, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+                // rensningen före synken går inte att ångra med Ctrl+Z: säg hur man får tillbaka texten
+                hiInfo = ch + rm == 0 ? Sdh.Summary(0, 0) : Sdh.Summary(ch, rm) + " Kryssa ur rutan och synka igen för att få tillbaka den.";
+                hiUndoDepth = 0;
+                Log.Info("Text för hörselskadade: " + ch + " rader ändrade, " + rm + " borttagna av " + tgtCues.Count);
+            }
             cts = new CancellationTokenSource();
             var token = cts.Token;
             SetBusy(true, "Förbereder…");
@@ -224,6 +241,7 @@ namespace TextSync
                 sb.Append("\n");
             }
             if (r.FpsText.Length > 0) sb.Append(r.FpsText + "\n");
+            if (hiInfo != null) sb.Append(hiInfo + "\n");
             foreach (var n in r.Notes) sb.Append("⚠  " + n + "\n");
             if (!good) sb.Append("Under 95 % av raderna har referenstext samtidigt – granska de röda raderna (F3 hoppar till nästa).\n");
             if (proposals.Count > 0)

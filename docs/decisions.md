@@ -2,6 +2,23 @@
 
 Nyast först.
 
+## 2026-11-10 – Ta bort text för hörselskadade, som en inställning
+- **Område:** GUI / text
+- **Önskemål (ägaren):** en kryssruta som tar bort text för hörselskadade. Inte ikryssad från början, och valet sparas (`removehi` i settings.txt).
+- **Beslut:**
+  - Rutan **"Ta bort text för hörselskadade ([MUSIK], (skrattar), talarnamn)"** står bredvid "Upptäck bildfrekvensfel".
+  - **Grundregel:** en rad som inte innehåller något av mönstren lämnas exakt som den är, också blanksteg och taggar.
+  - **Det som tas bort:** allt inom [hakparenteser], även över flera rader; parenteser som är hela raden, står först på en rad, står sist efter en hel mening eller bara innehåller versaler (minst 6 bokstäver eller flera ord); rader som bara är noter (♪ ♫); talarnamn i versaler först på raden (`JOHN:`, `- MARIA:`, `MAN 2:`, `JOHN (skrattar):`). Rader som blir tomma tas bort, och replikstrecket tas bort när bara en talare blir kvar.
+  - **Talarnamn** tas bara bort när samma namn står först på minst två rader i filen. Då är det ett namn och inte en rubrik ("USA: 3, Sverige: 2"). Vanliga ord före kolon (OBS, PS, OK, DAG, ÅR, KAPITEL, DEL m.fl.) tas aldrig bort.
+  - **Det som står kvar:** parentes mitt i en mening, också när den börjar på rad två ("Jag träffade Anna / (min syster) i går"); korta förkortningar i parentes ("(WHO)"); versaler utan kolon ("FBI är här", "NEJ!"); klockslag; namn med små bokstäver; rader utan bokstäver ("?!", "…"); sångtexter mellan ♪; positionstaggar som `{\an8}`.
+  - **Före synken** rensas texten som ska synkas, eftersom ljudbeskrivningar inte motsvarar tal och kan störa synken mot ljudet. Resultatrutan säger hur många rader som ändrades och togs bort, och att man kryssar ur rutan och synkar igen för att få tillbaka dem. Den rensningen går inte att ångra med Ctrl+Z.
+  - **Efter synken** (rutan kryssas i när det finns ett resultat) rensas den synkade texten direkt, som en ändring som går att ångra med Ctrl+Z. Ångrar man kryssas rutan ur, så att rutan och texten stämmer.
+  - Skulle färre än 5 rader bli kvar görs ingenting, och programmet säger att nästan allt ser ut som text för hörselskadade.
+  - Originalfilen rörs inte förrän man sparar, och då sparas en kopia som vanligt.
+- **Kända gränser:** talarnamn med små bokstäver ("John:") och namn som bara förekommer en gång tas inte bort. En text helt i versaler kan förlora början av en mening före ett kolon om samma början återkommer. Originaltexten (separat SRT på filmens språk) rensas inte.
+- **Test:** 87 av 87 kontroller (11 nya, en per mönster plus kontroller av att vanlig dialog inte förstörs och att konstig indata inte hänger programmet). Provat i programmet med Blacklist-texten med påhittade `RED:`, `[MUSIK]` och ♪: 43 rader ändrade och 2 borttagna, Ctrl+Z gav tillbaka dem, och synken gav samma besked (Bra) med och utan rutan. **Inte provat mot en riktig text för hörselskadade.**
+- **Product-check (oberoende granskning):** inget blockerande. Rättat: orörda rader ändras inte längre (blanksteg vid kursivtaggar försvann), förkortningar och rubriker före kolon står kvar, parentes först på rad två mitt i en mening står kvar, korta förkortningar i parentes står kvar, rader utan bokstäver står kvar, beskrivningar över flera rader och efter kursiv text tas bort, tydligt besked om hur man får tillbaka text som rensades före synken, rutan kryssas ur när rensningen ångras, skydd när nästan allt skulle tas bort, och ett reguljärt uttryck som kunde bli mycket långsamt. Kan vänta (docs/next.md): rensa originaltexten, visa vad som tas bort innan det sker.
+- **Nivå:** LIVE
 ## 2026-11-10 – Spela upp filmen runt en rad (▶ i listan)
 - **Område:** GUI
 - **Önskemål (ägaren):** en liten play-knapp på varje textrad som spelar 5 sekunder före och 5 sekunder efter, så att man kan kontrollera att texten stämmer med det som sägs.

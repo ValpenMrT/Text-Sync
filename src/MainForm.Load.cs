@@ -214,7 +214,7 @@ namespace TextSync
             if (acceptAllLink != null) acceptAllLink.Visible = false;
             if (resBox != null) resBox.Visible = false;
             StopPlay();
-            quality = null; weakStops = new List<int>(); cueWeak = null;
+            quality = null; weakStops = new List<int>(); cueWeak = null; hiInfo = null; hiUndoDepth = 0;
             if (openLink != null) openLink.Visible = false;
             undo.Clear(); rowMatched = null; transcript = null; origSynced = null; origUsed = null; if (saveTextBtn != null) saveTextBtn.Visible = false;
             if (undoLink != null) undoLink.Visible = false;

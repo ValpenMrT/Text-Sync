@@ -64,7 +64,10 @@ namespace TextSync
         ComboBox trackCombo, modeCombo, encCombo;
         Label refInfo, tgtInfo, statusLabel, resultLabel, trackLabel;
         LinkLabel openLink, helpLink;
-        CheckBox fpsCheck;
+        CheckBox fpsCheck, hiCheck;
+        string hiInfo;                 // vad som togs bort som text för hörselskadade (visas i resultatet)
+        int hiUndoDepth;               // ångra-nivån där den synkade texten rensades i efterhand (0 = inte gjort)
+        bool hiQuiet;                  // rutan ändras av programmet, inte av användaren
         Button syncBtn, saveBtn, muxBtn, cancelBtn, refBtn, tgtBtn;
         ProgressBar progress;
         ListView list;
@@ -225,6 +228,28 @@ namespace TextSync
             opts.Controls.Add(modeCombo);
             fpsCheck = new CheckBox { Text = "Upptäck bildfrekvensfel (25 ↔ 23,976 fps m.fl.)", Checked = true, AutoSize = true, Margin = new Padding(0, 8, 16, 0) };
             opts.Controls.Add(fpsCheck);
+            // text för hörselskadade: inte ikryssad från början, valet sparas till nästa gång
+            hiCheck = new CheckBox { Text = "Ta bort text för hörselskadade ([MUSIK], (skrattar), talarnamn)", AutoSize = true, Margin = new Padding(0, 8, 16, 0), Checked = Tools.GetSetting("removehi", "0") == "1" };
+            hiCheck.CheckedChanged += (s, e) =>
+            {
+                Tools.SetSetting("removehi", hiCheck.Checked ? "1" : "0");
+                if (hiQuiet || busy || result == null) return;
+                if (hiCheck.Checked)
+                {
+                    // finns redan en synkad text rensas den direkt, som en ändring som går att ångra
+                    int ch, rm;
+                    var cleaned = Sdh.Apply(result.Output, out ch, out rm);
+                    if (cleaned.Count == 0) SetStatus("Nästan allt i texten ser ut som text för hörselskadade, så ingenting togs bort.", false);
+                    else if (ch + rm > 0)
+                    {
+                        hiInfo = Sdh.Summary(ch, rm); hiUndoDepth = undo.Count + 1;
+                        Changed(cleaned, null, hiInfo + " Ctrl+Z ångrar.", "Text för hörselskadade borttagen ur den synkade texten: " + ch + " ändrade, " + rm + " borttagna");
+                    }
+                    else SetStatus(Sdh.Summary(0, 0), true);
+                }
+                else if (hiInfo != null && !hiInfo.StartsWith("Ingen")) SetStatus("Rutan gäller från nästa synk. Synka igen för att få tillbaka texten som togs bort.", false);
+            };
+            opts.Controls.Add(hiCheck);
 
             syncBtn = MakeButton("&Synka", true);
             syncBtn.Width = 120; syncBtn.Height = 34; syncBtn.Margin = new Padding(0, 2, 12, 0);
@@ -739,7 +764,7 @@ namespace TextSync
             syncBtn.Enabled = !busy && haveRef && tgtCues != null;
             saveBtn.Enabled = !busy && synced != null;
             muxBtn.Enabled = !busy && synced != null;
-            foreach (Control c in new Control[] { refBox, tgtBox, refBtn, tgtBtn, trackCombo, modeCombo, fpsCheck, extraNum, langBox, encCombo, gpuCombo, audioCombo, origLink })
+            foreach (Control c in new Control[] { refBox, tgtBox, refBtn, tgtBtn, trackCombo, modeCombo, fpsCheck, hiCheck, extraNum, langBox, encCombo, gpuCombo, audioCombo, origLink })
                 if (c != null) c.Enabled = !busy;
             gpuCombo.Enabled = !busy && !gpuPending;
         }
@@ -784,6 +809,7 @@ namespace TextSync
                 "Klicka på ▶ på en rad (eller tryck P) för att spela filmen 5 sekunder före och efter raden, med texten ovanpå. Esc stänger filmfönstret.\n\n" +
                 "Har filmen ingen engelsk text men du har en engelsk SRT som inte går i takt: klicka \"Lägg till undertext på filmens originalspråk\" " +
                 "(eller dra in filmen och båda SRT-filerna). Den engelska synkas då mot filmens ljud och kontrolleras med Whisper, och sedan synkas den svenska mot den.\n\n" +
+                "Rutan \"Ta bort text för hörselskadade\" tar bort [MUSIK], (skrattar) och talarnamn som JOHN: ur texten. Resultatet säger hur många rader som togs bort.\n\n" +
                 "Tips: dra in båda filerna samtidigt. Rödmarkerade rader saknar engelsk text samtidigt – ofta helt i sin ordning (t.ex. utrop).\n" +
                 "Kryssa i \"Föreslå radindelning som referensen\" så föreslår programmet att dela eller slå ihop rader som de engelska (blå, \"Dela?\"/\"Ihop?\") – högerklicka för att godkänna. " +
                 "Visa ovanför listan döljer grå rader eller visar bara röda eller blå. Utseende längst upp väljer ljust eller mörkt.\n\n" +

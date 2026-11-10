@@ -52,6 +52,12 @@ Ja. Klicka på **▶** längst till vänster på en rad i listan (eller markera 
 **Programmet varnar för att texten hör till ett annat avsnitt.**
 Filnamnen pekar på olika avsnitt, till exempel S04E02 i textens namn och S04E01 i filmens, eller så är texterna mycket olika långa. Kontrollera att du har valt rätt filer. Är du säker klickar du **Synka ändå**.
 
+**Texten har [MUSIK], (skrattar) och namn som JOHN: före replikerna. Kan de tas bort?**
+Ja. Kryssa i **Ta bort text för hörselskadade** bredvid Metod. Då tas ljudbeskrivningar inom [hakparenteser] och (parenteser), rader med bara ♪ och talarnamn i versaler bort. Vanlig text i parentes mitt i en mening, till exempel "Han (min bror) kom hem", står kvar, och det gör sångtexter också. Rader utan sådant innehåll ändras inte alls. Namn skrivna med små bokstäver ("John:") tas inte bort.
+- Kryssar du i rutan före synken tas texten bort innan synken. Det hjälper också synken mot filmens ljud. Resultatet säger hur många rader som ändrades och togs bort. Vill du ha tillbaka dem kryssar du ur rutan och synkar igen.
+- Kryssar du i den efter synken rensas den synkade texten direkt. Statusraden säger hur många rader som ändrades och togs bort, och **Ctrl+Z** ångrar (rutan kryssas då ur igen).
+- Originalfilen ändras inte förrän du sparar, och då sparas en kopia av originalet. Valet gäller tills du kryssar ur rutan, även nästa gång du startar programmet.
+
 **Kan jag ändra, lägga till eller ta bort rader?**
 Ja, i listan:
 - **Dubbelklick** eller **Enter** ändrar text och tid.

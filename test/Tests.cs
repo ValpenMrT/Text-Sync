@@ -538,6 +538,41 @@ namespace TextSync
                     MainForm.PickMovie(new[] { vids[0] }, @"C:\F\ref.srt", @"C:\F\Serie.S04E02.srt") == null);
             }
 
+            // ---- text för hörselskadade
+            {
+                Func<string, string> H = s => Sdh.Clean(s) ?? "(borttagen)";
+                Check("Hörselskadade: hela rader med [MUSIK], (skrattar) och ♪ tas bort",
+                    H("[MUSIK]") == "(borttagen)" && H("(skrattar)") == "(borttagen)" && H("♪ ♪") == "(borttagen)" && H("<i>[DÖRR SLÅR IGEN]</i>") == "(borttagen)" && H("- [SUCKAR]\n- (HOSTAR)") == "(borttagen)");
+                Check("Hörselskadade: ljudbeskrivning inuti en rad tas bort och resten står kvar",
+                    H("[suckar] Jag vet inte.") == "Jag vet inte." && H("(skrattar) Det var kul.") == "Det var kul." && H("Vänta! (springer)") == "Vänta!" &&
+                    H("Jag hör (DÖRR SLÅR IGEN) något.") == "Jag hör något." && H("<i>[radio] Nyheterna.</i>") == "<i>Nyheterna.</i>");
+                Check("Hörselskadade: talarnamn i versaler först på raden tas bort",
+                    H("JOHN: Kom hit.") == "Kom hit." && H("- MARIA: Nej.\n- JOHN: Jo.") == "- Nej.\n- Jo." && H("MAN 2: Stanna!") == "Stanna!" && H("JOHN: (suckar) Jaha.") == "Jaha." && H("DR. ÅKE:\nHur mår du?") == "Hur mår du?");
+                Check("Hörselskadade: replikstrecket tas bort när bara en talare blir kvar",
+                    H("- [SKRATTAR]\n- Vad sa du?") == "Vad sa du?" && H("- Hej.\n- Hej då.") == "- Hej.\n- Hej då." && H("- Vänta lite.") == "- Vänta lite.");
+                Check("Hörselskadade: vanlig dialog med parenteser, versaler, klockslag och sångtext förstörs inte",
+                    H("Han (min bror) kom hem.") == "Han (min bror) kom hem." && H("FBI är här.") == "FBI är här." && H("Vi ses 12:30.") == "Vi ses 12:30." &&
+                    H("Klockan: tolv.") == "Klockan: tolv." && H("♪ Ja, må hon leva ♪") == "♪ Ja, må hon leva ♪" && H("{\\an8}Stockholm, 1987") == "{\\an8}Stockholm, 1987" && H("NEJ!") == "NEJ!");
+                int hc, hr;
+                var hl = Sdh.Apply(new List<Cue> { new Cue(0, 1000, "[MUSIK]"), new Cue(2000, 3000, "ANNA: Hej."), new Cue(4000, 5000, "Hej."), new Cue(6000, 7000, "♪"),
+                    new Cue(8000, 9000, "ANNA: Kom."), new Cue(10000, 11000, "USA: 3, Sverige: 2"), new Cue(12000, 13000, "Han sa <i>nej </i>till mig.") }, out hc, out hr);
+                Check("Hörselskadade: antalet ändrade och borttagna rader räknas, och tiderna behålls",
+                    hc == 2 && hr == 2 && hl.Count == 5 && hl[0].Text == "Hej." && hl[0].Start == 2000 && Sdh.Summary(hc, hr) == "Text för hörselskadade borttagen: 2 rader ändrade, 2 rader borttagna.");
+                Check("Hörselskadade: ett namn i versaler som bara står en gång i filen räknas inte som talarnamn, och orörda rader ändras inte alls",
+                    hl[3].Text == "USA: 3, Sverige: 2" && hl[4].Text == "Han sa <i>nej </i>till mig.");
+                Check("Hörselskadade: förkortningar och rubriker före kolon står kvar",
+                    H("OBS: Dörren är låst.") == "OBS: Dörren är låst." && H("PS: Ring mamma.") == "PS: Ring mamma." && H("DAG 3: Ingen mat kvar.") == "DAG 3: Ingen mat kvar.");
+                Check("Hörselskadade: parentes först på andra raden mitt i en mening står kvar, liksom förkortningar i parentes och rader utan bokstäver",
+                    H("Jag träffade Anna\n(min syster) i går.") == "Jag träffade Anna\n(min syster) i går." && H("Världshälsoorganisationen (WHO) varnar.") == "Världshälsoorganisationen (WHO) varnar." &&
+                    H("Plan (B) gäller.") == "Plan (B) gäller." && H("?!") == "?!" && H("…") == "…" && H("Kom hit.\n(suckar) Nu.") == "Kom hit.\nNu.");
+                Check("Hörselskadade: beskrivningar över flera rader, efter kursiv text och mellan namn och kolon tas bort",
+                    H("[MUSIK SPELAR\nI BAKGRUNDEN]") == "(borttagen)" && H("(skrattar\nhögt)") == "(borttagen)" && H("<i>Vänta!</i> (springer)") == "<i>Vänta!</i>" &&
+                    H("JOHN (skrattar): Hej.") == "Hej." && H("Hej. [MUSIK\nTONAR UT] Vi går.") == "Hej. Vi går.");
+                var sw2 = System.Diagnostics.Stopwatch.StartNew();
+                H(string.Concat(Enumerable.Repeat("<->", 60)) + "x"); H(new string('(', 5000) + "x"); H(string.Concat(Enumerable.Repeat("- ", 3000)) + "(");
+                Check("Hörselskadade: konstig indata hänger inte programmet", sw2.ElapsedMilliseconds < 2000);
+            }
+
             Console.WriteLine();
             if (muxSkipped) Console.WriteLine("OBS: testet av \"Lägg in i MKV\" hoppades över, eftersom mkvmerge (MKVToolNix) inte är installerat.");
             if (failed == 0) Console.WriteLine("RESULTAT: alla {0} kontroller gick igenom.", checks);

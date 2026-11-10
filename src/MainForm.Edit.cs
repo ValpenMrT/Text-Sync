@@ -162,6 +162,12 @@ namespace TextSync
         {
             if (busy || result == null || undo.Count == 0) return;
             result.Output = undo.Pop();
+            if (hiUndoDepth > 0 && undo.Count < hiUndoDepth)
+            {
+                // rensningen av text för hörselskadade ångrades: rutan ska stämma med texten
+                hiUndoDepth = 0; hiInfo = null;
+                hiQuiet = true; hiCheck.Checked = false; hiQuiet = false;
+            }
             unsaved = true;
             list.SelectedIndices.Clear();
             RefreshPreview();
