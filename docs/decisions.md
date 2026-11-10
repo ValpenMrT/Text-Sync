@@ -2,6 +2,13 @@
 
 Nyast först.
 
+## 2026-11-10 – MainForm.cs uppdelad i delar
+- **Område:** Struktur
+- **Beslut (ägaren, se svaren på frågorna samma dag):** `MainForm.cs` (cirka 2 000 rader) är uppdelad i `MainForm.cs`, `MainForm.Load.cs`, `MainForm.Edit.cs`, `MainForm.Audio.cs`, `MainForm.Sync.cs` och `MainForm.Save.cs` (partial class), och tidslinjen ligger i `Timeline.cs`. Ingen kod är ändrad, bara flyttad. `docs/structure.md` visar vad som ligger var.
+- **Test:** 55 av 55 kontroller, och gränssnittet startar och läser in testfilmen.
+- **Product-check:** Claude granskade själv (ren flytt av kod, inget ändrat för användaren).
+- **Nivå:** LIVE
+
 ## 2026-11-10 – Svar på de obesvarade frågorna
 - **Område:** GUI / ljudsynk / struktur
 - **Beslut (ägaren godkände Claudes förslag):**

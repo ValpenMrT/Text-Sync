@@ -8,7 +8,13 @@ CLAUDE.md          Instruktioner för Claude: allt på svenska, var dokumentatio
 CLAUDE.local.md    Sökvägar som bara gäller den här datorn (testfilmen). Inte i git.
 src/
   Program.cs       Start, globala felhanterare (visar svenskt felmeddelande och skriver loggen)
-  MainForm.cs      Hela gränssnittet: inläsning, synk, förhandsvisning, redigering med ångra, sparande, MKV-inbäddning, tidslinje
+  MainForm.cs      Gränssnittet (partial class, delad på flera filer): fält, fönstrets uppbyggnad, tema, dra-och-släpp, knappar, hjälp
+  MainForm.Load.cs   Inläsning av referens (film eller SRT), originaltext och undertexten som ska synkas
+  MainForm.Edit.cs   Redigera rader med ångra, förslag om radindelning, hoppa till nästa röda rad
+  MainForm.Audio.cs  Listorna Ljudspår och Grafikkort, nedladdning av verktyg, spara igenkänd text
+  MainForm.Sync.cs   Synken (DoSync), resultatrutan och förhandsvisningen i listan
+  MainForm.Save.cs   Spara SRT med säkerhetskopia, lägga in i MKV
+  Timeline.cs      Tidslinjen under listan (TimelinePanel)
   CueDialog.cs     Dialog för att ändra eller lägga till en rad (start, slut, text)
   Align.cs         Förslag om att slå ihop (2↔1) eller dela (1↔2) rader efter referensens radindelning (dynamisk programmering på tider)
   Theme.cs         Ljust/mörkt läge: paletter, färgbyte på kontrollerna, mörka Windows-delar (rullister, rubriker, titelrad)

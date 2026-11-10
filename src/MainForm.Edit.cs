@@ -1,0 +1,213 @@
+// Text Sync - användargränssnitt: redigera rader, ångra, förslag
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Drawing;
+using System.Drawing.Drawing2D;
+using System.Globalization;
+using System.IO;
+using System.Linq;
+using System.Text;
+using System.Text.RegularExpressions;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+using Microsoft.Win32;
+
+namespace TextSync
+{
+    public partial class MainForm
+    {
+        // ------------------------------------------------------------ redigera rader (med ångra)
+        // Markerade rader som index i synced (grå referensrader hoppas över)
+        List<int> SelectedCues()
+        {
+            var r = new List<int>();
+            if (rowCue == null) return r;
+            foreach (int row in list.SelectedIndices)
+                if (row < rowCue.Length && rowCue[row] >= 0) r.Add(rowCue[row]);
+            r.Sort();
+            return r;
+        }
+
+        // Markera synkad rad nummer ci (index i synced)
+        void SelectRow(int ci)
+        {
+            list.SelectedIndices.Clear();
+            if (cueRow == null || ci < 0 || ci >= cueRow.Length) return;
+            int i = cueRow[ci];
+            if (i < 0 || i >= list.Items.Count) return;
+            list.Items[i].Selected = true; list.Items[i].Focused = true; list.EnsureVisible(i);
+            list.Focus();
+        }
+
+        // Varje ändring sparar först en kopia av hela listan, så att den kan ångras
+        void Changed(List<Cue> newOutput, Cue select, string status, string log)
+        {
+            undo.Push(result.Output);
+            result.Output = newOutput.OrderBy(c => c.Start).ToList();
+            unsaved = true;
+            list.SelectedIndices.Clear();
+            RefreshPreview();
+            int i = select != null ? result.Output.IndexOf(select) : -1;
+            if (i >= 0) SelectRow(i);
+            SetStatus(status, false);
+            openLink.Visible = false;
+            undoLink.Visible = true;
+            Log.Info(log);
+        }
+
+        void DeleteSelected()
+        {
+            if (busy || result == null || list.SelectedIndices.Count == 0) return;
+            var idx = SelectedCues();
+            if (idx.Count == 0)
+            {
+                SetStatus("Grå rader kommer från referensen och sparas inte – de kan inte tas bort.", false);
+                return;
+            }
+            if (idx.Count == result.Output.Count)
+            {
+                SetStatus("Minst en rad måste finnas kvar.", false);
+                return;
+            }
+            var del = new HashSet<int>(idx);
+            var keep = result.Output.Where((c, i) => !del.Contains(i)).ToList();
+            int next = Math.Min(idx[0], keep.Count - 1);
+            Changed(keep, keep[next], idx.Count == 1 ? "1 rad borttagen." : idx.Count + " rader borttagna.", "Tog bort " + idx.Count + " rad(er)");
+        }
+
+        void EditSelected()
+        {
+            if (busy || result == null || list.SelectedIndices.Count != 1) return;
+            int row = list.SelectedIndices[0];
+            if (rowCue == null || row >= rowCue.Length) return;
+            if (rowCue[row] < 0) { AddRow(rowRef[row]); return; }   // grå referensrad: lägg till en egen rad på samma tid
+            int i = rowCue[row];
+            var shown = synced[i];
+            double extra = (double)extraNum.Value;
+            using (var d = new CueDialog("Ändra rad " + (i + 1), shown.Start, shown.End, shown.Text))
+            {
+                if (d.ShowDialog(this) != DialogResult.OK) return;
+                var nc = new Cue(d.StartMs - extra, d.EndMs - extra, d.CueText) { OrigStart = result.Output[i].OrigStart };
+                var list2 = new List<Cue>(result.Output);
+                list2[i] = nc;
+                Changed(list2, nc, "Rad " + (i + 1) + " ändrad.", "Ändrade rad " + (i + 1));
+            }
+        }
+
+        void AddRow() { AddRow(null); }
+
+        // at = grå referensrad att ta tiden från, annars hamnar raden efter den markerade
+        void AddRow(Cue at)
+        {
+            if (busy || result == null) return;
+            double extra = (double)extraNum.Value;
+            double start = 0;
+            var selCues = SelectedCues();
+            if (at != null) start = at.Start;
+            else if (selCues.Count > 0) start = synced[selCues[selCues.Count - 1]].End + 200;
+            else if (synced.Count > 0) start = synced[synced.Count - 1].End + 200;
+            double end = at != null ? at.End : start + 2000;
+            using (var d = new CueDialog("Lägg till rad", start, end, ""))
+            {
+                if (d.ShowDialog(this) != DialogResult.OK) return;
+                var nc = new Cue(d.StartMs - extra, d.EndMs - extra, d.CueText);
+                var list2 = new List<Cue>(result.Output); list2.Add(nc);
+                Changed(list2, nc, "Rad tillagd.", "Lade till rad vid " + Srt.FormatTime(d.StartMs));
+            }
+        }
+
+        // Förslag som berör de markerade raderna
+        List<AlignProposal> SelectedProposals()
+        {
+            var r = new List<AlignProposal>();
+            if (cueProp == null) return r;
+            foreach (int ci in SelectedCues())
+                if (ci < cueProp.Length && cueProp[ci] >= 0 && !r.Contains(proposals[cueProp[ci]])) r.Add(proposals[cueProp[ci]]);
+            return r;
+        }
+
+        // Slå ihop eller dela raderna enligt förslagen. Ett enda steg att ångra, även för alla förslag på en gång.
+        void AcceptProposals(List<AlignProposal> ps)
+        {
+            if (busy || result == null || ps == null || ps.Count == 0) return;
+            ps = new List<AlignProposal>(ps);
+            double extra = (double)extraNum.Value;
+            var replaced = new HashSet<int>(); var added = new List<Cue>();
+            foreach (var p in ps)
+            {
+                for (int k = 0; k < p.Count; k++) replaced.Add(p.First + k);
+                foreach (var c in p.NewCues) added.Add(new Cue(c.Start - extra, c.End - extra, c.Text) { OrigStart = c.OrigStart });
+            }
+            var list2 = result.Output.Where((c, i) => !replaced.Contains(i)).Concat(added).ToList();
+            int merged = ps.Count(p => p.IsMerge), splits = ps.Count - merged;
+            var parts = new List<string>();
+            if (merged > 0) parts.Add(merged == 1 ? "1 sammanslagning" : merged + " sammanslagningar");
+            if (splits > 0) parts.Add(splits == 1 ? "1 delning" : splits + " delningar");
+            string what = string.Join(" och ", parts);
+            Changed(list2, added[0], "Godkände " + what + ". Ctrl+Z ångrar.", "Godkände förslag: " + what);
+        }
+
+        // Avvisade förslag visas inte igen förrän nästa synk
+        void RejectProposals(List<AlignProposal> ps)
+        {
+            if (busy || result == null || ps == null || ps.Count == 0) return;
+            foreach (var p in ps) rejected.Add(p.Key);
+            RefreshPreview();
+            SetStatus(ps.Count == 1 ? "Förslaget avvisat." : ps.Count + " förslag avvisade.", false);
+        }
+
+        void UndoChange()
+        {
+            if (busy || result == null || undo.Count == 0) return;
+            result.Output = undo.Pop();
+            unsaved = true;
+            list.SelectedIndices.Clear();
+            RefreshPreview();
+            SetStatus("Ändringen ångrades.", false);
+            undoLink.Visible = undo.Count > 0;
+        }
+
+        // Hoppa till nästa rad som saknar referenstext samtidigt (börjar om från toppen)
+        void NextUnmatched()
+        {
+            if (rowMatched == null || rowMatched.Length == 0) return;
+            int from = 0;
+            if (list.SelectedIndices.Count > 0 && rowCue != null)
+            {
+                // första synkade raden efter den markerade listraden
+                int row = list.SelectedIndices[0];
+                for (int r = row + 1; r < rowCue.Length; r++) if (rowCue[r] >= 0) { from = rowCue[r]; break; }
+            }
+            for (int k = 0; k < rowMatched.Length; k++)
+            {
+                int i = (from + k) % rowMatched.Length;
+                if (!rowMatched[i])
+                {
+                    // den röda raden är dold av valet i Visa: visa alla rader först
+                    if (cueRow != null && i < cueRow.Length && cueRow[i] < 0) viewCombo.SelectedIndex = ViewAll;
+                    SelectRow(i); return;
+                }
+            }
+            SetStatus("Alla rader har referenstext samtidigt.", true);
+        }
+
+        // Under 95 % matchade rader: fråga innan sparning
+        bool ConfirmLowMatch()
+        {
+            if (rowMatched == null || rowMatched.Length == 0) return true;
+            int ok = rowMatched.Count(m => m), n = rowMatched.Length;
+            if (ok >= MatchThreshold * n) return true;
+            var a = MessageBox.Show(this,
+                "Bara " + ok + " av " + n + " rader (" + Fmt(100.0 * ok / n, "0") + " %) har en referensrad samtidigt.\n\n" +
+                "Det kan betyda att synken är fel, men också att texten har rader som inte finns i referensen (t.ex. utrop eller textarens namn).\n\n" +
+                "Vill du spara ändå?\n\nVälj Nej för att granska de röda raderna – F3 hoppar till nästa.",
+                Caption, MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2);
+            if (a == DialogResult.Yes) return true;
+            list.SelectedIndices.Clear();
+            NextUnmatched();
+            return false;
+        }
+    }
+}
