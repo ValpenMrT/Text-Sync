@@ -33,10 +33,11 @@ namespace TextSync
         // Inställningar som görs en gång (utseende, bildfrekvensfel, text för hörselskadade, formatering) ligger i dialogen Inställningar.
         // Kryssrutorna fpsCheck, hiCheck och plainCheck finns kvar som bärare av valen och deras händelser, men visas inte i fönstret.
         int themeIndex;                // 0 = som Windows, 1 = ljust, 2 = mörkt
-        Button settingsBtn;
-        Label optInfo;                 // vilka inställningar som avviker från det vanliga, så att de syns i huvudfönstret
+        Button settingsBtn, seasonBtn;
+        SeasonDialog seasonDlg;        // fönstret Hel säsong. Samma fönster används igen, så att listan står kvar medan programmet är öppet.
+        Label optInfo;                // vilka inställningar som avviker från det vanliga, så att de syns i huvudfönstret
         public const string BackupFolder = "Text Sync original";
-        static readonly string Caption = "Text Sync " + Program.Version;
+        internal static readonly string Caption = "Text Sync " + Program.Version;
         readonly Stack<List<Cue>> undo = new Stack<List<Cue>>(); // för att ångra ändringar av rader
         const double MatchThreshold = 0.95;   // andel rader som ska ha referenstext samtidigt
         bool[] rowMatched;             // per synkad rad: har referenstext samtidigt
@@ -146,10 +147,17 @@ namespace TextSync
             settingsBtn.Width = 130; settingsBtn.Margin = new Padding(0);   // fast bredd: med AutoSize blev knappen dubbelt så stor vid 200 % skalning
             settingsBtn.Click += (s, e) => OpenSettings();
             head.Controls.Add(settingsBtn);
+            // Hel säsong: alla avsnitt i en mapp synkas i kö (eget fönster, SeasonDialog)
+            seasonBtn = MakeButton("&Hel säsong…", false);
+            seasonBtn.Width = 130; seasonBtn.Margin = new Padding(0);
+            seasonBtn.Click += (s, e) => OpenSeason(null);
+            tips.SetToolTip(seasonBtn, "Synka alla avsnitt i en säsong på en gång. Det går också att dra in en mapp i fönstret.");
+            head.Controls.Add(seasonBtn);
             head.Layout += (s, e) =>
             {
                 ver.Left = title.Right + 6; ver.Top = title.Bottom - ver.Height - (int)(title.Height * 0.12);
                 settingsBtn.Left = head.ClientSize.Width - settingsBtn.Width; settingsBtn.Top = 2;
+                seasonBtn.Left = settingsBtn.Left - seasonBtn.Width - settingsBtn.Width / 16; seasonBtn.Top = 2;
             };
             KeyPreview = true;
             KeyDown += (s, e) =>
@@ -766,7 +774,7 @@ namespace TextSync
             {
                 var files = e.Data.GetData(DataFormats.FileDrop) as string[];
                 if (files == null || files.Length == 0) return;
-                if (files.Length > 1) { RouteFiles(files, false); return; }
+                if (files.Length > 1 || LooksLikeSeason(files)) { RouteFiles(files, false); return; }   // flera filer, eller en mapp (hel säsong)
                 load(files[0]);
             };
 
@@ -854,7 +862,7 @@ namespace TextSync
         // En AutoSize-etikett i en tabell mäts ibland som om den vore några bildpunkter bred: vid 200 % skalning
         // blev ruta 1 och 2 då flera tusen bildpunkter höga och fyllde hela fönstret.
         // below = luft under texten, i bildpunkter vid 100 % skalning
-        static void FitLabelHeight(Label l, int below = 0)
+        internal static void FitLabelHeight(Label l, int below = 0)
         {
             l.AutoSize = false;
             EventHandler fit = (s, e) =>
@@ -949,7 +957,7 @@ namespace TextSync
             }
         }
 
-        Button MakeButton(string text, bool primary)
+        internal Button MakeButton(string text, bool primary)
         {
             var b = new Button { Text = text, AutoSize = false, Width = 100, Height = 30, FlatStyle = FlatStyle.Flat, Cursor = Cursors.Hand };
             if (HC) { b.FlatStyle = FlatStyle.System; b.UseVisualStyleBackColor = true; return b; }
@@ -974,13 +982,13 @@ namespace TextSync
             e.Effect = !busy && e.Data.GetDataPresent(DataFormats.FileDrop) ? DragDropEffects.Copy : DragDropEffects.None;
         }
 
-        static bool IsMkv(string f) { string x = Path.GetExtension(f).ToLowerInvariant(); return x == ".mkv" || x == ".mks" || x == ".mka"; }
-        static bool IsSrt(string f) { return Path.GetExtension(f).ToLowerInvariant() == ".srt"; }
+        internal static bool IsMkv(string f) { string x = Path.GetExtension(f).ToLowerInvariant(); return x == ".mkv" || x == ".mks" || x == ".mka"; }
+        internal static bool IsSrt(string f) { return Path.GetExtension(f).ToLowerInvariant() == ".srt"; }
 
         static readonly Dictionary<string, string> Iso3 = new Dictionary<string, string> {
             {"swe","sv"},{"eng","en"},{"nor","no"},{"nob","no"},{"dan","da"},{"fin","fi"},{"ger","de"},{"deu","de"},
             {"fre","fr"},{"fra","fr"},{"spa","es"},{"ita","it"},{"dut","nl"},{"nld","nl"},{"pol","pl"} };
-        static string Norm(string l)
+        internal static string Norm(string l)
         {
             if (string.IsNullOrEmpty(l)) return null;
             l = l.ToLowerInvariant(); string two;
@@ -1045,9 +1053,50 @@ namespace TextSync
                 targetFile = srts.FirstOrDefault(f => Norm(GuessLang(f)) == want) ?? srts[0];
         }
 
+        // En mapp, eller minst två filmer, är en hel säsong: de hamnar i fönstret Hel säsong i stället för i ruta 1 och 2
+        public static bool LooksLikeSeason(string[] files)
+        {
+            if (files == null) return false;
+            int films = 0;
+            foreach (var f in files)
+            {
+                if (string.IsNullOrEmpty(f)) continue;
+                try { if (Directory.Exists(f)) return true; } catch { }
+                if (IsMkv(f) || Audio.IsVideo(f)) films++;
+            }
+            return films >= 2;
+        }
+
+        // Öppnar fönstret Hel säsong, med paths (mappar eller filer) tillagda i listan. Inställningarna följer huvudfönstret.
+        void OpenSeason(string[] paths)
+        {
+            if (busy) return;
+            StopPlay();
+            string lang = langBox.Text.Trim().ToLowerInvariant();
+            if (!Regex.IsMatch(lang, @"^[a-z]{2,3}(-[a-z0-9]{2,8})*$")) lang = "sv";
+            lang = Norm(lang);   // "swe" → "sv", så att filerna heter lika hur koden än står i rutan
+            // ett nytt fönster om utseendet har bytts sedan det byggdes (listan töms då, men det som är sparat går fortfarande att återställa)
+            if (seasonDlg != null && (seasonDlg.IsDisposed || seasonDlg.BuiltDark != Theme.Dark)) { seasonDlg.Dispose(); seasonDlg = null; }
+            if (seasonDlg == null) seasonDlg = new SeasonDialog(this);
+            seasonDlg.Prepare(new SeasonOptions { Lang = lang, Mode = (SyncMode)modeCombo.SelectedIndex, DetectFramerate = fpsCheck.Checked, RemoveHi = hiCheck.Checked, StripFormatting = plainCheck.Checked }, paths);
+            Log.Info("Öppnar Hel säsong" + (paths != null ? ": " + string.Join("; ", paths) : ""));
+            var res = seasonDlg.ShowDialog(this);
+            // "Öppna i huvudfönstret": läs in avsnittet och synka, så att raderna går att granska
+            if (res == DialogResult.OK && seasonDlg.OpenRef != null)
+            {
+                string rf = seasonDlg.OpenRef, tf = seasonDlg.OpenTarget;
+                LoadReference(rf);
+                LoadTarget(tf);
+                langBox.Text = lang;   // LoadTarget gissar koden ur filnamnet ("swe"): Spara SRT… ska föreslå samma fil som säsongssynken sparade
+                if (syncBtn.Enabled) BeginInvoke(new Action(async () => await DoSync()));
+            }
+        }
+
         public async void RouteFiles(string[] files, bool autoSync)
         {
             if (busy || files == null || files.Length == 0) return;
+            // startas efter att dra-och-släpp är klart, så att Utforskaren inte står låst medan fönstret är öppet
+            if (LooksLikeSeason(files)) { BeginInvoke(new Action(() => OpenSeason(files))); return; }
             string rf, tf, of, note;
             // filmen ligger redan i ruta 1 och bara SRT-filer dras in: behåll filmen, den andra SRT:n blir originaltext
             bool keepFilm = mkvPath != null && !files.Any(f => IsMkv(f) || Audio.IsVideo(f)) && files.Count(IsSrt) >= 2;
@@ -1064,15 +1113,15 @@ namespace TextSync
             if (autoSync && syncBtn.Enabled && files.Length >= 2) BeginInvoke(new Action(async () => await DoSync()));
         }
 
-        static string Fmt(double v, string f) { return v.ToString(f, CultureInfo.GetCultureInfo("sv-SE")); }
+        internal static string Fmt(double v, string f) { return v.ToString(f, CultureInfo.GetCultureInfo("sv-SE")); }
 
-        static string FmtOffset(double ms)
+        internal static string FmtOffset(double ms)
         {
             string sign = ms >= 0 ? "+" : "−";
             return sign + Fmt(Math.Abs(ms) / 1000.0, "0.000") + " s";
         }
 
-        static string Friendly(Exception ex)
+        internal static string Friendly(Exception ex)
         {
             if (ex is UserMessageException) return ex.Message;
             if (ex is AggregateException && ex.InnerException != null) return Friendly(ex.InnerException);
@@ -1084,14 +1133,14 @@ namespace TextSync
             return ex.Message;
         }
 
-        static bool SamePath(string a, string b)
+        internal static bool SamePath(string a, string b)
         {
             if (string.IsNullOrEmpty(a) || string.IsNullOrEmpty(b)) return false;
             try { return string.Equals(Path.GetFullPath(a), Path.GetFullPath(b), StringComparison.OrdinalIgnoreCase); }
             catch { return false; }
         }
 
-        static void ShowInFolder(string path)
+        internal static void ShowInFolder(string path)
         {
             if (string.IsNullOrEmpty(path)) return;
             try { Process.Start("explorer.exe", "/select,\"" + path + "\""); } catch { }
@@ -1113,7 +1162,7 @@ namespace TextSync
             syncBtn.Enabled = busy ? owner == syncBtn && !cancelling : haveRef && tgtCues != null;
             saveBtn.Enabled = !busy && synced != null;
             muxBtn.Enabled = busy ? owner == muxBtn && !cancelling : synced != null;
-            foreach (Control c in new Control[] { refBtn, tgtBtn, trackCombo, modeCombo, settingsBtn, extraNum, langBox, encCombo, gpuCombo, audioCombo, origLink })
+            foreach (Control c in new Control[] { refBtn, tgtBtn, trackCombo, modeCombo, settingsBtn, seasonBtn, extraNum, langBox, encCombo, gpuCombo, audioCombo, origLink })
                 if (c != null) c.Enabled = !busy;
             gpuCombo.Enabled = !busy && !gpuPending;
         }
@@ -1180,6 +1229,8 @@ namespace TextSync
                 "Där väljer du också ljust eller mörkt utseende.\n\n" +
                 "Kodade tecken som &amp; i texten görs alltid om till riktiga tecken (&), och trasig formatering som <i> utan avslut lagas. Sådana rader är märkta ✎ i listan: håll muspekaren över raden för att se vad som stod i filen. " +
                 "Visar din TV <i> som text? Kryssa i \"Ta bort kursiv och annan formatering\" i Inställningar. Kryssar du ur rutan kommer formateringen tillbaka.\n\n" +
+                "Hel säsong (knappen Hel säsong… uppe till höger, eller dra in en mapp): alla avsnitt synkas i kö och varje undertext sparas bredvid sitt avsnitt. " +
+                "Osäkra avsnitt sparas inte. Återställ… i det fönstret ångrar allt: filerna som fanns före kommer tillbaka och nya undertexter tas bort. Det går även efter att programmet har stängts.\n\n" +
                 "Tips: dra in båda filerna samtidigt. Rödmarkerade rader saknar engelsk text samtidigt – ofta helt i sin ordning (t.ex. utrop).\n" +
                 "Kryssa i \"Föreslå radindelning som referensen\" så föreslår programmet att dela eller slå ihop rader som de engelska (blå, \"Dela?\"/\"Ihop?\") – högerklicka för att godkänna. " +
                 "Under varje förslag står hur raden blir om du godkänner det (→ blir). " +

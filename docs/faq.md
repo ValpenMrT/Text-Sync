@@ -11,6 +11,36 @@ Text Sync är inte signerat med ett köpt certifikat.
 3. Titta på några rader i listan. Den engelska texten bredvid ska betyda samma sak, och **Synkad start** ska ligga nära **Referenstid**. **Före synk** visar tiden i din osynkade fil, och **Flyttad** hur mycket raden flyttades. Ett plötsligt hopp i Flyttad betyder ett klipp i filmen. Kontrollera gärna raderna där.
 4. Klicka **Spara SRT…**. Filen sparas som `Filmnamn.sv.srt` bredvid filmen, och då hittar VLC, Plex och Kodi den automatiskt.
 
+**Kan jag synka en hel säsong på en gång?**
+Ja. Klicka **Hel säsong…** längst upp till höger, eller dra in mappen med säsongen i Text Sync-fönstret. Det går också att dra in flera filmer och undertexter samtidigt.
+1. Programmet parar ihop filmer och undertexter efter avsnittsnumret i filnamnen, till exempel S04E01 eller 4x01. Undertexterna får ligga i en undermapp, till exempel `Subs`. Listan visar ett avsnitt per rad.
+2. Kontrollera listan. Markera ett avsnitt och klicka **Byt undertext…** om fel fil är vald eller om undertexten saknas, eller **Hoppa över** om avsnittet inte ska synkas.
+3. Klicka **Synka alla**. Avsnitten synkas ett i taget, och varje undertext sparas som `Filmnamn.sv.srt` bredvid sitt avsnitt. Språkkoden är den som står i huvudfönstret.
+
+Efteråt står ett besked på varje rad:
+- **✔ Bra – sparad:** texten går i takt.
+- **⚠ Kontrollera – sparad:** synken är inte helt säker. Markera raden för att se varför: förklaringen står under listan. Klicka **Öppna i huvudfönstret** för att granska raderna och spela upp ställen i filmen.
+- **✖ Osäkert – inte sparad:** texten verkar inte passa filmen, så ingenting sparades för det avsnittet. Byt undertext och klicka **Synka resten**.
+- **✖ Misslyckades:** något gick fel, till exempel att filen inte gick att läsa. Ingenting sparades för det avsnittet.
+
+Som referens används filmens engelska textspår. Har filmen inget textspår används filmens ljud. Du kan välja ljudet för alla avsnitt i listan **Referens** i fönstret. Metod och det du har valt i Inställningar (bildfrekvensfel, text för hörselskadade, formatering) gäller också här.
+
+**Avbryt** stannar när avsnittet som pågår är klart. Det som redan är sparat ligger kvar, och **Synka resten** fortsätter där du slutade. **Avbryt nu** avbryter direkt.
+
+Drar du in samma mapp en annan dag känner programmet igen undertexterna det redan har sparat. De står som **✔ Redan synkad** och synkas inte en gång till, så du kan fortsätta med avsnitten som återstod. Markera ett avsnitt och klicka **Synka igen** om det ändå ska göras om. En undertext som du har ändrat efter synken räknas inte som redan synkad.
+
+Finns det redan en `Filmnamn.sv.srt` bredvid filmen skrivs den över. Det står på raden före synken ("Väntar – skriver över filen som finns"). Den gamla filen kommer tillbaka med Återställ…, och en kopia läggs i mappen `Text Sync original` bredvid filen.
+
+Extra justering i huvudfönstret gäller inte här. Finns ingen film för ett avsnitt, men två undertexter på olika språk, används den andra undertexten som referens, och resultatet sparas som `Namn.synkad.srt`.
+
+**Säsongssynken blev inte bra. Kan jag ångra den?**
+Ja. Klicka **Hel säsong…** och sedan **Återställ…**. Då byts varje undertext tillbaka mot filen som fanns före synken, och undertexter som inte fanns före tas bort. Filmerna rörs aldrig.
+- Det går även efter att programmet har stängts. Rutan som frågar säger vilken dag och vilken mapp det gäller, och hur många filer som byts tillbaka och tas bort.
+- Varje mapp du synkar är en egen omgång. Återställ… ångrar den senaste. Finns det en äldre omgång kvar säger programmet det efteråt, och då ångrar nästa klick på Återställ… den. De tio senaste omgångarna sparas.
+- **Återställ avsnittet** ångrar bara det markerade avsnittet. Den knappen fungerar så länge programmet är öppet. Efter en omstart ångrar du hela omgången med Återställ….
+- En undertext som du har ändrat efter synken rörs inte. Programmet säger vilka filer det gäller.
+- En fil som skrevs över finns dessutom kvar i mappen `Text Sync original` bredvid filen, som när du sparar i huvudfönstret.
+
 **Vad betyder röda rader och procenten?**
 Röda rader har ingen engelsk text samtidigt. Det är ofta helt rätt, till exempel ett utrop eller textarens namn. Procenten visar hur många rader som *har* engelsk text samtidigt, och en lyckad synk brukar ge 98–100 %. Under 95 % frågar programmet innan det sparar. Tryck **F3** för att hoppa till nästa röda rad. Är många rader röda i följd har synken gått fel. Prova då metoden **Avancerad**, eller välj ett annat engelskt spår.
 

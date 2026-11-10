@@ -14,7 +14,7 @@
    - Uppdatera alla ställen som nämner `TextSync.exe` eller `test\bin\`: `build.ps1` (kommentarer och utskrift), `README.md` (bygga och dela ut), `docs/operations.md` (bygga, köra inifrån PowerShell, dela ut), `docs/structure.md` och `CLAUDE.md`. Snabbstarten och beslutsloggen kan säga "Text Sync-programmet" i stället för ett filnamn med version.
    - För in beslutet i `docs/decisions.md` och höj versionen.
    - Frågor 9–11 i README.md ("Obesvarade frågor") besvaras innan arbetet börjar.
-5. **Synka en hel säsong på en gång** (önskemål 2026-11-09). Man drar in en mapp, eller flera filmer och SRT-filer. Programmet parar ihop dem efter avsnittsnummer i namnet (S04E01, 4x01 m.m.), visar parningen så att man kan rätta den, synkar dem i kö och sparar varje fil bredvid sitt avsnitt.
+5. ~~**Synka en hel säsong på en gång.**~~ **Klart i 2.4.2**, se beslutsloggen 2026-11-11. Planen var (önskemål 2026-11-09): Man drar in en mapp, eller flera filmer och SRT-filer. Programmet parar ihop dem efter avsnittsnummer i namnet (S04E01, 4x01 m.m.), visar parningen så att man kan rätta den, synkar dem i kö och sparar varje fil bredvid sitt avsnitt.
    - Visa en sammanfattning per avsnitt efteråt: klart, osäkert (se punkt 7) eller misslyckat med en svensk förklaring.
    - Avbryt ska stoppa kön efter det avsnitt som pågår och behålla det som redan är klart.
 6. ~~**Granska i filmen.**~~ **Klart 2026-11-10**, se beslutsloggen. Planen var: Man klickar på en rad i listan och spelar upp filmen några sekunder runt repliken, med den synkade texten ovanpå. Det kontrollerar att texten stämmer med det som sägs, inte bara att tiderna har ändrats.
@@ -42,6 +42,20 @@
 - **Rekommendera Ljud A utan NVIDIA-grafikkort:** en kort förklaring bredvid valet när datorn saknar NVIDIA-kort.
 - **Markera rättningar från Whisper-kontrollen i listan**, så att man kan granska dem.
 - **Testutdata på svenska** ("offset", "cuts", "Route" m.fl.): översätts efter hand när testfilerna ändras.
+
+## Kvar från granskningarna av Hel säsong 2026-11-11 (kan vänta)
+- **Inte provat mot en riktig säsong**, mot ljud i kön eller med riktiga klick. Se beslutsloggen 2026-11-11.
+- **Två serier i samma mapp:** parningen tittar bara på säsong och avsnitt, inte serienamnet. Fel text blir oftast Osäkert och sparas inte. Förslag: jämför namnet före SxxEyy, och visa serienamnet i kolumnen Avsnitt.
+- **Undertexter i en mapp per avsnitt** (`Subs\Show.S04E01\3_Swedish.srt`) paras inte, eftersom numret står i mappnamnet och "Swedish" inte är en känd språkkod.
+- **Avsnittstitlar som slutar på ett språkord** ("…Say.No.srt") tolkas som språkkod (`GuessLang`) och blir aldrig mål.
+- **Två rader med samma utfil** (t.ex. `X.mkv` och `X.mp4`) varnas inte för. Den andra skriver över den första (den första finns i återställningen).
+- **Textspår med nästan ingen text** gör att kön går över till ljudet utan att verktygen har kontrollerats först. Saknas ffmpeg blir avsnittet Misslyckades.
+- **Återställ… visar ingen lista över omgångarna.** Den tar den senaste, och säger efteråt om en äldre finns. Återställ avsnittet finns bara medan programmet är öppet.
+- **Efter Öppna i huvudfönstret och Spara SRT…** står raden kvar som Kontrollera, och den filen räknas sedan som ändrad av användaren (återställs inte).
+- **Ingen länk Visa i mappen** i fönstret. Sökvägen står under listan när raden är markerad.
+- **Byter man utseende** (ljust/mörkt) medan listan är fylld töms listan nästa gång fönstret öppnas. Det som är sparat går fortfarande att återställa.
+- **Kopian i `Text Sync original`** kan vara en tidigare synkad fil, om samma avsnitt synkas om efter att kopian i den mappen har tagits bort.
+- **Nya filer har radslut LF** (`Season.cs`, `SeasonSync.cs`, `SeasonDialog.cs`), övriga CRLF. Kompilatorn bryr sig inte.
 
 ## Kvar från product-check 2026-11-10 (kodade tecken och taggar, kan vänta)
 - **Inte provat mot en riktig SRT-fil** med kodade tecken från en undertextsajt, eller på en TV som visar taggar som text.

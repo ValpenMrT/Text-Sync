@@ -2,6 +2,31 @@
 
 Nyast först.
 
+## 2026-11-11 – 2.4.2: Hel säsong – synka alla avsnitt i kö, med återställning
+- **Område:** GUI / filer
+- **Önskemål (ägaren):** "göra så jag kan synka en hel säsong av en serie istället för att behöva göra det avsnitt för avsnitt. Gör så det går att återställa om något inte blir bra." Punkt 5 i `docs/next.md`.
+- **Beslut:**
+  - **Eget fönster, Hel säsong…** (knapp bredvid Inställningar…, Alt+H). Det öppnas också när man drar in en mapp eller minst två filmer i huvudfönstret. Huvudfönstret är orört i övrigt.
+  - **Parning efter avsnittsnummer** i filnamnen (S04E01, 4x01), eller efter att undertexten heter som filmen. Undermappar tas med (tre nivåer, t.ex. `Subs`). Listan visar ett avsnitt per rad och går att rätta: Byt undertext…, Hoppa över.
+  - **Vilken undertext som synkas:** den med språkkoden i huvudfönstret, annars en utan språkkod. En text på ett annat språk blir aldrig mål. Den vanliga texten går före text för hörselskadade och tvingad text.
+  - **Referens:** filmens engelska textspår (samma val som huvudfönstret). Saknas textspår, eller har det bara tvingad text, används filmens ljud: A, eller A+B om Whisper redan finns och ett NVIDIA-kort är valt. Ljudet kan väljas för alla avsnitt i listan Referens. Verktygen hämtas en gång före kön.
+  - **Sparas** som `Filmnamn.sv.srt` bredvid filmen, med samma teckenkodning som Spara SRT…. Metod, bildfrekvensfel, text för hörselskadade och formatering följer huvudfönstret.
+  - **Besked per avsnitt:** Bra – sparad, Kontrollera – sparad, Osäkert – inte sparad, Misslyckades. Varningen för fel avsnitt eller olika längd blir Kontrollera i stället för en ruta som stoppar kön. Förklaringen står under listan när raden är markerad.
+  - **Osäkra avsnitt sparas inte.** En dålig text bredvid filmen plockas upp automatiskt av spelaren, och det är värre än ingen text.
+  - **Avbryt i två steg:** första klicket stannar efter avsnittet som pågår, andra klicket (Avbryt nu) avbryter direkt. Det som är sparat ligger kvar, och Synka resten fortsätter.
+  - **Återställ…** byter tillbaka varje undertext mot filen som fanns före och tar bort undertexter som inte fanns före. En bekräftelseruta säger dag, mapp och antal. Återställ avsnittet gör samma sak för en rad.
+  - **Återställningen fungerar efter omstart.** Varje omgång (en mapp) har en egen mapp i `%LOCALAPPDATA%\TextSync\undo` med kopior av det som skrevs över och en lista med SHA-256 för det som sparades. De tio senaste omgångarna sparas.
+  - **En fil som användaren har ändrat efter synken rörs aldrig** vid återställning (annan SHA-256), och tas aldrig bort. Programmet säger vilka filer det gäller. Filmer rörs aldrig.
+  - **Redan synkade avsnitt känns igen** när mappen läggs till igen (samma SHA-256 som i listan): de står som Redan synkad och synkas inte om, och den osynkade filen väljs som undertext i stället för programmets egen.
+  - **Öppna i huvudfönstret** läser in avsnittets film och den osynkade undertexten och synkar, så att raderna går att granska och spela upp.
+- **Arbetssätt:** ägaren bad om hjälp av subagenter. En byggde parningen och återställningen med tester i ett eget arbetsträd, medan huvudsessionen byggde kön och fönstret. Två granskade sedan oberoende: koden (dataförlust, trådar) och upplevelsen (sju scenarier som en icke-teknisk användare).
+- **Rättat efter granskningarna:** redan synkade filer känns igen (förut skulle "Synka alla" ha synkat om allt dagen efter); Språkkod "swe" blir "sv" och sätts tillbaka efter Öppna i huvudfönstret; en omgång per mapp, och Töm listan börjar en ny (förut kunde Återställ… ångra två säsonger under ett namn); en fil som ändrats för hand mellan två synkar får en egen kopia; omgångar utan sparade filer tränger inte undan äldre; text för hörselskadade väljs inte före den vanliga texten; listan kan inte bytas ut medan kön går; dubbelklick på Avbryt blir inte Avbryt nu; frågan om Whisper på processorn kommer före nedladdningen; förklaringen visas under listan och inte bara i tipsrutan; raden säger före synken att en fil skrivs över.
+- **Teknik:** `src/Season.cs` (`SeasonPlan`, `SeasonUndo`), `src/SeasonSync.cs` (`ChooseRef`, `SyncOne`), `src/SeasonDialog.cs`. I `MainForm`: `OpenSeason`, `LooksLikeSeason`, `PickTextTrack`, `PrepareGpu`, och `EnsureTools` tar emot vilket fönster som frågar.
+- **Test:** 197 av 197 kontroller (67 nya): parning, `Collect`, återställning, och hela kön mot tre påhittade avsnitt med MKV-textspår (förskjutning, fel bildfrekvens, fel text → Osäkert, avbrott, Ta bort formatering, återställning). Provat i programmet (fönstret i samma process, 200 % skalning, mörkt läge, skärmbilder): parad lista, kön, besked, bekräftelserutan, återställt, och samma mapp tillagd igen (Redan synkad).
+- **Ej provat:** en riktig säsong (bara testfilmens enda avsnitt finns på datorn), synk mot ljud i kön, nedladdning av verktyg från det här fönstret, riktiga klick och dra-och-släpp av en mapp, Öppna i huvudfönstret, Byt undertext…, Avbryt under en riktig kö, ljust läge, högkontrast, 100–150 % skalning.
+- **Product-check:** två oberoende granskningar, inget blockerande kvar. Frågor till ägaren står i README.md under Obesvarade frågor. Kvarstående fynd står i `docs/next.md`.
+- **Nivå:** LIVE
+
 ## 2026-11-10 – 2.4.1: val av hur SRT-filen sparas, Lägg in i MKV blir Avbryt, versionsnummer i varje commit
 - **Område:** GUI / filformat
 - **Önskemål (ägaren):** en inställning för hur SRT-filen sparas, så att tecken utanför ASCII (å, ä, ö med flera) visas rätt i olika spelare. Lägg in i MKV… ska bli en avbrytknapp när man trycker på den. Versionsnumret ska öka i varje commit.

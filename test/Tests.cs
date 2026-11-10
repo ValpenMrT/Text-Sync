@@ -718,6 +718,322 @@ namespace TextSync
                 Check("Tecken och taggar: konstig indata hänger inte programmet", sw3.ElapsedMilliseconds < 2000);
             }
 
+            // ------------------------------------------------------------ hel säsong: parning och återställning
+            {
+                Console.WriteLine("Säsong: parning och återställning");
+                List<string> un;
+                Func<string, string> P = fileName => @"C:\S\" + fileName;
+
+                // S04E01–E03: två sätt att skriva avsnittet, och en film utan text
+                var s1 = SeasonPlan.Build(new[] { P("Show.S04E03.1080p.mkv"), P("Show.S04E01.1080p.mkv"), P(@"Subs\show - 4x01 - titel.sv.srt"), P("Show.S04E02.srt"), P("Show.S04E02.1080p.mkv") }, "sv", out un);
+                Check("Säsong: tre filmer blir tre poster i avsnittsordning",
+                    s1.Count == 3 && s1[0].Title == "S04E01" && s1[1].Title == "S04E02" && s1[2].Title == "S04E03" && s1.All(i => i.RefIsVideo));
+                Check("Säsong: texten paras med filmen på avsnittsnummer, också när det skrivs 4x01",
+                    s1.Count == 3 && s1[0].RefPath == P("Show.S04E01.1080p.mkv") && s1[0].TargetPath == P(@"Subs\show - 4x01 - titel.sv.srt") && s1[0].Include && s1[0].Note == null &&
+                    s1[1].TargetPath == P("Show.S04E02.srt") && s1[1].Include);
+                Check("Säsong: film utan undertext finns med, utan bock och med en anmärkning",
+                    s1.Count == 3 && s1[2].TargetPath == null && !s1[2].Include && s1[2].Note == "Ingen undertext hittades för avsnittet." && s1[2].Candidates.Count == 0 && s1[2].OutputPath("sv") == null);
+                Check("Säsong: inga filer blir över när alla hör till ett avsnitt", un.Count == 0);
+                Check("Säsong: resultatet sparas bredvid filmen med filmens namn och språkkoden",
+                    s1.Count == 3 && s1[0].OutputPath("sv") == P("Show.S04E01.1080p.sv.srt") && s1[0].OutputPath("no") == P("Show.S04E01.1080p.no.srt") && s1[0].OutputPath(null) == P("Show.S04E01.1080p.sv.srt"));
+
+                // annat språk blir aldrig mål
+                var s2 = SeasonPlan.Build(new[] { P("A.S01E01.mkv"), P("A.S01E01.en.srt"), P("A.S01E01.sv.srt") }, "sv", out un);
+                Check("Säsong: med svensk och engelsk text är den svenska målet, och den engelska finns inte bland kandidaterna",
+                    s2.Count == 1 && s2[0].TargetPath == P("A.S01E01.sv.srt") && s2[0].Candidates.Count == 1 && s2[0].Candidates[0] == P("A.S01E01.sv.srt") && s2[0].Note == null &&
+                    un.Count == 1 && un[0] == P("A.S01E01.en.srt"));
+                s2 = SeasonPlan.Build(new[] { P("A.S01E01.mkv"), P("A.S01E01.en.srt") }, "sv", out un);
+                Check("Säsong: en text på ett annat språk blir aldrig mål", s2.Count == 1 && s2[0].TargetPath == null && !s2[0].Include && un.Count == 1);
+                s2 = SeasonPlan.Build(new[] { P("A.S01E01.mkv"), P("A.S01E01.en.srt"), P("a 1x01.srt"), P("A.S01E01.swe.srt") }, "swe", out un);
+                Check("Säsong: text med önskat språk går före text utan språkkod, och swe räknas som sv",
+                    s2.Count == 1 && s2[0].TargetPath == P("A.S01E01.swe.srt") && s2[0].Note == null && s2[0].Candidates.Count == 2 && s2[0].Candidates[1] == P("a 1x01.srt"));
+                s2 = SeasonPlan.Build(new[] { P("A.S01E01.mkv"), P("A.S01E01.en.srt"), P("a 1x01.srt") }, null, out un);
+                Check("Säsong: saknas text med önskat språk väljs den utan språkkod", s2.Count == 1 && s2[0].TargetPath == P("a 1x01.srt") && s2[0].Include);
+
+                // utan film: texten på ett annat språk blir referens
+                var s3 = SeasonPlan.Build(new[] { P("X.S01E01.en.srt"), P("X.S01E01.sv.srt"), P("Y.S01E02.srt"), P("y - 1x02.srt"), P("Z.S01E03.sv.srt") }, "sv", out un);
+                Check("Säsong: utan film blir texten på det andra språket referens",
+                    s3.Count == 1 && s3[0].RefPath == P("X.S01E01.en.srt") && s3[0].TargetPath == P("X.S01E01.sv.srt") && !s3[0].RefIsVideo && s3[0].Include && s3[0].Title == "S01E01");
+                Check("Säsong: mot en referenstext sparas resultatet som .synkad.srt, aldrig över referensen",
+                    s3.Count == 1 && s3[0].OutputPath("sv") == P("X.S01E01.sv.synkad.srt") && s3[0].OutputPath("sv") != s3[0].RefPath);
+                Check("Säsong: två texter utan språkkod paras inte, och en ensam text blir över",
+                    un.Count == 3 && un[0] == P("Y.S01E02.srt") && un[1] == P("y - 1x02.srt") && un[2] == P("Z.S01E03.sv.srt"));
+
+                // programmets egna filer
+                var s4 = SeasonPlan.Build(new[] { P("B.S01E01.mkv"), P("B.S01E01 (Text Sync).mkv"), P(@"Text Sync original\B.S01E01.sv.srt"), P("B.S01E01.whisper.en.srt"),
+                    P("B.S01E01.whisper.sv.srt"), P("B.S01E01.sv.srt"), P("B.S01E01.sv.synkad.srt"), P("anteckning.txt") }, "sv", out un);
+                Check("Säsong: kopior i Text Sync original, igenkända texter (.whisper.) och MKV-kopian (Text Sync) hoppas över",
+                    s4.Count == 1 && s4[0].RefPath == P("B.S01E01.mkv") && s4[0].TargetPath == P("B.S01E01.sv.srt") && s4[0].Candidates.Count == 1 && s4[0].Note == null);
+                Check("Säsong: bara främmande filer räknas som överblivna, inte programmets egna", un.Count == 1 && un[0] == P("anteckning.txt"));
+                s4 = SeasonPlan.Build(new[] { P("B.S01E01 (Text Sync).mkv"), P("b 1x01.sv.synkad.srt") }, "sv", out un);
+                Check("Säsong: en ensam MKV-kopia och en ensam synkad text används när inget annat finns",
+                    s4.Count == 1 && s4[0].Include && s4[0].TargetPath == P("b 1x01.sv.synkad.srt"));
+
+                // flera kandidater
+                var s5 = SeasonPlan.Build(new[] { P(@"Subs\C.S02E01.sv.srt"), P("c 2x01.sv.srt"), P("C.S02E01.mkv") }, "sv", out un);
+                Check("Säsong: flera texter som passar ger en anmärkning, och den i filmens mapp väljs",
+                    s5.Count == 1 && s5[0].TargetPath == P("c 2x01.sv.srt") && s5[0].Note == "Flera undertexter passar. Kontrollera att rätt fil är vald." &&
+                    s5[0].Candidates.Count == 2 && s5[0].Candidates[0] == s5[0].TargetPath && s5[0].Candidates[1] == P(@"Subs\C.S02E01.sv.srt") && un.Count == 0);
+                s5 = SeasonPlan.Build(new[] { P(@"Subs\c.s02e01 b.sv.srt"), P(@"Subs\C.S02E01 a.sv.srt"), P("C.S02E01.mkv") }, "sv", out un);
+                Check("Säsong: ligger ingen i filmens mapp väljs den första i bokstavsordning",
+                    s5.Count == 1 && s5[0].TargetPath == P(@"Subs\C.S02E01 a.sv.srt") && s5[0].Note != null);
+                s5 = SeasonPlan.Build(new[] { P("C.S02E01.mkv"), P("C.S02E01.720p.mkv"), P("C.S02E01.720p.sv.srt"), P("c 2x01.sv.srt") }, "sv", out un);
+                Check("Säsong: samma avsnitt två gånger blir två poster med en anmärkning, och filnamnet går före avsnittsnumret",
+                    s5.Count == 2 && s5[0].RefPath == P("C.S02E01.720p.mkv") && s5[0].TargetPath == P("C.S02E01.720p.sv.srt") && s5[0].Note.Contains("två gånger") &&
+                    s5[1].RefPath == P("C.S02E01.mkv") && s5[1].TargetPath == P("c 2x01.sv.srt") && s5[1].Note.Contains("två gånger") && un.Count == 0);
+
+                // utan avsnittsnummer: bara på filnamnet
+                var s6 = SeasonPlan.Build(new[] { P("Min film.mkv"), P("min film.sv.srt"), P("Annan text.sv.srt"), P("D.S01E02.mkv"), P("D.S01E02.srt"), P("Bio.mp4") }, "sv", out un);
+                Check("Säsong: filer utan avsnittsnummer paras på filnamnet och hamnar sist",
+                    s6.Count == 3 && s6[0].Title == "S01E02" && s6[1].Title == "Bio" && s6[1].Id == null && !s6[1].Include &&
+                    s6[2].Title == "Min film" && s6[2].TargetPath == P("min film.sv.srt") && s6[2].Include && s6[2].OutputPath("sv") == P("Min film.sv.srt"));
+                Check("Säsong: en text som inte hör till någon film blir över", un.Count == 1 && un[0] == P("Annan text.sv.srt"));
+                s6 = SeasonPlan.Build(null, "sv", out un);
+                Check("Säsong: ingen fil alls ger en tom lista", s6.Count == 0 && un.Count == 0);
+
+                // riktiga filer bara i testmappen
+                string sdir = Path.Combine(dir, "säsong test");
+                string oldRoot = SeasonUndo.Root;
+                bool oldLogging = SeasonUndo.Logging;
+                try
+                {
+                    SeasonUndo.Logging = false;   // de avsiktliga felen nedan ska inte hamna i den riktiga loggfilen
+                    if (Directory.Exists(sdir)) Directory.Delete(sdir, true);
+                    string col = Path.Combine(sdir, "Serien S01");
+                    Directory.CreateDirectory(Path.Combine(col, "Subs"));
+                    Directory.CreateDirectory(Path.Combine(col, MainForm.BackupFolder));
+                    Directory.CreateDirectory(Path.Combine(col, @"1\2\3\4"));
+                    foreach (var f in new[] { "E.S01E01.mkv", @"Subs\E.S01E01.sv.srt", MainForm.BackupFolder + @"\E.S01E01.sv.srt", "läs mig.txt", @"1\2\3\tre.srt", @"1\2\3\4\fyra.srt" })
+                        File.WriteAllBytes(Path.Combine(col, f), new byte[0]);
+                    string lone = Path.Combine(sdir, "ensam.srt"), loneTxt = Path.Combine(sdir, "ensam.txt");
+                    File.WriteAllBytes(lone, new byte[0]); File.WriteAllBytes(loneTxt, new byte[0]);
+                    var got = SeasonPlan.Collect(new[] { col, lone, loneTxt, Path.Combine(sdir, "finns inte"), col });
+                    Check("Säsong: en mapp görs om till sina filmer och texter, också i undermappar",
+                        got.Count == 4 && got.Contains(Path.Combine(col, "E.S01E01.mkv")) && got.Contains(Path.Combine(col, @"Subs\E.S01E01.sv.srt")) && got.Contains(lone));
+                    Check("Säsong: mappen Text Sync original och andra filtyper tas inte med",
+                        !got.Any(f => f.Contains(MainForm.BackupFolder)) && !got.Any(f => f.EndsWith(".txt")));
+                    Check("Säsong: undermappar tas med högst tre nivåer ner",
+                        got.Contains(Path.Combine(col, @"1\2\3\tre.srt")) && !got.Contains(Path.Combine(col, @"1\2\3\4\fyra.srt")));
+                    var s7 = SeasonPlan.Build(got, "sv", out un);
+                    Check("Säsong: filerna ur mappen paras ihop", s7.Count == 1 && s7[0].Include && s7[0].TargetPath == Path.Combine(col, @"Subs\E.S01E01.sv.srt") && un.Count == 2);
+
+                    // ---- återställning
+                    SeasonUndo.Root = Path.Combine(sdir, "ångra");
+                    string work = Path.Combine(sdir, "Filmer åäö & mera = bra");
+                    Directory.CreateDirectory(work);
+                    Func<string, byte[]> B = t => Encoding.UTF8.GetBytes(t);
+                    Func<string, string> Rd = f => File.Exists(f) ? Encoding.UTF8.GetString(File.ReadAllBytes(f)) : null;
+                    Check("Återställning: utan körningar finns inget att återställa", SeasonUndo.List().Count == 0 && SeasonUndo.Latest() == null);
+
+                    var run = SeasonUndo.Begin("Serien åäö S01");
+                    string fNew = Path.Combine(work, "Ny fil S01E01.sv.srt"), fOld = Path.Combine(work, "Gammal S01E02.sv.srt"), fChg = Path.Combine(work, "Ändrad S01E03.sv.srt"),
+                        fTwo = Path.Combine(work, "Två gånger S01E04.sv.srt"), fGone = Path.Combine(work, "Borta S01E05.sv.srt"), fLock = Path.Combine(work, "Låst S01E06.sv.srt");
+                    byte[] orig = { 0xEF, 0xBB, 0xBF, 0x31, 0x0D, 0x0A, 0xC3, 0xA5, 0x00, 0xFF };
+                    File.WriteAllBytes(fOld, orig); File.WriteAllText(fChg, "original 3"); File.WriteAllText(fTwo, "original 4"); File.WriteAllText(fGone, "original 5"); File.WriteAllText(fLock, "original 6");
+                    var eNew = SeasonUndo.Write(run, fNew, B("synkad 1"), "S01E01");
+                    var eOld = SeasonUndo.Write(run, fOld, B("synkad 2"), "S01E02");
+                    var eChg = SeasonUndo.Write(run, fChg, B("synkad 3"), "S01E03");
+                    var eTwo = SeasonUndo.Write(run, fTwo, B("synkad 4a"), "S01E04");
+                    var eTwo2 = SeasonUndo.Write(run, fTwo, B("synkad 4b"), "S01E04");
+                    var eGone = SeasonUndo.Write(run, fGone, B("synkad 5"), "S01E05");
+                    var eLock = SeasonUndo.Write(run, fLock, B("synkad 6"), "S01E06");
+                    Check("Återställning: filerna skrivs, och ingen temporär fil blir kvar",
+                        Rd(fNew) == "synkad 1" && Rd(fOld) == "synkad 2" && Rd(fTwo) == "synkad 4b" && Directory.GetFiles(work, "*.textsync-tmp").Length == 0);
+                    Check("Återställning: filen som fanns före sparas som kopia med samma filnamn, och en ny fil har ingen kopia",
+                        eNew.Kept == null && eOld.Kept != null && Path.GetFileName(eOld.Kept) == Path.GetFileName(fOld) && eOld.Kept.StartsWith(run.Dir) && File.ReadAllBytes(eOld.Kept).SequenceEqual(orig));
+                    Check("Återställning: samma fil skriven två gånger blir en post som behåller det verkliga originalet",
+                        ReferenceEquals(eTwo, eTwo2) && run.Entries.Count == 6 && run.Pending == 6 && Rd(eTwo.Kept) == "original 4" && eTwo.Hash == SeasonUndo.HashBytes(B("synkad 4b")));
+
+                    var listed = SeasonUndo.List();
+                    var fromDisk = listed.Count == 1 ? listed[0] : new UndoRun();
+                    Check("Återställning: körningen läses tillbaka från disken med rätt poster, också med å/ä/ö och blanksteg i sökvägen",
+                        listed.Count == 1 && !ReferenceEquals(fromDisk, run) && fromDisk.Title == "Serien åäö S01" && fromDisk.When == run.When && fromDisk.Dir == run.Dir && fromDisk.Entries.Count == 6 && fromDisk.Pending == 6 &&
+                        Enumerable.Range(0, Math.Min(6, fromDisk.Entries.Count)).All(ix => fromDisk.Entries[ix].Path == run.Entries[ix].Path && fromDisk.Entries[ix].Kept == run.Entries[ix].Kept &&
+                            fromDisk.Entries[ix].Hash == run.Entries[ix].Hash && fromDisk.Entries[ix].Label == run.Entries[ix].Label && !fromDisk.Entries[ix].Restored));
+                    var latest = SeasonUndo.Latest();
+                    Check("Återställning: den nyaste körningen med något kvar hittas", latest != null && latest.Dir == run.Dir && !ReferenceEquals(latest, run));
+
+                    var rNew = SeasonUndo.Restore(run, eNew);
+                    Check("Återställning: en fil som inte fanns före tas bort", rNew.Outcome == RestoreOutcome.Removed && !File.Exists(fNew) && eNew.Restored && rNew.Entry == eNew && !string.IsNullOrEmpty(rNew.Message));
+                    var rOld = SeasonUndo.Restore(run, eOld);
+                    Check("Återställning: originalet kommer tillbaka byte för byte", rOld.Outcome == RestoreOutcome.Restored && File.ReadAllBytes(fOld).SequenceEqual(orig) && eOld.Restored);
+                    File.WriteAllText(fOld, "användarens nya text");
+                    var rOld2 = SeasonUndo.Restore(run, eOld);
+                    Check("Återställning: en redan återställd post rörs inte en gång till", rOld2.Outcome == RestoreOutcome.Restored && Rd(fOld) == "användarens nya text");
+                    File.WriteAllText(fChg, "ändrad av användaren");
+                    var rChg = SeasonUndo.Restore(run, eChg);
+                    Check("Återställning: en fil som har ändrats efter synken rörs inte",
+                        rChg.Outcome == RestoreOutcome.Changed && Rd(fChg) == "ändrad av användaren" && !eChg.Restored && rChg.Message.Contains("Ändrad S01E03.sv.srt") && rChg.Message.Contains("rördes inte"));
+                    File.Delete(eGone.Kept);
+                    var rGone = SeasonUndo.Restore(run, eGone);
+                    Check("Återställning: saknas kopian av originalet misslyckas återställningen och filen rörs inte",
+                        rGone.Outcome == RestoreOutcome.Failed && Rd(fGone) == "synkad 5" && !eGone.Restored && rGone.Message.Contains("Kopian"));
+                    RestoreResult rLock;
+                    using (new FileStream(fLock, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+                        rLock = SeasonUndo.Restore(run, eLock);
+                    Check("Återställning: en låst fil ger ett begripligt fel i stället för ett undantag",
+                        rLock.Outcome == RestoreOutcome.Failed && !eLock.Restored && rLock.Message.Contains("öppen i ett annat program") && Rd(fLock) == "synkad 6");
+
+                    // från disken, som efter en omstart
+                    var again = SeasonUndo.Latest();
+                    Check("Återställning: det som är återställt minns programmet till nästa start",
+                        again != null && again.Pending == 4 && again.Entries[0].Restored && again.Entries[1].Restored && !again.Entries[2].Restored);
+                    var all = again != null ? SeasonUndo.RestoreAll(again) : new List<RestoreResult>();
+                    Check("Återställning: Återställ alla hoppar över det som redan är återställt",
+                        all.Count == 4 && all.Count(r => r.Outcome == RestoreOutcome.Restored) == 2 && all.Count(r => r.Outcome == RestoreOutcome.Changed) == 1 && all.Count(r => r.Outcome == RestoreOutcome.Failed) == 1);
+                    Check("Återställning: efter två skrivningar av samma fil kommer det verkliga originalet tillbaka",
+                        Rd(fTwo) == "original 4" && Rd(fLock) == "original 6" && Rd(fChg) == "ändrad av användaren" && Rd(fGone) == "synkad 5" && Rd(fOld) == "användarens nya text" && !File.Exists(fNew));
+                    Check("Återställning: inga temporära filer blir kvar efter återställningen", Directory.GetFiles(work, "*.textsync-tmp").Length == 0 && again != null && again.Pending == 2);
+
+                    // filen borta, originalet redan på plats, och en post från en annan körning
+                    var run2 = SeasonUndo.Begin(null);
+                    string fDel = Path.Combine(work, "Raderad.srt"), fDel2 = Path.Combine(work, "Raderad ny.srt"), fSame = Path.Combine(work, "Redan original.srt");
+                    File.WriteAllText(fDel, "original 7"); File.WriteAllText(fSame, "original 8");
+                    var eDel = SeasonUndo.Write(run2, fDel, B("synkad 7"), null);
+                    var eDel2 = SeasonUndo.Write(run2, fDel2, B("synkad 7b"), "x");
+                    var eSame = SeasonUndo.Write(run2, fSame, B("synkad 8"), "y");
+                    File.Delete(fDel); File.Delete(fDel2); File.WriteAllText(fSame, "original 8");
+                    var rDel = SeasonUndo.Restore(run2, eDel);
+                    var rDel2 = SeasonUndo.Restore(run2, eDel2);
+                    var rSame = SeasonUndo.Restore(run2, eSame);
+                    Check("Återställning: är den synkade filen borta läggs originalet tillbaka, och fanns inget original görs ingenting",
+                        rDel.Outcome == RestoreOutcome.Restored && Rd(fDel) == "original 7" && rDel2.Outcome == RestoreOutcome.Removed && !File.Exists(fDel2));
+                    Check("Återställning: ligger originalet redan på plats räknas posten som återställd", rSame.Outcome == RestoreOutcome.Restored && Rd(fSame) == "original 8" && run2.Pending == 0);
+                    Check("Återställning: en post från en annan körning återställs inte", SeasonUndo.Restore(run2, eChg).Outcome == RestoreOutcome.Failed && Rd(fChg) == "ändrad av användaren");
+                    Check("Återställning: en körning utan namn får mappens namn, och två körningar samma sekund får var sin mapp",
+                        run2.Title == Path.GetFileName(run2.Dir) && run2.Dir != run.Dir && Directory.Exists(run2.Dir));
+                    Check("Återställning: en körning där allt är återställt är inte längre den senaste", SeasonUndo.Latest() != null && SeasonUndo.Latest().Dir == run.Dir && SeasonUndo.List().Count == 2 && SeasonUndo.List()[0].Dir == run2.Dir);
+                    var eRe = SeasonUndo.Write(run2, fDel, B("synkad igen"), "z");
+                    Check("Återställning: en fil som skrivs igen efter återställning får en ny post med en ny kopia",
+                        !ReferenceEquals(eRe, eDel) && run2.Pending == 1 && Rd(eRe.Kept) == "original 7" && SeasonUndo.Restore(run2, eRe).Outcome == RestoreOutcome.Restored && Rd(fDel) == "original 7");
+
+                    // skrivfel: ingen post blir kvar
+                    bool threw = false;
+                    int before = run2.Entries.Count;
+                    try { using (new FileStream(fSame, FileMode.Open, FileAccess.ReadWrite, FileShare.None)) SeasonUndo.Write(run2, fSame, B("går inte"), "q"); }
+                    catch (IOException) { threw = true; }
+                    Check("Återställning: går filen inte att skriva blir ingen post kvar", threw && run2.Entries.Count == before && Rd(fSame) == "original 8" && SeasonUndo.List()[0].Entries.Count == before);
+
+                    // trasigt manifest och rensning
+                    string broken = Path.Combine(SeasonUndo.Root, "20000101-000000");
+                    Directory.CreateDirectory(broken);
+                    File.WriteAllText(Path.Combine(broken, "manifest.txt"), "inte ett manifest\r\n");
+                    string foreign = Path.Combine(SeasonUndo.Root, "Användarens mapp");
+                    Directory.CreateDirectory(foreign);
+                    File.WriteAllText(Path.Combine(foreign, "viktigt.txt"), "rör ej");
+                    Check("Återställning: ett trasigt manifest hoppas över", SeasonUndo.List().Count == 2);
+                    var run3 = SeasonUndo.Begin("nyast");
+                    SeasonUndo.Prune(1);
+                    Check("Återställning: rensningen lämnar bara den nyaste körningen",
+                        Directory.Exists(run3.Dir) && !Directory.Exists(run2.Dir) && !Directory.Exists(run.Dir) && !Directory.Exists(broken) && SeasonUndo.List().Count == 1);
+                    Check("Återställning: rensningen rör inte en mapp utan manifest, och inte användarens filer",
+                        File.Exists(Path.Combine(foreign, "viktigt.txt")) && Rd(fChg) == "ändrad av användaren" && Rd(fDel) == "original 7");
+                    SeasonUndo.Prune(0);
+                    Check("Återställning: rensning av allt tar bort körningarna men inget annat", !Directory.Exists(run3.Dir) && Directory.Exists(foreign) && SeasonUndo.Latest() == null);
+                }
+                finally
+                {
+                    SeasonUndo.Root = oldRoot;
+                    SeasonUndo.Logging = oldLogging;
+                    try { if (Directory.Exists(sdir)) Directory.Delete(sdir, true); } catch { }
+                }
+            }
+
+            // Hel säsong från början till slut: mapp → parning → synk av varje avsnitt → sparat → återställt
+            {
+                string sd = Path.Combine(dir, "säsong kö"); if (Directory.Exists(sd)) Directory.Delete(sd, true);
+                Directory.CreateDirectory(Path.Combine(sd, "Subs"));
+                string oldRoot = SeasonUndo.Root; bool oldLogging = SeasonUndo.Logging;
+                SeasonUndo.Root = Path.Combine(sd, "ångra"); SeasonUndo.Logging = false;
+                try
+                {
+                    var r1 = MakeRef(20); var o1 = MakeOther(r1);
+                    var r2 = MakeRef(20); var o2 = MakeOther(r2);
+                    var r3 = MakeRef(20); var wrong = MakeOther(MakeRef(20));   // E03: en text som hör till något helt annat
+                    WriteMkv(Path.Combine(sd, "Serie.S01E01.mkv"), r1, false, false);
+                    WriteMkv(Path.Combine(sd, "Serie.S01E02.mkv"), r2, false, false);
+                    WriteMkv(Path.Combine(sd, "Serie.S01E03.mkv"), r3, false, false);
+                    string t1 = Path.Combine(sd, "Serie.S01E01.sv.srt"), t2 = Path.Combine(sd, @"Subs\serie 1x02.srt"), t3 = Path.Combine(sd, "Serie.S01E03.sv.srt");
+                    Srt.Save(t1, Distort(o1, t => t + 2500));                    // ligger redan där resultatet ska sparas: skrivs över
+                    Srt.Save(t2, Distort(o2, t => t * 25 / 23.976 - 1200));      // i en undermapp: resultatet blir en ny fil bredvid filmen
+                    Srt.Save(t3, wrong);
+                    byte[] orig1 = File.ReadAllBytes(t1), orig3 = File.ReadAllBytes(t3);
+                    string out2 = Path.Combine(sd, "Serie.S01E02.sv.srt");
+
+                    List<string> un;
+                    var plan = SeasonPlan.Build(SeasonPlan.Collect(new[] { sd }), "sv", out un);
+                    Check("Hel säsong: tre avsnitt paras ihop ur mappen", plan.Count == 3 && plan.All(pl => pl.Include && pl.RefIsVideo) &&
+                        plan[0].TargetPath == t1 && plan[1].TargetPath == t2 && plan[2].TargetPath == t3 && plan[1].OutputPath("sv") == out2);
+                    Check("Hel säsong: en mapp eller två filmer räknas som en säsong, en film och en text gör det inte",
+                        MainForm.LooksLikeSeason(new[] { sd }) && MainForm.LooksLikeSeason(new[] { @"C:\a\A.S01E01.mkv", @"C:\a\A.S01E02.mp4", @"C:\a\A.srt" }) &&
+                        !MainForm.LooksLikeSeason(new[] { @"C:\a\Film.mkv", @"C:\a\Film.sv.srt" }) && !MainForm.LooksLikeSeason(new string[0]));
+                    var ch = SeasonSync.ChooseRef(plan[0].RefPath, SeasonRefMode.Auto, false);
+                    var chA = SeasonSync.ChooseRef(plan[0].RefPath, SeasonRefMode.Speech, true);
+                    Check("Hel säsong: filmens textspår väljs som referens, och ljudet när det är valt",
+                        ch.Track != null && !ch.Audio && chA.Audio && chA.Mode == AudioMode.Speech && SeasonSync.ChooseRef(plan[0].RefPath, SeasonRefMode.Combined, false).Mode == AudioMode.Combined);
+
+                    var run = SeasonUndo.Begin("Serie");
+                    var opt = new SeasonOptions { Lang = "sv" };
+                    var res = new List<EpisodeOutcome>();
+                    foreach (var pl in plan) res.Add(SeasonSync.SyncOne(pl, opt, () => run, (a, b) => { }, System.Threading.CancellationToken.None));
+                    Console.WriteLine("Hel säsong: {0} | {1} | {2}", res[0].Text, res[1].Text, res[2].Text);
+                    Check("Hel säsong: avsnitt 1 och 2 synkas och sparas bredvid filmen", res[0].Saved && res[1].Saved &&
+                        (res[0].State == EpisodeState.Good || res[0].State == EpisodeState.Check) && (res[1].State == EpisodeState.Good || res[1].State == EpisodeState.Check) && File.Exists(out2));
+                    // facit: texten på varje rad är den sanna starttiden
+                    Func<string, bool> inSync = f => { var c = Srt.Load(f).Where(x => x.Text.StartsWith("T|")).ToList(); return c.Count > 100 && c.Count(x => Math.Abs(x.Start - double.Parse(x.Text.Substring(2))) < 300) > 0.97 * c.Count; };
+                    Check("Hel säsong: de sparade undertexterna går i takt (förskjutning och fel bildfrekvens)", inSync(t1) && inSync(out2));
+                    Check("Hel säsong: en text som inte passar filmen blir Osäkert och sparas inte",
+                        res[2].State == EpisodeState.Unsure && !res[2].Saved && File.ReadAllBytes(t3).SequenceEqual(orig3));
+                    Check("Hel säsong: den överskrivna filen finns också i mappen Text Sync original, och den osynkade i undermappen är orörd",
+                        File.ReadAllBytes(Path.Combine(sd, MainForm.BackupFolder, "Serie.S01E01.sv.srt")).SequenceEqual(orig1) && !inSync(t2));
+                    Check("Hel säsong: beskedet säger var filen sparades och vilken referens som användes",
+                        res[1].Detail.Contains(out2) && res[1].Detail.Contains("textspår") && res[2].Detail.Contains("Ingenting har sparats"));
+
+                    // inställningarna följer med: formatering tas bort ur det som sparas
+                    string t4 = Path.Combine(sd, "Subs", "serie 1x02 kursiv.srt");
+                    Srt.Save(t4, Distort(o2, t => t + 900).Select(c => new Cue(c.Start, c.End, "<i>" + c.Text + "</i>")).ToList());
+                    var it4 = new SeasonItem { RefPath = plan[1].RefPath, RefIsVideo = true, TargetPath = t4, Include = true };
+                    var r4 = SeasonSync.SyncOne(it4, new SeasonOptions { Lang = "sv", StripFormatting = true }, () => run, (a, b) => { }, System.Threading.CancellationToken.None);
+                    Check("Hel säsong: Ta bort formatering gäller det som sparas", r4.Saved && !File.ReadAllText(out2).Contains("<i>") && inSync(out2));
+
+                    // avbrott: inget sparas för avsnittet som pågick
+                    var cts = new System.Threading.CancellationTokenSource(); cts.Cancel();
+                    bool cancelled = false; byte[] before = File.ReadAllBytes(t1);
+                    try { SeasonSync.SyncOne(plan[0], opt, () => run, (a, b) => { }, cts.Token); } catch (OperationCanceledException) { cancelled = true; }
+                    Check("Hel säsong: ett avbrutet avsnitt sparar ingenting", cancelled && File.ReadAllBytes(t1).SequenceEqual(before));
+
+                    // återställning: det som fanns före kommer tillbaka, och den nya filen tas bort
+                    var undone = SeasonUndo.RestoreAll(SeasonUndo.Latest());
+                    Check("Hel säsong: Återställ lägger tillbaka den osynkade filen och tar bort den nya",
+                        undone.Count == 2 && undone.All(x => x.Outcome == RestoreOutcome.Restored || x.Outcome == RestoreOutcome.Removed) &&
+                        File.ReadAllBytes(t1).SequenceEqual(orig1) && !File.Exists(out2) && File.Exists(t2) && File.Exists(t3) && SeasonUndo.Latest() == null);
+                    Check("Hel säsong: filmerna rörs aldrig", new[] { "Serie.S01E01.mkv", "Serie.S01E02.mkv", "Serie.S01E03.mkv" }.All(f => File.Exists(Path.Combine(sd, f))));
+
+                    // rättningar efter granskningen
+                    List<string> un2;
+                    var pk = SeasonPlan.Build(new[] { @"C:\s\F.S01E01.mkv", @"C:\s\F.S01E01.sv.sdh.srt", @"C:\s\F.S01E01.sv.forced.srt", @"C:\s\F.S01E01.sv.srt" }, "sv", out un2);
+                    Check("Hel säsong: den vanliga texten väljs före text för hörselskadade och tvingad text", pk.Count == 1 && pk[0].TargetPath == @"C:\s\F.S01E01.sv.srt");
+                    Func<string, byte[]> u8 = s => Encoding.UTF8.GetBytes(s);
+                    var runB = SeasonUndo.Begin("b"); string fb = Path.Combine(sd, "b.srt");
+                    File.WriteAllText(fb, "original");
+                    SeasonUndo.Write(runB, fb, u8("synk 1"), "x");
+                    File.WriteAllText(fb, "ändrad för hand");
+                    SeasonUndo.Write(runB, fb, u8("synk 2"), "x");
+                    SeasonUndo.RestoreAll(runB);
+                    Check("Återställning: en fil som ändrades för hand mellan två synkar får en egen kopia och kommer tillbaka",
+                        runB.Entries.Count == 2 && File.ReadAllText(fb) == "ändrad för hand" && File.ReadAllText(runB.Entries[0].Kept) == "original");
+                    var runC = SeasonUndo.Begin("tom");
+                    SeasonUndo.PruneFinished(null);
+                    Check("Återställning: omgångar utan något kvar att återställa rensas, de med något kvar står kvar",
+                        !Directory.Exists(runC.Dir) && !Directory.Exists(run.Dir) && Directory.Exists(runB.Dir) && File.ReadAllText(fb) == "ändrad för hand");
+                }
+                finally
+                {
+                    SeasonUndo.Root = oldRoot; SeasonUndo.Logging = oldLogging;
+                    try { Directory.Delete(sd, true); } catch { }
+                }
+            }
+
             Console.WriteLine();
             if (muxSkipped) Console.WriteLine("OBS: testet av \"Lägg in i MKV\" hoppades över, eftersom mkvmerge (MKVToolNix) inte är installerat.");
             if (failed == 0) Console.WriteLine("RESULTAT: alla {0} kontroller gick igenom.", checks);

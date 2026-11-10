@@ -15,6 +15,9 @@ src/
   MainForm.Sync.cs   Synken (DoSync), resultatrutan och förhandsvisningen i listan
   MainForm.Save.cs   Spara SRT med säkerhetskopia, lägga in i MKV
   MainForm.Play.cs   Spela upp filmen runt en rad med ffplay (▶ i listan), med de synkade raderna ovanpå
+  SeasonDialog.cs  Fönstret Hel säsong: listan med avsnitt, kön (Synka alla, Avbryt), Byt undertext, Återställ
+  SeasonSync.cs    Synkar ett avsnitt i kön utan gränssnitt: väljer referens (textspår eller ljud), synkar, bedömer och sparar via SeasonUndo
+  Season.cs        Parar ihop filmer och undertexter efter avsnittsnummer (SeasonPlan) och återställer en säsongssynk (SeasonUndo, %LOCALAPPDATA%\TextSync\undo)
   Timeline.cs      Tidslinjen under listan (TimelinePanel)
   SettingsDialog.cs Dialogen Inställningar: utseende, bildfrekvensfel, text för hörselskadade, formatering
   CueDialog.cs     Dialog för att ändra eller lägga till en rad (start, slut, text)
@@ -36,7 +39,8 @@ test/
   Tests.cs         Tester: synk i 7 scenarier × 3 metoder (G = korta klipp), tid före synk, SRT/teckenkodningar, dra-och-släpp-fördelning,
                    spara med säkerhetskopia, MKV-läsning (egen MKV-skrivare, avkortade filer), mkvmerge-inbäddning,
                    matchning av rader (dela, slå ihop, radlängd, mitt i mening, gles referens),
-                   text för hörselskadade, kodade tecken och taggar
+                   text för hörselskadade, kodade tecken och taggar,
+                   hel säsong: parning av filmer och undertexter, återställning, kön från början till slut
   Diag.cs          Felsökning mot riktiga filer: skriver ut avsnitt, träffsäkerhet och rader utan referens
   AudioDiag.cs     Jämför ljudsynk A, B och A+B mot facit (synk mot filmens undertextspår)
   ToolsDl.cs       Hämtar ljudverktygen med programmets egen nedladdningskod

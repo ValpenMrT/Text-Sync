@@ -96,13 +96,7 @@ namespace TextSync
                     }
                     else
                     {
-                        // förval: engelska (eller okänt språk), inte "forced" och inte SDH/hörselskadade
-                        Func<MkvTrack, bool> plain = t => !t.Forced && !Regex.IsMatch(t.Name, @"\b(SDH|CC|HI|forced)\b", RegexOptions.IgnoreCase);
-                        int pick = text.FindIndex(t => plain(t) && t.Language.StartsWith("en"));
-                        if (pick < 0) pick = text.FindIndex(t => plain(t) && t.Language == "und");
-                        if (pick < 0) pick = text.FindIndex(t => t.Language.StartsWith("en") && !t.Forced);
-                        if (pick < 0) pick = text.FindIndex(t => !t.Forced);
-                        trackCombo.SelectedIndex = Math.Max(0, pick);
+                        trackCombo.SelectedIndex = PickTextTrack(text);
                         refInfo.Text = text.Count + " textspår hittades – eller välj synk mot ljudet i listan";
                     }
                     refInfoDefault = refInfo.Text;
@@ -117,6 +111,17 @@ namespace TextSync
                 mkvPath = null; refSrtCues = null;
             }
             UpdateButtons();
+        }
+
+        // Förvalt textspår: engelska (eller okänt språk), inte "forced" och inte SDH/hörselskadade. Används också när en hel säsong synkas.
+        internal static int PickTextTrack(List<MkvTrack> text)
+        {
+            Func<MkvTrack, bool> plain = t => !t.Forced && !Regex.IsMatch(t.Name, @"\b(SDH|CC|HI|forced)\b", RegexOptions.IgnoreCase);
+            int pick = text.FindIndex(t => plain(t) && t.Language.StartsWith("en"));
+            if (pick < 0) pick = text.FindIndex(t => plain(t) && t.Language == "und");
+            if (pick < 0) pick = text.FindIndex(t => t.Language.StartsWith("en") && !t.Forced);
+            if (pick < 0) pick = text.FindIndex(t => !t.Forced);
+            return Math.Max(0, pick);
         }
 
         void BrowseOrig()
@@ -193,7 +198,7 @@ namespace TextSync
             UpdateButtons();
         }
 
-        static string GuessLang(string path)
+        internal static string GuessLang(string path)
         {
             var m = Regex.Match(Path.GetFileNameWithoutExtension(path), @"[._ -]([a-z]{2,3})(?:[._ -](?:forced|sdh|cc|hi))?$", RegexOptions.IgnoreCase);
             if (!m.Success) return null;

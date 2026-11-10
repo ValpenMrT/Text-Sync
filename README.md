@@ -15,6 +15,8 @@ Text Sync får en undertext som inte går i takt med filmen, till exempel en sve
 
 Har filmen ingen engelsk text kan Text Sync synka mot filmens ljud i stället. Första gången frågar programmet om det får hämta gratisverktyg som behövs för det. Utan NVIDIA-grafikkort tar det längre tid.
 
+En hel säsong: klicka **Hel säsong…** och dra in mappen. Blir det inte bra ångrar **Återställ…** allt.
+
 Originalfilen ändras aldrig utan att en kopia sparas.
 
 **Mer hjälp:** klicka **Hjälp** i programmet.
@@ -36,7 +38,7 @@ powershell -ExecutionPolicy Bypass -File build.ps1
 Det skapar `Build\TextSync-<version>.exe`, till exempel `Build\TextSync-2.4.exe`. Versionen läses ur `Program.Version` i [src/Program.cs](src/Program.cs), och bygget avbryts om `AssemblyVersion` och `AssemblyFileVersion` inte stämmer med den. Äldre versioner ligger kvar i `Build\`. Kräver bara Windows, med .NET Framework 4.8 som redan finns i Windows 10/11.
 
 - **Lägg in i MKV…** kräver [MKVToolNix](https://mkvtoolnix.download/). Det behövs bara för den knappen.
-- Ljudsynk och Whisper behöver ffmpeg, whisper.cpp och en språkmodell. Programmet frågar och laddar ner dem första gången, och kontrollerar varje fil mot en SHA-256-summa. De hamnar i `%LOCALAPPDATA%\TextSync\tools`, cirka 1,4 GB med NVIDIA-grafikkort och 0,6 GB med processorn (det som hämtas följer valet i listan Grafikkort). Loggen och cachen ligger också i `%LOCALAPPDATA%\TextSync`.
+- Ljudsynk och Whisper behöver ffmpeg, whisper.cpp och en språkmodell. Programmet frågar och laddar ner dem första gången, och kontrollerar varje fil mot en SHA-256-summa. De hamnar i `%LOCALAPPDATA%\TextSync\tools`, cirka 1,4 GB med NVIDIA-grafikkort och 0,6 GB med processorn (det som hämtas följer valet i listan Grafikkort). Loggen och cachen ligger också i `%LOCALAPPDATA%\TextSync`, liksom mappen `undo` med det som behövs för att återställa en säsongssynk.
 
 ### Testa
 ```
@@ -50,7 +52,12 @@ Kopiera den senaste `TextSync-<version>.exe` från `Build\` till ett USB-minne. 
 Programmet är inte signerat (se [docs/decisions.md](docs/decisions.md)). Versionen står i filnamnet och i fönstrets rubrik, och sätts bara i `Program.Version` i [src/Program.cs](src/Program.cs) (plus de två `Assembly…Version`-raderna, som bygget kontrollerar).
 
 ### Obesvarade frågor (tas upp vid nästa körning)
-Inga just nu.
+Om Hel säsong (2.4.2). Claude valde det som står först, eftersom ägaren inte hade svarat:
+1. **Osäkra avsnitt sparas inte.** Ska de sparas ändå, eftersom allt går att återställa?
+2. **Film utan textspår synkas mot ljud A** (taldetektering). A+B används bara om Whisper redan är nedladdat och ett NVIDIA-kort är valt, så att kön aldrig börjar med en stor nedladdning eller timmar på processorn. Är det rätt förval?
+3. **De tio senaste säsongssynkarna går att återställa.** Räcker det, och ska äldre tas bort automatiskt som nu?
+4. **Knappen Hel säsong…** står bredvid Inställningar…. Är det rätt plats?
+5. **Lägg in i MKV… finns inte för en hel säsong**, bara Spara SRT bredvid filmen. Behövs det?
 
 ### Dokumentation
 

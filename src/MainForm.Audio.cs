@@ -103,10 +103,20 @@ namespace TextSync
             return a == DialogResult.Yes;
         }
 
+        // Väntar på sökningen efter grafikkort och ställer in det sparade valet (Audio.WhisperDevice), även när listan Grafikkort inte visas
+        internal async Task PrepareGpu()
+        {
+            await Tools.GpuScan();
+            if (gpuDevices == null) FillGpus();
+        }
+
         // ------------------------------------------------------------ verktyg för ljudsynk
         // Frågar en gång och laddar ner det som saknas (kontrolleras mot fasta kontrollsummor).
-        async Task<bool> EnsureTools(bool whisper, CancellationToken token)
+        // owner och prog: fönstret som frågar och visar förloppet (säsongsfönstret när en hel säsong synkas), annars huvudfönstret
+        internal async Task<bool> EnsureTools(bool whisper, CancellationToken token, IWin32Window owner = null, Action<int, string> prog = null)
         {
+            if (owner == null) owner = this;
+            if (prog == null) prog = Progress;
             var need = new List<ToolPackage>();
             if (!Tools.IsInstalled(Tools.Ffmpeg)) need.Add(Tools.Ffmpeg);
             // bara det som behövs för valt grafikkort (eller processorn), inte allt som skulle kunna användas
@@ -117,7 +127,7 @@ namespace TextSync
             if (free >= 0 && free < want)
             {
                 Log.Info("För lite diskutrymme för verktygen: " + free / 1048576 + " MB ledigt, behöver " + want / 1048576 + " MB");
-                MessageBox.Show(this,
+                MessageBox.Show(owner,
                     "Det finns för lite ledigt utrymme på disken " + Path.GetPathRoot(Path.GetFullPath(Tools.Root)).TrimEnd('\\') + " för verktygen som synk mot ljudet behöver.\n\n" +
                     "De behöver cirka " + Fmt(want / 1073741824.0, "0.0") + " GB under nedladdningen, men bara " + Fmt(free / 1073741824.0, "0.0") + " GB är ledigt.\n\n" +
                     "Frigör utrymme, till exempel genom att tömma Papperskorgen, och försök igen. Du kan också synka mot en undertext (textspår eller SRT) i stället" +
@@ -125,7 +135,7 @@ namespace TextSync
                     Caption, MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return false;
             }
-            var a = MessageBox.Show(this,
+            var a = MessageBox.Show(owner,
                 "Synk mot ljudet behöver några gratisverktyg som inte finns på datorn ännu:\n\n" +
                 string.Join("\n", need.Select(p => "•  " + p.Name + "  (" + Fmt(p.Size / 1048576.0, "0") + " MB)")) +
                 "\n\nTotalt cirka " + Fmt(total / 1048576.0, "0") + " MB. De laddas ner en gång till\n" + Tools.Root +
@@ -136,7 +146,7 @@ namespace TextSync
             foreach (var p in need)
             {
                 var pkg = p; long before = doneBefore;
-                await Task.Run(() => Tools.Download(pkg, (d, t) => Progress((int)(100 * (before + d) / Math.Max(1, total)),
+                await Task.Run(() => Tools.Download(pkg, (d, t) => prog((int)(100 * (before + d) / Math.Max(1, total)),
                     "Laddar ner " + pkg.Name + "… " + Fmt((before + d) / 1048576.0, "0") + " av " + Fmt(total / 1048576.0, "0") + " MB"), token));
                 doneBefore += p.Size;
             }
