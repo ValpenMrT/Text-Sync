@@ -50,9 +50,7 @@ Kopiera den senaste `TextSync-<version>.exe` från `Build\` till ett USB-minne. 
 Programmet är inte signerat (se [docs/decisions.md](docs/decisions.md)). Versionen står i filnamnet och i fönstrets rubrik, och sätts bara i `Program.Version` i [src/Program.cs](src/Program.cs) (plus de två `Assembly…Version`-raderna, som bygget kontrollerar).
 
 ### Obesvarade frågor (tas upp vid nästa körning)
-Från genomgången av projektstrukturen 2026-11-09:
-
-1. Ska en `.gitattributes` läggas till för enhetliga radslut? `src/Mkv.cs` har blandade radslut. Förslag: ja. (Ägaren svarar senare, 2026-11-10.)
+Inga just nu.
 
 ### Dokumentation
 

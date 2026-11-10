@@ -2,6 +2,15 @@
 
 Nyast först.
 
+## 2026-11-10 – .gitattributes för enhetliga radslut
+- **Område:** projektstruktur
+- **Fråga (från README, "Obesvarade frågor"):** ska en `.gitattributes` läggas till för enhetliga radslut? **Svar (ägaren):** ja ("skapa en sån fil").
+- **Beslut:** `.gitattributes` i projektets rot. Textfiler (`.cs`, `.ps1`, `.md`, `LICENSE`, `.gitignore`) lagras med LF i git och har Windows-radslut (CRLF) i arbetsmappen, oavsett hur git är inställt på datorn. `.ico`, `.exe` och `.png` är binära och rörs aldrig.
+- **Varför:** `src/Mkv.cs` hade blandade radslut, git varnade vid varje commit, och en ändring på en rad kunde visas som att hela filen var ändrad.
+- **Följd:** inget i programmet ändras. I git låg alla filer redan med LF, så commiten innehåller bara den nya filen och dokumentationen. Arbetsmappens filer hämtades ut på nytt efter commiten, så att alla har CRLF.
+- **Test:** 114 av 114 kontroller efter att `src/Mkv.cs` fått enhetliga radslut.
+- **Nivå:** LIVE
+
 ## 2026-11-10 – Inställningar i en egen ruta
 - **Område:** GUI
 - **Fråga (från README, "Obesvarade frågor"):** ska inställningarna flyttas till en egen ruta? Raden under fält 2 hade tre kryssrutor och bröts på två rader. **Svar (ägaren):** ja ("implementera alla dina förslag").

@@ -1,0 +1,15 @@
+# Radslut: textfiler lagras med LF i git och har Windows-radslut (CRLF) i arbetsmappen,
+# oavsett hur git är inställt på datorn. Se docs/decisions.md 2026-11-10.
+* text=auto
+
+*.cs   text eol=crlf
+*.ps1  text eol=crlf
+*.md   text eol=crlf
+LICENSE        text eol=crlf
+.gitignore     text eol=crlf
+.gitattributes text eol=crlf
+
+# Binära filer rörs aldrig
+*.ico binary
+*.exe binary
+*.png binary
