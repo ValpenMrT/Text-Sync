@@ -2,6 +2,22 @@
 
 Nyast först.
 
+## 2026-11-11 – 2.4.5: Knappen Lägg in i MKV… i fönstret Hel säsong
+- **Område:** GUI
+- **Önskemål (ägaren):** "Jag ser ingen knapp för Lägg till i MKV för en hel säsong. Kan du lägga till denna funktionen." I 2.4.3 fanns funktionen bara som en kryssruta ovanför listan, och den hittade ägaren inte.
+- **Beslut:**
+  - **Knappen Lägg in i MKV…** (Alt+L) står längst ner i fönstret, mellan Synka alla och Återställ…, som i huvudfönstret: först synka, sedan lägga in. Den gäller alla avsnitt som har en sparad undertext bredvid filmen, också de som står som Redan synkad, och använder SRT-filen som ligger på disken.
+  - **En ruta frågar först:** hur många avsnitt det gäller, hur mycket plats kopiorna behöver och hur mycket som är ledigt, och att Återställ… tar bort dem. Knapparna är "Skapa kopiorna" och "Avbryt".
+  - **Avsnitt som redan har en kopia hoppas över**, och rutan säger hur många.
+  - **Avbryt** fungerar som under synken (samma knapp, två steg). En halvfärdig kopia tas bort.
+  - **Beskedet på raden** får tillägget "· MKV skapad" eller "· ingen MKV", med skälet under listan.
+  - **Kryssrutan finns kvar**, med ny text: "Lägg in i MKV direkt vid synken (kopia av filmen)". Den är för den som vill ha allt gjort i ett steg.
+- **Teknik:** `MuxAll`, `HaveMkvMerge` och `GetRun` i `SeasonDialog.cs`, `SeasonSync.MuxSaved`.
+- **Test:** 208 av 208 kontroller (3 nya, med riktig mkvmerge: kopian skapas av den sparade undertexten, skrivs inte över, tas bort av Återställ). Provat i programmet (fönstret i samma process, 200 %, mörkt läge): synk av en påhittad säsong, klick på knappen, frågan, tre kopior skapade, och Återställ… som tog bort kopiorna och undertexterna (6 filer).
+- **Ej provat:** riktiga filmer på flera GB, Avbryt medan en kopia skapas, för lite plats, och avsnitt som står som Redan synkad.
+- **Product-check:** Claude granskade själv (en knapp till en funktion som redan fanns och var testad).
+- **Nivå:** LIVE
+
 ## 2026-11-11 – 2.4.4: Tio omgångar räcker för återställning av Hel säsong
 - **Område:** filer
 - **Fråga:** *De tio senaste omgångarna går att återställa, och äldre tas bort automatiskt. En omgång är en hel säsong (en mapp) med alla sina avsnitt. Räcker tio?* **Svar (ägaren):** "Ja det räcker."

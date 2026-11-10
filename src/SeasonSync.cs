@@ -32,6 +32,7 @@ namespace TextSync
         public UndoEntry Entry;       // filen som sparades (null = inget sparat)
         public UndoRun Run;           // omgången som Entry hör till
         public UndoEntry MkvEntry;    // MKV-kopian med undertexten inlagd (null = ingen skapad)
+        public UndoRun MkvRun;        // omgången som MkvEntry hör till
         public bool Saved { get { return Entry != null && !Entry.Restored; } }
     }
 
@@ -190,6 +191,7 @@ namespace TextSync
                 if (err == null)
                 {
                     res.MkvEntry = SeasonUndo.RegisterCreated(res.Run, mkvOut, it.Title);
+                    res.MkvRun = res.Run;
                     res.Text = res.Text.Replace("– sparad", "– SRT och MKV sparade");
                     detail.Add("MKV-kopia med undertexten inlagd: " + mkvOut);
                     Log.Info("Säsong " + it.Title + ": MKV skapad " + mkvOut);
@@ -215,6 +217,22 @@ namespace TextSync
         public static string MkvCopyPath(string film)
         {
             return Path.Combine(Path.GetDirectoryName(film), Path.GetFileNameWithoutExtension(film) + " (Text Sync).mkv");
+        }
+
+        // Knappen Lägg in i MKV… i fönstret Hel säsong: lägger in en redan sparad undertext (srtPath) i en kopia av filmen.
+        // Returnerar null när kopian är skapad (entry = posten för återställning), annars en mening om varför den inte skapades.
+        public static string MuxSaved(string film, string srtPath, string lang, string label, Func<UndoRun> getRun, Action<int, string> progress, CancellationToken ct, out UndoEntry entry, out UndoRun run)
+        {
+            entry = null; run = null;
+            var cues = Markup.FixAll(Srt.Load(srtPath));
+            if (cues.Count == 0) return "MKV-kopian skapades inte: undertexten " + Path.GetFileName(srtPath) + " innehåller inga repliker.";
+            string outPath = MkvCopyPath(film);
+            string err = Mux(film, cues, lang, outPath, progress, ct);
+            if (err != null) { Log.Info("Säsong " + label + ": ingen MKV: " + err); return err; }
+            run = getRun();
+            entry = SeasonUndo.RegisterCreated(run, outPath, label);
+            Log.Info("Säsong " + label + ": MKV skapad " + outPath + " av " + srtPath);
+            return null;
         }
 
         // Lägger in undertexten i en kopia av filmen med mkvmerge (MKVToolNix). Originalfilmen ändras aldrig, och en fil som redan finns skrivs aldrig över.

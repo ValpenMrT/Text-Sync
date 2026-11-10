@@ -1230,7 +1230,7 @@ namespace TextSync
                 "Kodade tecken som &amp; i texten görs alltid om till riktiga tecken (&), och trasig formatering som <i> utan avslut lagas. Sådana rader är märkta ✎ i listan: håll muspekaren över raden för att se vad som stod i filen. " +
                 "Visar din TV <i> som text? Kryssa i \"Ta bort kursiv och annan formatering\" i Inställningar. Kryssar du ur rutan kommer formateringen tillbaka.\n\n" +
                 "Hel säsong (knappen Hel säsong… uppe till höger, eller dra in en mapp): alla avsnitt synkas i kö och varje undertext sparas bredvid sitt avsnitt. " +
-                "Där väljer du också om undertexten ska läggas in i en kopia av varje film (MKV) och om osäkra avsnitt ska sparas. Återställ… i det fönstret ångrar allt: filerna som fanns före kommer tillbaka och nya undertexter tas bort. Det går även efter att programmet har stängts.\n\n" +
+                "Lägg in i MKV… i det fönstret lägger in de sparade undertexterna i en kopia av varje film. Där väljer du också om osäkra avsnitt ska sparas. Återställ… i det fönstret ångrar allt: filerna som fanns före kommer tillbaka och nya undertexter tas bort. Det går även efter att programmet har stängts.\n\n" +
                 "Tips: dra in båda filerna samtidigt. Rödmarkerade rader saknar engelsk text samtidigt – ofta helt i sin ordning (t.ex. utrop).\n" +
                 "Kryssa i \"Föreslå radindelning som referensen\" så föreslår programmet att dela eller slå ihop rader som de engelska (blå, \"Dela?\"/\"Ihop?\") – högerklicka för att godkänna. " +
                 "Under varje förslag står hur raden blir om du godkänner det (→ blir). " +

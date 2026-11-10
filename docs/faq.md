@@ -26,9 +26,13 @@ Efteråt står ett besked på varje rad:
 Som referens används filmens engelska textspår. Har filmen inget textspår används filmens ljud. Programmet frågar då före kön hur du vill göra: **ljud A+B** (säkrast, med taligenkänningen Whisper) eller **ljud A** (snabbt). Saknas verktygen för A+B erbjuder programmet att ladda ner dem, och visar hur stort det är innan något hämtas. Finns Whisper redan och ett NVIDIA-grafikkort är valt används A+B utan fråga. Du kan också välja ljudet för alla avsnitt i listan **Referens** i fönstret.
 
 **Kan undertexten läggas in i själva filmen för en hel säsong?**
-Ja. Kryssa i **Lägg också in undertexten i en kopia av filmen (MKV)** ovanför listan. Då får varje avsnitt både SRT-filen och en kopia av filmen med undertexten inlagd, `Filmnamn (Text Sync).mkv`, bredvid originalet.
+Ja, på två sätt. Båda ger en kopia av filmen med undertexten inlagd, `Filmnamn (Text Sync).mkv`, bredvid originalet. SRT-filen sparas alltid också.
+- **Efteråt:** klicka **Lägg in i MKV…** längst ner i fönstret Hel säsong när avsnitten är synkade. Alla avsnitt som har en sparad undertext får en kopia, även de som står som Redan synkad. En ruta säger först hur många avsnitt det gäller och hur mycket plats kopiorna behöver.
+- **Direkt:** kryssa i **Lägg in i MKV direkt vid synken** ovanför listan innan du klickar Synka alla. Då skapas kopian så fort varje avsnitt är synkat.
+
 - Originalfilmen ändras aldrig. Kopian är lika stor som filmen, så en hel säsong behöver mycket plats. Räcker inte platsen säger programmet det före kön, och de avsnitt som inte får plats får bara SRT-filen.
 - Gratisprogrammet MKVToolNix behövs, som för **Lägg in i MKV…** i huvudfönstret.
+- Medan kopiorna skapas är **Synka alla** en avbrytknapp, som under synken. Det som redan är klart ligger kvar.
 - Finns kopian redan skrivs den inte över. Ta bort den själv om den ska göras om.
 - **Återställ…** tar bort kopiorna igen, om de inte har ändrats sedan de skapades. Metod och det du har valt i Inställningar (bildfrekvensfel, text för hörselskadade, formatering) gäller också här.
 

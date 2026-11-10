@@ -1055,6 +1055,21 @@ namespace TextSync
                         SeasonUndo.RestoreAll(runE);
                         Check("Hel säsong: Återställ tar bort MKV-kopian och lägger tillbaka undertexten", !File.Exists(copy) && File.ReadAllBytes(t1).SequenceEqual(orig1) && File.Exists(plan[0].RefPath));
                     }
+                    // knappen Lägg in i MKV…: en redan sparad undertext läggs in i efterhand
+                    if (MainForm.FindMkvMergePublic() != null)
+                    {
+                        string copy = SeasonSync.MkvCopyPath(plan[0].RefPath);
+                        var rS = SeasonSync.SyncOne(plan[0], new SeasonOptions { Lang = "sv" }, () => runE, (a, b) => { }, System.Threading.CancellationToken.None);
+                        UndoEntry me, me2; UndoRun mr, mr2;
+                        string merr = SeasonSync.MuxSaved(plan[0].RefPath, rS.Entry.Path, "sv", "S01E01", () => runE, (a, b) => { }, System.Threading.CancellationToken.None, out me, out mr);
+                        bool two = false;
+                        if (File.Exists(copy)) using (var mf = new MkvFile(copy)) two = mf.Tracks.Count(x => x.IsSubtitle) == 2;
+                        Check("Hel säsong: Lägg in i MKV… lägger in den sparade undertexten i en kopia av filmen", merr == null && me != null && mr == runE && two && rS.MkvEntry == null);
+                        string merr2 = SeasonSync.MuxSaved(plan[0].RefPath, rS.Entry.Path, "sv", "S01E01", () => runE, (a, b) => { }, System.Threading.CancellationToken.None, out me2, out mr2);
+                        Check("Hel säsong: Lägg in i MKV… skriver inte över en kopia som finns", merr2 != null && merr2.Contains("finns redan") && me2 == null);
+                        SeasonUndo.RestoreAll(runE);
+                        Check("Hel säsong: Återställ tar bort kopian som knappen skapade", !File.Exists(copy) && File.ReadAllBytes(t1).SequenceEqual(orig1));
+                    }
                     else Console.WriteLine("OBS: testet av MKV-kopior i Hel säsong hoppades över, eftersom mkvmerge (MKVToolNix) inte är installerat.");
                     var runC = SeasonUndo.Begin("tom");
                     SeasonUndo.PruneFinished(null);
