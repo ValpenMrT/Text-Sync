@@ -2,6 +2,22 @@
 
 Nyast först.
 
+## 2026-11-10 – Inställningar i en egen ruta
+- **Område:** GUI
+- **Fråga (från README, "Obesvarade frågor"):** ska inställningarna flyttas till en egen ruta? Raden under fält 2 hade tre kryssrutor och bröts på två rader. **Svar (ägaren):** ja ("implementera alla dina förslag").
+- **Beslut:**
+  - Knappen **Inställningar…** längst upp till höger (Alt+I) öppnar en ruta med **Utseende**, **Upptäck bildfrekvensfel**, **Ta bort text för hörselskadade** och **Ta bort kursiv och annan formatering**, var och en med en rad förklaring. **OK** sparar och gäller direkt, **Avbryt** ändrar ingenting.
+  - **Metod** och **Synka** står kvar i huvudfönstret, eftersom de hör till varje synk.
+  - **Under Metod står vilka inställningar som avviker från det vanliga**, till exempel "Inställningar: text för hörselskadade tas bort · bildfrekvensfel upptäcks inte". Raden syns inte när allt är som vanligt. Så glöms en inställning inte bort i rutan.
+  - **Allt fungerar som förut** när ett val ändras: text för hörselskadade rensas direkt efter en synk och går att ångra med Ctrl+Z, och formateringen tas bort eller kommer tillbaka direkt.
+  - **"Upptäck bildfrekvensfel" sparas nu** till nästa gång (`fps` i settings.txt). Förut var den alltid ikryssad vid start.
+  - **Beskedet under fält 2 är kortare** ("Rättat: kodade tecken på 14 rader, formatering på 3 rader. 2 rader utan text borttagna.") och bryts på två rader i ett smalt fönster. Det längre beskedet hamnade under Teckenkodning.
+- **Teknik:** kryssrutorna `fpsCheck`, `hiCheck` och `plainCheck` finns kvar i `MainForm` som bärare av valen och deras händelser, men visas inte. `SettingsDialog` läser och sätter dem.
+- **Test:** 114 av 114 kontroller. Provat i programmet: rutan öppnad, formatering ikryssad och bildfrekvensfel urkryssad, OK gav direkt "Formatering borttagen på 74 rader", raden under Metod och rätt värden i settings.txt. Öppnad igen visade rutan de sparade valen, och Avbryt ändrade ingenting. Skärmbilder i mörkt läge.
+- **Ej provat:** ljust läge och högkontrast (där Utseende inte visas), byte av utseende från rutan, och 150 % skalning.
+- **Product-check:** Claude granskade själv (befintliga val flyttade, inga nya). Rättat under arbetet: beskedet under fält 2 krockade med Teckenkodning. Kan vänta: "Föreslå radindelning som referensen" och Visa står kvar ovanför listan, eftersom de hör till listan.
+- **Nivå:** LIVE
+
 ## 2026-11-10 – Koder från ASS, MicroDVD och webbsidor
 - **Område:** text
 - **Önskemål (ägaren):** "implementera alla dina förslag", efter listan över taggar och koder som programmet inte rörde (se "Kända gränser" i posten nedan, som den här posten ersätter).

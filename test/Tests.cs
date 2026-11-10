@@ -639,7 +639,7 @@ namespace TextSync
                 var fl0 = Markup.FixAll(new List<Cue> { new Cue(0, 1000, "<i> </i>"), new Cue(2000, 3000, "Hej &amp; hå"), new Cue(4000, 5000, "&nbsp;"), new Cue(6000, 7000, "<br>"), new Cue(8000, 9000, "Orörd"), new Cue(10000, 11000, "") }, out fe, out ft, out fg);
                 Check("Tecken och taggar: rader där ingen text blir kvar tas bort, och en rättad rad minns vad som stod i filen",
                     fg == 3 && fe == 1 && ft == 0 && fl0.Count == 3 && fl0[0].Text == "Hej & hå" && fl0[0].Raw == "Hej &amp; hå" && fl0[0].Clone().Raw == "Hej &amp; hå" && fl0[1].Raw == null && fl0[2].Text == "" &&
-                    Markup.Summary(fe, ft, fg) == "Rättat: kodade tecken (t.ex. &amp;) på 1 rad. 3 rader utan text borttagna." && Markup.Summary(0, 0, 1) == "1 rad utan text borttagen.");
+                    Markup.Summary(fe, ft, fg) == "Rättat: kodade tecken på 1 rad. 3 rader utan text borttagna." && Markup.Summary(0, 0, 1) == "1 rad utan text borttagen.");
                 var fsync = SyncEngine.Sync(refc, Markup.FixAll(Distort(other, t => t + 3700).Select((c, i) => i == 5 ? new Cue(c.Start, c.End, c.Text + " &amp; mer") : c).ToList()), new SyncOptions(), null);
                 Check("Tecken och taggar: märkningen av rättade rader följer med genom synken och den extra justeringen",
                     fsync.Output.Count(c => c.Raw != null) == 1 && SyncEngine.ApplyExtra(fsync.Output, 100).Count(c => c.Raw != null && c.Raw.EndsWith("&amp; mer") && c.Text.EndsWith("& mer")) == 1);
@@ -649,7 +649,7 @@ namespace TextSync
                 var fp = Markup.StripAll(fl, out fs);
                 Check("Tecken och taggar: antalet rättade rader räknas, och antalet rader och tiderna behålls",
                     fe == 2 && ft == 2 && fl.Count == 4 && fl[2].Text == "<i>Hej & hå</i>" && fl[1].Start == 2000 && fs == 3 && fp.Count == 4 && fp[3].Text == "Orörd" && fl[3].Text == "<i>Orörd</i>" &&
-                    Markup.Summary(fe, ft) == "Rättat: kodade tecken (t.ex. &amp;) på 2 rader, trasig formatering (t.ex. <i> utan avslut) på 2 rader." && Markup.Summary(0, 0) == "" && Markup.Summary(1, 0) == "Rättat: kodade tecken (t.ex. &amp;) på 1 rad.");
+                    Markup.Summary(fe, ft) == "Rättat: kodade tecken på 2 rader, formatering på 2 rader." && Markup.Summary(0, 0) == "" && Markup.Summary(1, 0) == "Rättat: kodade tecken på 1 rad.");
                 var fpath = Path.Combine(dir, "markup.srt");
                 File.WriteAllText(fpath, "1\r\n00:00:01,000 --> 00:00:02,000\r\n<i>Tom &amp; Jerry\r\n\r\n", new UTF8Encoding(false));
                 var fsrt = Srt.ToSrt(Markup.FixAll(Srt.Load(fpath)));

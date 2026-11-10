@@ -30,7 +30,11 @@ namespace TextSync
         static Color TitleColor { get { return Theme.Title; } }
         static Color RefOnlyRow { get { return Theme.RefOnly; } }
         static Color PropRow { get { return Theme.Prop; } }
-        ComboBox themeCombo;
+        // Inställningar som görs en gång (utseende, bildfrekvensfel, text för hörselskadade, formatering) ligger i dialogen Inställningar.
+        // Kryssrutorna fpsCheck, hiCheck och plainCheck finns kvar som bärare av valen och deras händelser, men visas inte i fönstret.
+        int themeIndex;                // 0 = som Windows, 1 = ljust, 2 = mörkt
+        Button settingsBtn;
+        Label optInfo;                 // vilka inställningar som avviker från det vanliga, så att de syns i huvudfönstret
         public const string BackupFolder = "Text Sync original";
         static readonly string Caption = "Text Sync " + Program.Version;
         readonly Stack<List<Cue>> undo = new Stack<List<Cue>>(); // för att ångra ändringar av rader
@@ -126,24 +130,17 @@ namespace TextSync
             var sub = new Label { Text = "Synka en undertext mot en annan undertext (annat språk) som redan går i takt med filmen.", AutoSize = true, Location = new Point(3, 36), ForeColor = Muted };
             var ver = new Label { Text = "version " + Program.Version, AutoSize = true, ForeColor = Muted, Location = new Point(title.PreferredWidth + 8, 14) };
             head.Controls.Add(title); head.Controls.Add(ver); head.Controls.Add(sub);
-            // utseende: som Windows, ljust eller mörkt (döljs i högkontrastläge, där Windows färger alltid används)
-            var themeRow = new FlowLayoutPanel { AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, WrapContents = false, Visible = !HC };
-            themeRow.Controls.Add(new Label { Text = "&Utseende:", AutoSize = true, Margin = new Padding(0, 6, 6, 0) });
-            themeCombo = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 150, Margin = new Padding(0, 2, 0, 0), AccessibleName = "Utseende" };
-            themeCombo.Items.AddRange(new object[] { "Som Windows", "Ljust", "Mörkt" });
+            // Inställningar längst upp till höger: utseende (som Windows, ljust, mörkt), bildfrekvensfel, text för hörselskadade, formatering
             string tm = Theme.Mode;
-            themeCombo.SelectedIndex = tm == Theme.Light ? 1 : tm == Theme.Dark_ ? 2 : 0;
-            themeCombo.SelectedIndexChanged += (s, e) =>
-            {
-                Theme.Mode = themeCombo.SelectedIndex == 1 ? Theme.Light : themeCombo.SelectedIndex == 2 ? Theme.Dark_ : Theme.Auto;
-                ApplyTheme();
-            };
-            themeRow.Controls.Add(themeCombo);
-            head.Controls.Add(themeRow);
+            themeIndex = tm == Theme.Light ? 1 : tm == Theme.Dark_ ? 2 : 0;
+            settingsBtn = MakeButton("&Inställningar…", false);
+            settingsBtn.AutoSize = true; settingsBtn.Margin = new Padding(0);
+            settingsBtn.Click += (s, e) => OpenSettings();
+            head.Controls.Add(settingsBtn);
             head.Layout += (s, e) =>
             {
                 ver.Left = title.Right + 6; ver.Top = title.Bottom - ver.Height - (int)(title.Height * 0.12);
-                themeRow.Left = head.ClientSize.Width - themeRow.Width; themeRow.Top = 2;
+                settingsBtn.Left = head.ClientSize.Width - settingsBtn.Width; settingsBtn.Top = 2;
             };
             KeyPreview = true;
             KeyDown += (s, e) =>
@@ -217,6 +214,8 @@ namespace TextSync
             tinfo.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
             tgtInfo.Anchor = AnchorStyles.Left; tgtInfo.Margin = new Padding(0);
             tinfo.Controls.Add(tgtInfo, 0, 0);
+            // en lång text ("… Rättat: kodade tecken på 14 rader, …") bryts på två rader i stället för att hamna under Teckenkodning
+            tinfo.SizeChanged += (s, e) => tgtInfo.MaximumSize = new Size(Math.Max(200, tinfo.ClientSize.Width - encCombo.Width - (int)(150 * DeviceDpi / 96f)), 0);
             tinfo.Controls.Add(new Label { Text = "&Teckenkodning:", AutoSize = true, Anchor = AnchorStyles.Right, Margin = new Padding(12, 0, 6, 0) }, 2, 0);
             tinfo.Controls.Add(encCombo, 3, 0);
             root.Controls.Add(MakeCard("2.  Undertext att synka (SRT som inte går i takt)", tgtBox, tgtBtn, tinfo), 0, 2);
@@ -231,13 +230,15 @@ namespace TextSync
                 "Avancerad – även klipp och reklampauser" });
             modeCombo.SelectedIndex = 0;
             opts.Controls.Add(modeCombo);
-            fpsCheck = new CheckBox { Text = "Upptäck bildfrekvensfel (25 ↔ 23,976 fps m.fl.)", Checked = true, AutoSize = true, Margin = new Padding(0, 8, 16, 0) };
-            opts.Controls.Add(fpsCheck);
+            // ikryssad från början, valet sparas till nästa gång (visas i dialogen Inställningar)
+            fpsCheck = new CheckBox { Text = "Upptäck bildfrekvensfel (25 ↔ 23,976 fps m.fl.)", Checked = Tools.GetSetting("fps", "1") == "1", AutoSize = true, Margin = new Padding(0, 8, 16, 0) };
+            fpsCheck.CheckedChanged += (s, e) => { Tools.SetSetting("fps", fpsCheck.Checked ? "1" : "0"); UpdateOptInfo(); };
             // text för hörselskadade: inte ikryssad från början, valet sparas till nästa gång
             hiCheck = new CheckBox { Text = "Ta bort text för hörselskadade ([MUSIK], (skrattar), talarnamn)", AutoSize = true, Margin = new Padding(0, 8, 16, 0), Checked = Tools.GetSetting("removehi", "0") == "1" };
             hiCheck.CheckedChanged += (s, e) =>
             {
                 Tools.SetSetting("removehi", hiCheck.Checked ? "1" : "0");
+                UpdateOptInfo();
                 if (hiQuiet || busy || result == null) return;
                 if (hiCheck.Checked)
                 {
@@ -252,9 +253,8 @@ namespace TextSync
                     }
                     else SetStatus(Sdh.Summary(0, 0), true);
                 }
-                else if (hiInfo != null && !hiInfo.StartsWith("Ingen")) SetStatus("Rutan gäller från nästa synk. Synka igen för att få tillbaka texten som togs bort.", false);
+                else if (hiInfo != null && !hiInfo.StartsWith("Ingen")) SetStatus("Inställningen gäller från nästa synk. Synka igen för att få tillbaka texten som togs bort.", false);
             };
-            opts.Controls.Add(hiCheck);
             // formatering: <i>, <b>, <u>, <s>, <font> och {\an8}. Inte ikryssad från början, valet sparas till nästa gång.
             // Rutan ändrar inte result.Output, utan bara det som visas, spelas upp och sparas (se RefreshPreview).
             // Därför kommer formateringen tillbaka när rutan kryssas ur.
@@ -262,15 +262,15 @@ namespace TextSync
             plainCheck.CheckedChanged += (s, e) =>
             {
                 Tools.SetSetting("striptags", plainCheck.Checked ? "1" : "0");
+                UpdateOptInfo();
                 if (busy || result == null) return;
                 int before = plainCount;
                 RefreshPreview();
                 if (before != plainCount) { unsaved = true; openLink.Visible = false; }   // bara om texten som sparas ändrades
-                if (plainCheck.Checked) SetStatus(plainCount == 0 ? "Texten har ingen formatering att ta bort." : "Formatering borttagen på " + plainCount + (plainCount == 1 ? " rad" : " rader") + ". Kryssa ur rutan för att få tillbaka den.", plainCount == 0);
+                if (plainCheck.Checked) SetStatus(plainCount == 0 ? "Texten har ingen formatering att ta bort." : "Formatering borttagen på " + plainCount + (plainCount == 1 ? " rad" : " rader") + ". Kryssa ur rutan i Inställningar för att få tillbaka den.", plainCount == 0);
                 else SetStatus("Formateringen är tillbaka.", false);
                 Log.Info("Ta bort formatering: " + (plainCheck.Checked ? "på, " + plainCount + " rader" : "av"));
             };
-            opts.Controls.Add(plainCheck);
 
             syncBtn = MakeButton("&Synka", true);
             syncBtn.Width = 120; syncBtn.Height = 34; syncBtn.Margin = new Padding(0, 2, 12, 0);
@@ -289,11 +289,17 @@ namespace TextSync
             undoLink = new LinkLabel { Text = "Ångra", AutoSize = true, Margin = new Padding(0, 9, 0, 0), Visible = false, LinkColor = Accent };
             undoLink.LinkClicked += (s, e) => UndoChange();
             opts.Controls.Add(undoLink);
+            // på en egen rad under: inställningar som avviker från det vanliga, så att de inte glöms bort i dialogen
+            optInfo = new Label { AutoSize = true, ForeColor = Muted, Margin = new Padding(0, 0, 0, 4), Visible = false };
             // efter synk mot ljudet: spara det Whisper hörde, eller originaltexten (t.ex. engelska) som synkades mot ljudet
             saveTextBtn = new LinkLabel { Text = "Spara igenkänd text…", AutoSize = true, Margin = new Padding(12, 9, 0, 0), Visible = false, LinkColor = Accent };
             saveTextBtn.LinkClicked += (s, e) => { if (!busy) SaveTranscript(); };
             opts.Controls.Add(saveTextBtn);
-            root.Controls.Add(opts, 0, 3);
+            var optWrap = new TableLayoutPanel { AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, Dock = DockStyle.Top, ColumnCount = 1, RowCount = 2, Margin = new Padding(0) };
+            optWrap.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            optWrap.RowStyles.Add(new RowStyle(SizeType.AutoSize)); optWrap.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            optWrap.Controls.Add(opts, 0, 0); optWrap.Controls.Add(optInfo, 0, 1);
+            root.Controls.Add(optWrap, 0, 3);
 
             // --- resultat
             // överst beskedet (Bra / Kontrollera / Osäkert) med länkar till svaga ställen, under det detaljerna
@@ -561,6 +567,7 @@ namespace TextSync
             brow.Controls.Add(helpLink, ctrls.Count + 1, 0);
             root.Controls.Add(brow, 0, 6);
 
+            UpdateOptInfo();
             Theme.Apply(this, null);
             Theme.ApplyMenu(list.ContextMenuStrip);
             // "Som Windows": följ med när mörkt läge slås på eller av i Windows
@@ -585,6 +592,38 @@ namespace TextSync
         {
             SystemEvents.UserPreferenceChanged -= OnUserPreferenceChanged;
             base.OnFormClosed(e);
+        }
+
+        // Dialogen Inställningar. Valen läggs i de dolda kryssrutorna, vars händelser sparar dem och ändrar texten direkt
+        // (text för hörselskadade som en ändring som går att ångra, formatering utan att texten i minnet ändras).
+        void OpenSettings()
+        {
+            if (busy) return;
+            using (var d = new SettingsDialog(themeIndex, !HC, fpsCheck.Checked, hiCheck.Checked, plainCheck.Checked))
+            {
+                if (d.ShowDialog(this) != DialogResult.OK) return;
+                if (d.ThemeIndex != themeIndex)
+                {
+                    themeIndex = d.ThemeIndex;
+                    Theme.Mode = themeIndex == 1 ? Theme.Light : themeIndex == 2 ? Theme.Dark_ : Theme.Auto;
+                    ApplyTheme();
+                }
+                fpsCheck.Checked = d.DetectFps;
+                hiCheck.Checked = d.RemoveHi;
+                plainCheck.Checked = d.StripFormatting;
+            }
+        }
+
+        // "Inställningar: text för hörselskadade tas bort · formatering tas bort". Tomt (dolt) när allt är som vanligt.
+        void UpdateOptInfo()
+        {
+            if (optInfo == null || fpsCheck == null || hiCheck == null || plainCheck == null) return;
+            var parts = new List<string>();
+            if (hiCheck.Checked) parts.Add("text för hörselskadade tas bort");
+            if (plainCheck.Checked) parts.Add("kursiv och annan formatering tas bort");
+            if (!fpsCheck.Checked) parts.Add("bildfrekvensfel upptäcks inte");
+            optInfo.Text = parts.Count == 0 ? "" : "Inställningar: " + string.Join("  ·  ", parts);
+            optInfo.Visible = parts.Count > 0;
         }
 
         // Byt mellan ljust och mörkt medan programmet körs
@@ -806,7 +845,7 @@ namespace TextSync
             syncBtn.Enabled = !busy && haveRef && tgtCues != null;
             saveBtn.Enabled = !busy && synced != null;
             muxBtn.Enabled = !busy && synced != null;
-            foreach (Control c in new Control[] { refBox, tgtBox, refBtn, tgtBtn, trackCombo, modeCombo, fpsCheck, hiCheck, plainCheck, extraNum, langBox, encCombo, gpuCombo, audioCombo, origLink })
+            foreach (Control c in new Control[] { refBox, tgtBox, refBtn, tgtBtn, trackCombo, modeCombo, settingsBtn, extraNum, langBox, encCombo, gpuCombo, audioCombo, origLink })
                 if (c != null) c.Enabled = !busy;
             gpuCombo.Enabled = !busy && !gpuPending;
         }
@@ -851,13 +890,14 @@ namespace TextSync
                 "Klicka på ▶ på en rad (eller tryck P) för att spela filmen 5 sekunder före och efter raden, med texten ovanpå. Esc stänger filmfönstret.\n\n" +
                 "Har filmen ingen engelsk text men du har en engelsk SRT som inte går i takt: klicka \"Lägg till undertext på filmens originalspråk\" " +
                 "(eller dra in filmen och båda SRT-filerna). Den engelska synkas då mot filmens ljud och kontrolleras med Whisper, och sedan synkas den svenska mot den.\n\n" +
-                "Rutan \"Ta bort text för hörselskadade\" tar bort [MUSIK], (skrattar) och talarnamn som JOHN: ur texten. Resultatet säger hur många rader som togs bort.\n\n" +
+                "Inställningar (knappen längst upp till höger): \"Ta bort text för hörselskadade\" tar bort [MUSIK], (skrattar) och talarnamn som JOHN: ur texten. Resultatet säger hur många rader som togs bort. " +
+                "Där väljer du också ljust eller mörkt utseende.\n\n" +
                 "Kodade tecken som &amp; i texten görs alltid om till riktiga tecken (&), och trasig formatering som <i> utan avslut lagas. Sådana rader är märkta ✎ i listan: håll muspekaren över raden för att se vad som stod i filen. " +
-                "Visar din TV <i> som text? Kryssa i \"Ta bort kursiv och annan formatering\". Kryssar du ur rutan kommer formateringen tillbaka.\n\n" +
+                "Visar din TV <i> som text? Kryssa i \"Ta bort kursiv och annan formatering\" i Inställningar. Kryssar du ur rutan kommer formateringen tillbaka.\n\n" +
                 "Tips: dra in båda filerna samtidigt. Rödmarkerade rader saknar engelsk text samtidigt – ofta helt i sin ordning (t.ex. utrop).\n" +
                 "Kryssa i \"Föreslå radindelning som referensen\" så föreslår programmet att dela eller slå ihop rader som de engelska (blå, \"Dela?\"/\"Ihop?\") – högerklicka för att godkänna. " +
                 "Under varje förslag står hur raden blir om du godkänner det (→ blir). " +
-                "Visa ovanför listan döljer grå rader eller visar bara röda eller blå. Sök (Ctrl+F) letar i texten, Enter hoppar till nästa träff. Utseende längst upp väljer ljust eller mörkt.\n\n" +
+                "Visa ovanför listan döljer grå rader eller visar bara röda eller blå. Sök (Ctrl+F) letar i texten, Enter hoppar till nästa träff.\n\n" +
                 "Verktygen för synk mot ljudet (0,6–1,4 GB) ligger i mappen tools i " + Log.Dir + ". Mappen kan tas bort när Text Sync är stängt, och verktygen hämtas igen vid behov.\n\n" +
                 "Text Sync " + Program.Version + " · MIT-licens\n" +
                 "Loggfil (för felsökning): " + Log.FilePath + "\n\n" +

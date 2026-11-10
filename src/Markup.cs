@@ -288,8 +288,8 @@ namespace TextSync
             return res;
         }
 
-        // Besked efter inläsningen, t.ex. "Rättat: kodade tecken (t.ex. &amp;) på 14 rader, trasig formatering (t.ex. <i> utan avslut) på 3 rader."
-        // Tomt om inget rättades. Visas i en Label: den måste ha UseMnemonic = false, annars blir "&a" ett understruket a.
+        // Besked efter inläsningen, t.ex. "Rättat: kodade tecken på 14 rader, formatering på 3 rader. 2 rader utan text borttagna."
+        // Tomt om inget rättades. Kort, eftersom det delar rad med Teckenkodning. Vad som ändrades syns på raderna märkta ✎ i listan.
         public static string Summary(int entities, int tags) { return Summary(entities, tags, 0); }
 
         public static string Summary(int entities, int tags, int removed)
@@ -302,8 +302,8 @@ namespace TextSync
         static string Summary2(int entities, int tags)
         {
             var parts = new List<string>();
-            if (entities > 0) parts.Add("kodade tecken (t.ex. &amp;) på " + entities + (entities == 1 ? " rad" : " rader"));
-            if (tags > 0) parts.Add("trasig formatering (t.ex. <i> utan avslut) på " + tags + (tags == 1 ? " rad" : " rader"));
+            if (entities > 0) parts.Add("kodade tecken på " + entities + (entities == 1 ? " rad" : " rader"));
+            if (tags > 0) parts.Add("formatering på " + tags + (tags == 1 ? " rad" : " rader"));
             return parts.Count == 0 ? "" : "Rättat: " + string.Join(", ", parts) + ".";
         }
     }

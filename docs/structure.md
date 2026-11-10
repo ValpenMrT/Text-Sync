@@ -16,6 +16,7 @@ src/
   MainForm.Save.cs   Spara SRT med säkerhetskopia, lägga in i MKV
   MainForm.Play.cs   Spela upp filmen runt en rad med ffplay (▶ i listan), med de synkade raderna ovanpå
   Timeline.cs      Tidslinjen under listan (TimelinePanel)
+  SettingsDialog.cs Dialogen Inställningar: utseende, bildfrekvensfel, text för hörselskadade, formatering
   CueDialog.cs     Dialog för att ändra eller lägga till en rad (start, slut, text)
   Align.cs         Förslag om att slå ihop (2↔1) eller dela (1↔2) rader efter referensens radindelning (dynamisk programmering på tider)
   Theme.cs         Ljust/mörkt läge: paletter, färgbyte på kontrollerna, mörka Windows-delar (rullister, rubriker, titelrad)

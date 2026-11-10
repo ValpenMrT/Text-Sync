@@ -41,11 +41,11 @@ namespace TextSync
                 if (tgt.Count < 5)
                 {
                     MessageBox.Show(this, "Nästan allt i texten ser ut som text för hörselskadade (" + (tgtCues.Count - tgt.Count) + " av " + tgtCues.Count + " rader skulle tas bort).\n\n" +
-                        "Kryssa ur rutan \"Ta bort text för hörselskadade\" och synka igen.", Caption, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        "Kryssa ur \"Ta bort text för hörselskadade\" i Inställningar och synka igen.", Caption, MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return;
                 }
                 // rensningen före synken går inte att ångra med Ctrl+Z: säg hur man får tillbaka texten
-                hiInfo = ch + rm == 0 ? Sdh.Summary(0, 0) : Sdh.Summary(ch, rm) + " Kryssa ur rutan och synka igen för att få tillbaka den.";
+                hiInfo = ch + rm == 0 ? Sdh.Summary(0, 0) : Sdh.Summary(ch, rm) + " Kryssa ur rutan i Inställningar och synka igen för att få tillbaka den.";
                 hiUndoDepth = 0;
                 Log.Info("Text för hörselskadade: " + ch + " rader ändrade, " + rm + " borttagna av " + tgtCues.Count);
             }
@@ -242,7 +242,7 @@ namespace TextSync
             }
             if (r.FpsText.Length > 0) sb.Append(r.FpsText + "\n");
             if (hiInfo != null) sb.Append(hiInfo + "\n");
-            if (plainCheck.Checked && plainCount > 0) sb.Append("Kursiv och annan formatering borttagen på " + plainCount + (plainCount == 1 ? " rad" : " rader") + ". Kryssa ur rutan för att få tillbaka den.\n");
+            if (plainCheck.Checked && plainCount > 0) sb.Append("Kursiv och annan formatering borttagen på " + plainCount + (plainCount == 1 ? " rad" : " rader") + ". Kryssa ur rutan i Inställningar för att få tillbaka den.\n");
             int fixedRows = r.Output.Count(c => c.Raw != null);
             if (fixedRows > 0) sb.Append((fixedRows == 1 ? "1 rad rättades" : fixedRows + " rader rättades") + " vid inläsningen (märkta ✎ i listan). Håll muspekaren över en sådan rad för att se vad som stod i filen, eller välj Bara rättade rader i Visa.\n");
             foreach (var n in r.Notes) sb.Append("⚠  " + n + "\n");

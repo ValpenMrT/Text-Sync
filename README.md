@@ -54,10 +54,6 @@ Från genomgången av projektstrukturen 2026-11-09:
 
 1. Ska en `.gitattributes` läggas till för enhetliga radslut? `src/Mkv.cs` har blandade radslut. Förslag: ja. (Ägaren svarar senare, 2026-11-10.)
 
-Från arbetet med kodade tecken och taggar 2026-11-10:
-
-2. Ska inställningarna flyttas till en egen ruta "Inställningar…"? Raden under fält 2 har nu tre kryssrutor och bryts på två rader. Förslag: ja, för val som görs en gång (Utseende, text för hörselskadade, formatering, bildfrekvensfel). Metod och Synka står kvar i huvudfönstret.
-
 ### Dokumentation
 
 | Fil | Innehåll |

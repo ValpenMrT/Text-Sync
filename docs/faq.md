@@ -35,7 +35,7 @@ Programmet föreslår bara det som går att göra säkert:
 Det är vanligt med många delningar men få sammanslagningar, eftersom svensk text ofta slår ihop två engelska repliker.
 
 **Kan programmet vara mörkt?**
-Ja. Välj **Utseende** längst upp till höger: **Som Windows** (förvalt), **Ljust** eller **Mörkt**. Som Windows följer inställningen *Välj appläge* under Inställningar → Anpassning → Färger och byter direkt när du ändrar den. Meddelanderutor (till exempel Hjälp) är alltid ljusa, eftersom Windows ritar dem. Med högkontrast i Windows används alltid Windows färger.
+Ja. Klicka **Inställningar…** längst upp till höger och välj **Utseende**: **Som Windows** (förvalt), **Ljust** eller **Mörkt**. Som Windows följer inställningen *Välj appläge* under Inställningar → Anpassning → Färger och byter direkt när du ändrar den. Meddelanderutor (till exempel Hjälp) är alltid ljusa, eftersom Windows ritar dem. Med högkontrast i Windows används alltid Windows färger.
 
 **Hur vet jag om synken blev bra?**
 Efter synken står ett besked ovanför listan:
@@ -56,7 +56,8 @@ Ja. Klicka på **▶** längst till vänster på en rad i listan (eller markera 
 Filnamnen pekar på olika avsnitt, till exempel S04E02 i textens namn och S04E01 i filmens, eller så är texterna mycket olika långa. Kontrollera att du har valt rätt filer. Är du säker klickar du **Synka ändå**.
 
 **Texten har [MUSIK], (skrattar) och namn som JOHN: före replikerna. Kan de tas bort?**
-Ja. Kryssa i **Ta bort text för hörselskadade** bredvid Metod. Då tas ljudbeskrivningar inom [hakparenteser] och (parenteser), rader med bara ♪ och talarnamn i versaler bort. Vanlig text i parentes mitt i en mening, till exempel "Han (min bror) kom hem", står kvar, och det gör sångtexter också. Rader utan sådant innehåll ändras inte alls. Namn skrivna med små bokstäver ("John:") tas inte bort.
+Ja. Klicka **Inställningar…** längst upp till höger och kryssa i **Ta bort text för hörselskadade**. Då tas ljudbeskrivningar inom [hakparenteser] och (parenteser), rader med bara ♪ och talarnamn i versaler bort. Vanlig text i parentes mitt i en mening, till exempel "Han (min bror) kom hem", står kvar, och det gör sångtexter också. Rader utan sådant innehåll ändras inte alls. Namn skrivna med små bokstäver ("John:") tas inte bort.
+- Under Metod står det vilka inställningar som är på, till exempel "Inställningar: text för hörselskadade tas bort".
 - Kryssar du i rutan före synken tas texten bort innan synken. Det hjälper också synken mot filmens ljud. Resultatet säger hur många rader som ändrades och togs bort. Vill du ha tillbaka dem kryssar du ur rutan och synkar igen.
 - Kryssar du i den efter synken rensas den synkade texten direkt. Statusraden säger hur många rader som ändrades och togs bort, och **Ctrl+Z** ångrar (rutan kryssas då ur igen).
 - Originalfilen ändras inte förrän du sparar, och då sparas en kopia av originalet. Valet gäller tills du kryssar ur rutan, även nästa gång du startar programmet.
@@ -68,7 +69,7 @@ Det är tecken som har kodats för webben och blivit kvar i filen. Text Sync gö
 Raden rättades när filen lästes in: kodade tecken gjordes om till riktiga tecken, trasig formatering lagades, eller koder från webbsidor och andra undertextformat (`<br>`, `<p>`, `\N`, `{\i1}`) gjordes om till radbrytningar och vanlig kursiv. Håll muspekaren över raden för att se vad som stod i filen. Välj **Bara rättade rader** i **Visa** ovanför listan för att se alla sådana rader. Rader där ingen text blev kvar, till exempel en rad med bara `<i></i>`, tas bort helt och sparas inte.
 
 **Min TV visar &lt;i&gt; och &lt;/i&gt; som text.**
-Det är taggar för kursiv stil. De flesta spelare på datorn (VLC, Plex, Kodi) visar texten kursiv, men en del TV-apparater visar taggarna som de står. Kryssa i **Ta bort kursiv och annan formatering** bredvid Metod. Då tas kursiv, fetstil, understruken och genomstruken text, färger och typsnitt bort, liksom koder som `{\an8}` (text överst i bilden). Själva texten står kvar.
+Det är taggar för kursiv stil. De flesta spelare på datorn (VLC, Plex, Kodi) visar texten kursiv, men en del TV-apparater visar taggarna som de står. Klicka **Inställningar…** längst upp till höger och kryssa i **Ta bort kursiv och annan formatering**. Då tas kursiv, fetstil, understruken och genomstruken text, färger och typsnitt bort, liksom koder som `{\an8}` (text överst i bilden). Själva texten står kvar.
 - Rutan gäller det som visas i listan, spelas upp och sparas. Kryssar du ur den kommer formateringen tillbaka, så du kan prova utan risk.
 - Ändrar du texten på en rad för hand, eller slår ihop eller delar rader via ett förslag, medan rutan är ikryssad får de raderna inte tillbaka formateringen när du kryssar ur den. Ändrar du bara tiden behålls den.
 - Är rutan inte ikryssad behålls formateringen. Trasig formatering lagas alltid vid inläsningen, till exempel en kursiv som aldrig avslutas. Raden under fält 2 säger hur många rader som lagades.
