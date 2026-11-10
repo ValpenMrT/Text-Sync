@@ -2,6 +2,27 @@
 
 Nyast först.
 
+## 2026-11-10 – Två oberoende granskningar av ombyggnaden: orsaken till skalningsfelet och rättningar
+- **Område:** GUI
+- **Bakgrund:** ägaren bad om hjälp av subagenter. En granskade layoutkoden och en granskade ändringen som en icke-teknisk användare. Ingen hittade något blockerande.
+- **Orsaken till dubbelskalningen är hittad och rättad.** Skalningen (`AutoScaleDimensions`, `AutoScaleMode`) slogs på överst i konstruktorn. Då skalades varje delträd direkt när det lades till, och en kontroll som fick ny höjd däremellan skalades en gång till. Därför fick rubriken i ruta 1 (lång text, ny höjd) marginalen 24 i stället för 12, men inte ruta 2. Skalningen slås nu på sist i konstruktorn, så att allt skalas exakt en gång. Följd vid 200 %: beskedet under filnamnet i ruta 1, raden med Synka och rutorna längst ner har nu samma luft som vid 100 % (de var för stora förut). Knappen Inställningar… har fått fast bredd, eftersom den med AutoSize blev dubbelt så stor.
+- **Rättat efter granskningen av koden:**
+  - Avbryt kunde fastna som "Avbryter…" under hela Lägg in i MKV, om man klickade innan mkvmerge hade startat. Processen stoppas nu även då.
+  - Högerklick och mittenklick i ruta 1 och 2 öppnade Välj fil. Nu gör bara vänsterklick det.
+  - Rutan kunde lysa kvar efter att Välj fil stängdes. Den släcks nu.
+- **Rättat efter granskningen av upplevelsen:**
+  - En egen siffra visar när text för hörselskadade eller formatering har tagits bort ("Text för hörselskadade borttagen"), med hela beskedet i tipsrutan. Förut stod det bara under Detaljer.
+  - "8 avsnitt" heter "Flyttad olika mycket i 8 delar", så att det inte läses som avsnitt av en tv-serie.
+  - Procentsiffran har en tipsruta: vad som är normalt, och att de röda raderna bör granskas under 95 %.
+  - Hjälpen (`ShowHelp`) nämner Detaljer och Avbryt.
+  - "Fält 1/2" heter "ruta 1/2" i felmeddelanden och FAQ.
+  - Spara SRT… har Alt+P. Förut delade den Alt+S med Synka.
+  - Skärmläsare: Bläddra… och filnamnet säger vilken ruta det gäller och vilken fil som är vald, med hela sökvägen.
+- **Test:** 121 av 121 kontroller. Skärmbilder med formuläret i samma process, i 200 % (ägarens maximerade fönster, 3840 × 2259) och i 100 % (1280 × 900): efter synk, Detaljer öppet, knappen som Avbryt.
+- **Ej provat:** 125 % och 150 %, högkontrast, riktiga klick och dra-och-släpp, Avbryt under ett riktigt MKV-arbete, och de nya tipsrutorna.
+- **Kvar, se `docs/next.md`:** frågor till ägaren (fråga innan osparade ändringar kastas, Detaljer öppet första gången, var Avbryt sitter vid Lägg in i MKV) och mindre fynd.
+- **Nivå:** LIVE
+
 ## 2026-11-10 – Rättat: ruta 1 och 2 fyllde hela fönstret vid 200 % skalning
 - **Område:** GUI
 - **Fel (ägaren):** "när man startar programmet så tar val av fil upp hela rutan". På ägarens skärm (3840 × 2400, 200 % skalning, fönstret maximerat) blev ruta 1 och 2 nästan 5 000 bildpunkter höga, så att resten av fönstret hamnade utanför. Felet kom med ombyggnaden samma dag och syntes inte vid 100 % skalning, som skärmbilderna då togs i.
@@ -12,7 +33,7 @@ Nyast först.
 - **Kvar att veta:** i det minsta fönstret (940 × 600 vid 100 %, alltså hela skärmen på en bärbar dator med 1920 × 1200 och 200 % skalning) syns nästan ingenting av listan efter en synk: rubrik, rutor, resultat, tidslinje och spara-rad tar hela höjden. Det var så även före ombyggnaden. Förslag i `docs/next.md`.
 - **Ej provat:** 125 % och 150 % skalning, och att flytta fönstret mellan skärmar med olika skalning.
 - **Lärdom för test:** skärmbilder av fönstret ska tas med `SetProcessDPIAware` anropat först, annars körs testet i 100 % oavsett skärm.
-- **Product-check:** två oberoende granskningar (layoutkoden och användarens upplevelse) startades samtidigt. Deras fynd förs in i nästa post.
+- **Product-check:** två oberoende granskningar (layoutkoden och användarens upplevelse) startades samtidigt. Deras fynd står i posten ovanför.
 - **Nivå:** LIVE
 
 ## 2026-11-10 – Kompakt resultatruta, Synka blir Avbryt, ruta 1 och 2 bredvid varandra

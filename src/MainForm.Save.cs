@@ -213,6 +213,8 @@ namespace TextSync
                     using (var p = Process.Start(psi))
                     {
                         muxProc = p;
+                        // Avbryt klickades innan mkvmerge hade startat: då fanns ingen process att stoppa, så den stoppas här
+                        if (token.IsCancellationRequested) { try { p.Kill(); } catch { } }
                         string line;
                         while ((line = p.StandardOutput.ReadLine()) != null)
                         {

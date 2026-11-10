@@ -60,7 +60,7 @@ namespace TextSync
         QualityResult quality; List<int> weakStops = new List<int>(); bool[] cueWeak;
         Label verdictLabel; LinkLabel prevWeakLink, nextWeakLink; TableLayoutPanel resBox;
         // resultatrutan: beskedet på en rad, siffrorna på nästa (chip*), varningar (notesLabel) och resten under Detaljer
-        Label summaryLabel, notesLabel, chipPct, chipRed, chipProp, chipGrey, chipFixed, chipSeg;
+        Label summaryLabel, notesLabel, chipPct, chipRed, chipProp, chipGrey, chipFixed, chipSeg, chipHi;
         FlowLayoutPanel chips; TableLayoutPanel detailsPanel; Panel detailsSep; Button detailsBtn;
         Label[] detailHead, detailBody;
         static readonly int[] DetailPct = { 36, 40, 24 };   // kolumnernas bredd under Detaljer
@@ -109,8 +109,6 @@ namespace TextSync
         public MainForm()
         {
             SuspendLayout();
-            AutoScaleDimensions = new SizeF(96F, 96F);
-            AutoScaleMode = AutoScaleMode.Dpi;
             Text = "Text Sync " + Program.Version;
             Font = new Font("Segoe UI", 9.5F);
             Theme.Set(Theme.WantDark(Theme.Mode));
@@ -144,7 +142,7 @@ namespace TextSync
             string tm = Theme.Mode;
             themeIndex = tm == Theme.Light ? 1 : tm == Theme.Dark_ ? 2 : 0;
             settingsBtn = MakeButton("&Inställningar…", false);
-            settingsBtn.AutoSize = true; settingsBtn.Margin = new Padding(0);
+            settingsBtn.Width = 130; settingsBtn.Margin = new Padding(0);   // fast bredd: med AutoSize blev knappen dubbelt så stor vid 200 % skalning
             settingsBtn.Click += (s, e) => OpenSettings();
             head.Controls.Add(settingsBtn);
             head.Layout += (s, e) =>
@@ -339,7 +337,7 @@ namespace TextSync
             vrow.Controls.Add(verdictLabel, 0, 0); vrow.Controls.Add(summaryLabel, 1, 0); vrow.Controls.Add(prevWeakLink, 2, 0); vrow.Controls.Add(nextWeakLink, 3, 0); vrow.Controls.Add(detailsBtn, 4, 0);
 
             chipPct = MakeChip(null, 80); chipRed = MakeChip(() => RedRow, 15); chipProp = MakeChip(() => PropRow, 15); chipGrey = MakeChip(() => RefOnlyRow, 15);
-            chipFixed = MakeChip(null, 0); chipSeg = MakeChip(null, 0);
+            chipFixed = MakeChip(null, 0); chipSeg = MakeChip(null, 0); chipHi = MakeChip(null, 0);
             // stapeln framför procenttalet: röd under gränsen (95 %), annars grön
             chipPct.Paint += (s, e) =>
             {
@@ -351,7 +349,7 @@ namespace TextSync
             tips.SetToolTip(chipGrey, "Grå rader finns bara i referensen och sparas inte.");
             tips.SetToolTip(chipFixed, "Rader märkta ✎ rättades vid inläsningen. Håll muspekaren över raden för att se vad som stod i filen.");
             chips = new FlowLayoutPanel { AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, Dock = DockStyle.Top, WrapContents = true, Margin = new Padding(10, 6, 10, 6) };
-            chips.Controls.AddRange(new Control[] { chipPct, chipRed, chipProp, chipGrey, chipFixed, chipSeg });
+            chips.Controls.AddRange(new Control[] { chipPct, chipRed, chipProp, chipGrey, chipFixed, chipSeg, chipHi });
             FitFlowHeight(chips);
             notesLabel = new Label { Anchor = AnchorStyles.Left | AnchorStyles.Right, UseMnemonic = false, ForeColor = Theme.Warn, Margin = new Padding(10, 0, 10, 6), Visible = false };
             FitLabelHeight(notesLabel);
@@ -608,7 +606,7 @@ namespace TextSync
             ctrls.Add(new Label { Text = "Språkkod:", AutoSize = true, Margin = new Padding(0, 0, 6, 0) });
             langBox = new TextBox { Text = "sv", Width = 50, Margin = new Padding(0, 0, 20, 0) };
             ctrls.Add(langBox);
-            saveBtn = MakeButton("&Spara SRT…", true); saveBtn.Enabled = false; saveBtn.Width = 130; saveBtn.Height = 34; saveBtn.Margin = new Padding(0, 0, 6, 0);
+            saveBtn = MakeButton("S&para SRT…", true); saveBtn.Enabled = false; saveBtn.Width = 130; saveBtn.Height = 34; saveBtn.Margin = new Padding(0, 0, 6, 0);
             saveBtn.Click += (s, e) => SaveSrt();
             ctrls.Add(saveBtn);
             muxBtn = MakeButton("Lägg in i &MKV…", false); muxBtn.Enabled = false; muxBtn.Width = 140; muxBtn.Height = 34;
@@ -634,6 +632,10 @@ namespace TextSync
             Theme.ApplyMenu(list.ContextMenuStrip);
             // "Som Windows": följ med när mörkt läge slås på eller av i Windows
             SystemEvents.UserPreferenceChanged += OnUserPreferenceChanged;
+            // Skalningen (t.ex. 200 %) slås på först här, när alla delar finns. Sätts den överst i konstruktorn skalas ett delträd
+            // varje gång det läggs till, och en kontroll som har fått ny höjd däremellan skalas en gång till (marginaler blev 24 i stället för 12).
+            AutoScaleDimensions = new SizeF(96F, 96F);
+            AutoScaleMode = AutoScaleMode.Dpi;
             ResumeLayout(true);
         }
 
@@ -786,7 +788,8 @@ namespace TextSync
             foreach (var c in parts)
             {
                 c.Cursor = Cursors.Hand;
-                c.Click += (s, e) => { if (!busy) browse(); };
+                // bara vänsterklick (Click kommer för alla musknappar). Markeringen släcks efteråt: pekaren står kvar över rutan när dialogen stängs.
+                c.MouseClick += (s, e) => { if (e.Button != MouseButtons.Left || busy) return; browse(); hot(false); };
                 c.MouseEnter += (s, e) => hot(!busy);
                 c.MouseLeave += leave;
             }
@@ -810,6 +813,10 @@ namespace TextSync
             name.Text = has ? file : "Ingen fil vald";
             name.ForeColor = has ? Theme.Fg : Muted;
             tips.SetToolTip(name, has ? path : null);
+            // skärmläsare: båda knapparna heter Bläddra…, så namnet säger vilken ruta det är och vilken fil som är vald
+            var btn = name == refName ? refBtn : tgtBtn;
+            string what = name == refName ? "Välj referens" : "Välj undertext att synka";
+            name.AccessibleName = btn.AccessibleName = what + (has ? ". Vald fil: " + path : ". Ingen fil vald");
         }
 
         // Rader under den klickbara delen av en ruta: namn till vänster, lista som fyller resten
@@ -989,7 +996,7 @@ namespace TextSync
                     else
                     {
                         ti = 1;
-                        note = "Kontrollera fälten: språket gick inte att se på filnamnen, så \"" + Path.GetFileName(two[0]) + "\" blev referens.";
+                        note = "Kontrollera rutorna: språket gick inte att se på filnamnen, så \"" + Path.GetFileName(two[0]) + "\" blev referens.";
                     }
                 }
                 refFile = two[1 - ti];
@@ -1006,7 +1013,7 @@ namespace TextSync
                     else
                     {
                         ti = 1;
-                        note = "Kontrollera fälten: språket gick inte att se på filnamnen, så \"" + Path.GetFileName(two[0]) + "\" blev originaltext.";
+                        note = "Kontrollera rutorna: språket gick inte att se på filnamnen, så \"" + Path.GetFileName(two[0]) + "\" blev originaltext.";
                     }
                 }
                 targetFile = two[ti];
@@ -1021,7 +1028,7 @@ namespace TextSync
         {
             if (busy || files == null || files.Length == 0) return;
             string rf, tf, of, note;
-            // filmen ligger redan i fält 1 och bara SRT-filer dras in: behåll filmen, den andra SRT:n blir originaltext
+            // filmen ligger redan i ruta 1 och bara SRT-filer dras in: behåll filmen, den andra SRT:n blir originaltext
             bool keepFilm = mkvPath != null && !files.Any(f => IsMkv(f) || Audio.IsVideo(f)) && files.Count(IsSrt) >= 2;
             PlanRoute(keepFilm ? new[] { mkvPath }.Concat(files).ToArray() : files, langBox.Text.Trim(), out rf, out tf, out of, out note);
             if (rf != null && !keepFilm) LoadReference(rf);
@@ -1136,7 +1143,7 @@ namespace TextSync
                 "Så här gör du:\n" +
                 "1. Referens: välj filmen (MKV) – eller en SRT som redan går i takt. Klicka i rutan eller dra in filen.\n" +
                 "2. Välj undertexten som inte går i takt.\n" +
-                "3. Klicka Synka. Beskedet ovanför listan säger om synken blev bra. Står det \"Kontrollera\" hoppar du mellan ställena med länkarna bredvid (märkta ⚠ i listan).\n" +
+                "3. Klicka Synka. Medan programmet arbetar är samma knapp Avbryt. Beskedet ovanför listan säger om synken blev bra, och Detaljer bredvid visar förskjutningen, vad färgerna i listan betyder och hur du ändrar rader. Står det \"Kontrollera\" hoppar du mellan ställena med länkarna bredvid (märkta ⚠ i listan).\n" +
                 "4. Spara SRT: sparas som Filmnamn.sv.srt bredvid filmen, så hittar spelaren den.\n\n" +
                 "Klicka på ▶ på en rad (eller tryck P) för att spela filmen 5 sekunder före och efter raden, med texten ovanpå. Esc stänger filmfönstret.\n\n" +
                 "Har filmen ingen engelsk text men du har en engelsk SRT som inte går i takt: klicka \"Lägg till undertext på filmens originalspråk\" " +

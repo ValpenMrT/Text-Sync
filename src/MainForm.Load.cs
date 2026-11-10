@@ -135,7 +135,7 @@ namespace TextSync
             try
             {
                 if (IsMkv(path) || Audio.IsVideo(path) || !LooksLikeText(path)) throw new InvalidDataException("Det måste vara en undertext (SRT).");
-                if (SamePath(path, tgtLoadedPath)) throw new InvalidDataException("Det är samma fil som undertexten som ska synkas i fält 2. Välj undertexten på filmens originalspråk (t.ex. engelska).");
+                if (SamePath(path, tgtLoadedPath)) throw new InvalidDataException("Det är samma fil som undertexten som ska synkas i ruta 2. Välj undertexten på filmens originalspråk (t.ex. engelska).");
                 cues = Markup.FixAll(Srt.Load(path));   // originaltexten kan också sparas, så den rättas på samma sätt
                 if (cues.Count < 5) throw new InvalidDataException("Hittade nästan inga repliker (" + cues.Count + ") – är det en SRT-fil?");
             }
@@ -173,7 +173,7 @@ namespace TextSync
             if (path.Length == 0) { tgtInfo.Text = ""; return; }
             try
             {
-                if (IsMkv(path) || Audio.IsVideo(path)) throw new InvalidDataException("Här ska undertexten (SRT) som ska synkas ligga. Lägg filmen i fält 1.");
+                if (IsMkv(path) || Audio.IsVideo(path)) throw new InvalidDataException("Här ska undertexten (SRT) som ska synkas ligga. Lägg filmen i ruta 1.");
                 // kodade tecken (&amp;) och trasiga taggar rättas alltid, redan vid inläsningen
                 int fixedEnt, fixedTags, fixedGone;
                 tgtCues = Markup.FixAll(Srt.Load(path, (int)Srt.Encodings[encCombo.SelectedIndex][0]), out fixedEnt, out fixedTags, out fixedGone);

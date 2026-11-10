@@ -71,7 +71,7 @@ Ja. Klicka **Inställningar…** längst upp till höger och kryssa i **Ta bort 
 - Originalfilen ändras inte förrän du sparar, och då sparas en kopia av originalet. Valet gäller tills du kryssar ur rutan, även nästa gång du startar programmet.
 
 **Det står &amp;amp; eller andra konstiga koder i texten.**
-Det är tecken som har kodats för webben och blivit kvar i filen. Text Sync gör alltid om dem till riktiga tecken när filen läses in (&amp;amp; blir &, &amp;quot; blir "). Raden under fält 2 säger hur många rader som rättades. Du behöver inte göra något.
+Det är tecken som har kodats för webben och blivit kvar i filen. Text Sync gör alltid om dem till riktiga tecken när filen läses in (&amp;amp; blir &, &amp;quot; blir "). Raden under filnamnet i ruta 2 säger hur många rader som rättades. Du behöver inte göra något.
 
 **Vad betyder ✎ framför radnumret?**
 Raden rättades när filen lästes in: kodade tecken gjordes om till riktiga tecken, trasig formatering lagades, eller koder från webbsidor och andra undertextformat (`<br>`, `<p>`, `\N`, `{\i1}`) gjordes om till radbrytningar och vanlig kursiv. Håll muspekaren över raden för att se vad som stod i filen. Välj **Bara rättade rader** i **Visa** ovanför listan för att se alla sådana rader. Rader där ingen text blev kvar, till exempel en rad med bara `<i></i>`, tas bort helt och sparas inte.
@@ -80,7 +80,7 @@ Raden rättades när filen lästes in: kodade tecken gjordes om till riktiga tec
 Det är taggar för kursiv stil. De flesta spelare på datorn (VLC, Plex, Kodi) visar texten kursiv, men en del TV-apparater visar taggarna som de står. Klicka **Inställningar…** längst upp till höger och kryssa i **Ta bort kursiv och annan formatering**. Då tas kursiv, fetstil, understruken och genomstruken text, färger och typsnitt bort, liksom koder som `{\an8}` (text överst i bilden). Själva texten står kvar.
 - Rutan gäller det som visas i listan, spelas upp och sparas. Kryssar du ur den kommer formateringen tillbaka, så du kan prova utan risk.
 - Ändrar du texten på en rad för hand, eller slår ihop eller delar rader via ett förslag, medan rutan är ikryssad får de raderna inte tillbaka formateringen när du kryssar ur den. Ändrar du bara tiden behålls den.
-- Är rutan inte ikryssad behålls formateringen. Trasig formatering lagas alltid vid inläsningen, till exempel en kursiv som aldrig avslutas. Raden under fält 2 säger hur många rader som lagades.
+- Är rutan inte ikryssad behålls formateringen. Trasig formatering lagas alltid vid inläsningen, till exempel en kursiv som aldrig avslutas. Raden under filnamnet i ruta 2 säger hur många rader som lagades.
 - Vanlig text inom vinkelparenteser, till exempel "\<I morgon åker vi.\>", är inte formatering och står alltid kvar.
 - Valet gäller tills du kryssar ur rutan, även nästa gång du startar programmet.
 
@@ -94,7 +94,7 @@ Ja, i listan:
 Allt finns också i högerklicksmenyn. Ingenting ändras i filen förrän du sparar.
 
 **Min film har ingen textundertext alls.**
-Synka mot filmens **ljud** i stället. Välj i listan **Referens** under fält 1:
+Synka mot filmens **ljud** i stället. Välj i listan **Referens** under filnamnet i ruta 1:
 - **Ljud A – taldetektering:** snabbast, ungefär en minut. Den hittar var det pratas.
 - **Ljud B – Whisper:** taligenkänning som hör vad som sägs. Den är säkrare men tar längre tid, särskilt utan NVIDIA-grafikkort.
 - **Ljud A+B – kombinerat:** säkrast. Rekommenderas när verktygen finns.
@@ -102,13 +102,13 @@ Synka mot filmens **ljud** i stället. Välj i listan **Referens** under fält 1
 Första gången laddar Text Sync ner de gratisverktyg som behövs. Programmet frågar först och visar hur stort det är. Vad som hämtas beror på valet i listan **Grafikkort**: cirka 1,4 GB med NVIDIA-grafikkort och cirka 0,6 GB med processorn. Medan det laddas ner behövs ungefär dubbelt så mycket ledigt utrymme. Finns det inte säger programmet till innan något hämtas. Efter en Whisper-synk kan du också spara den igenkända texten som en egen undertext med **Spara igenkänd text…**. Den är automatisk och kan innehålla fel.
 
 **Kan Whisper kontrollera att filmens engelska textspår går i takt?**
-Ja. Välj "Spår N … + Whisper-kontroll" i listan **Referens**. Whisper lyssnar ord för ord, och delar av textspåret som ligger mer än ungefär 1 s fel rättas innan din svenska text synkas. I resultatet står hur mycket som kontrollerades och vad som rättades. Det tar ungefär 1 minut per avsnitt med NVIDIA-grafikkort. Välj grafikkort i listan bredvid.
+Ja. Välj "Spår N … + Whisper-kontroll" i listan **Referens**. Whisper lyssnar ord för ord, och delar av textspåret som ligger mer än ungefär 1 s fel rättas innan din svenska text synkas. Under **Detaljer** i resultatet står hur mycket som kontrollerades och vad som rättades. Det tar ungefär 1 minut per avsnitt med NVIDIA-grafikkort. Välj grafikkort i listan bredvid.
 
 **Filmen har ingen engelsk text, men jag har en engelsk SRT som inte går i takt. Kan den användas?**
-Ja. Klicka **Lägg till undertext på filmens originalspråk (SRT)…** under fält 1, eller dra in filmen och båda SRT-filerna samtidigt. Den svenska texten hamnar i fält 2 och den engelska blir originaltext. Den engelska synkas först mot filmens ljud och kontrolleras ord för ord med Whisper. Sedan synkas den svenska mot den. Den synkade engelska texten kan du spara med **Spara synkad originaltext…**. SRT-filen måste vara på samma språk som filmens ljud.
+Ja. Klicka **Lägg till undertext på filmens originalspråk (SRT)…** under filnamnet i ruta 1, eller dra in filmen och båda SRT-filerna samtidigt. Den svenska texten hamnar i ruta 2 och den engelska blir originaltext. Den engelska synkas först mot filmens ljud och kontrolleras ord för ord med Whisper. Sedan synkas den svenska mot den. Den synkade engelska texten kan du spara med **Spara synkad originaltext…**. SRT-filen måste vara på samma språk som filmens ljud.
 
 **Filmen har flera ljudspår (till exempel dubbning eller kommentarspår).**
-Då visas listan **Ljudspår** under fält 1 när du synkar mot ljudet eller använder Whisper-kontroll. Engelska väljs först, annars filmens standardspår, men aldrig ett kommentarspår eller syntolkning om det finns något annat. Välj spåret där skådespelarna pratar filmens originalspråk.
+Då visas listan **Ljudspår** under filnamnet i ruta 1 när du synkar mot ljudet eller använder Whisper-kontroll. Engelska väljs först, annars filmens standardspår, men aldrig ett kommentarspår eller syntolkning om det finns något annat. Välj spåret där skådespelarna pratar filmens originalspråk.
 
 **Varför syns inte mitt grafikkort i listan Grafikkort?**
 Whisper kan bara använda NVIDIA-grafikkort från ungefär 2014 och senare, med en drivrutin från december 2022 eller senare (version 527). Uppdatera drivrutinen från NVIDIA:s webbplats. Annars körs Whisper på processorn, vilket tar längre tid. Står det att grafikkortet inte fungerade under synken, börjar Whisper om på processorn automatiskt.
@@ -126,7 +126,7 @@ Nej. Allt körs på din egen dator. Internet behövs bara första gången, för 
 De kan inte läsas, men ljudsynken ovan fungerar. Du kan också använda en engelsk SRT-fil för samma version av filmen som referens.
 
 **Bokstäverna ser konstiga ut (t.ex. "Ã¥" i stället för "å", eller fel tecken på ryska och polska).**
-Välj rätt **Teckenkodning** i kort 2, under fältet för undertexten. Västeuropeisk passar svenska och engelska, Centraleuropeisk passar polska och tjeckiska, och Kyrillisk passar ryska.
+Välj rätt **Teckenkodning** i ruta 2. Västeuropeisk passar svenska och engelska, Centraleuropeisk passar polska och tjeckiska, och Kyrillisk passar ryska.
 
 **Kan jag använda programmet utan mus?**
 Ja. Tab flyttar mellan fälten och Alt + understruken bokstav trycker på en knapp, till exempel Alt+S för Synka. I tidslinjen flyttar piltangenterna och + och − zoomar. Programmet följer också Windows högkontrastläge.

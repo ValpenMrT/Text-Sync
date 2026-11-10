@@ -247,6 +247,7 @@ namespace TextSync
                 pctFrac = (double)ok / n; pctGood = good;
                 chipPct.Text = Fmt(Math.Floor(1000.0 * ok / n) / 10, "0.#") + " % av raderna " + (speech ? "ligger på tal i ljudet" : "har referenstext samtidigt") + " (" + ok + " av " + n + ")";
                 chipPct.Invalidate();
+                tips.SetToolTip(chipPct, "En lyckad synk brukar ge 98–100 %." + (good ? "" : " Nu är det under 95 %: granska de röda raderna (F3 hoppar till nästa)."));
             }
             string redWhy = speech ? "Röda rader ligger inte på tal i ljudet." : "Röda rader har ingen referenstext samtidigt.";
             chipRed.Visible = red > 0;
@@ -261,8 +262,15 @@ namespace TextSync
             chipFixed.Text = "✎ " + (fixedRows == 1 ? "1 rättad rad" : fixedRows + " rättade rader");
             bool drift = Math.Abs(r.DriftMsPerHour) >= 1;
             chipSeg.Visible = true;
-            chipSeg.Text = r.Segments.Count > 1 ? r.Segments.Count + " avsnitt" : "Förskjutning " + FmtOffset(r.OffsetMs) + (drift ? ", drift " + Fmt(r.DriftMsPerHour, "0") + " ms/timme" : "");
-            tips.SetToolTip(chipSeg, r.Segments.Count > 1 ? "Texten har flyttats olika mycket i olika delar av filmen. Se Detaljer." : null);
+            // "avsnitt" kan läsas som avsnitt av en tv-serie, därför "delar" här
+            chipSeg.Text = r.Segments.Count > 1 ? "Flyttad olika mycket i " + r.Segments.Count + " delar" : "Förskjutning " + FmtOffset(r.OffsetMs) + (drift ? ", drift " + Fmt(r.DriftMsPerHour, "0") + " ms/timme" : "");
+            tips.SetToolTip(chipSeg, r.Segments.Count > 1 ? "Texten har flyttats olika mycket i olika delar av filmen, t.ex. vid klipp eller reklampauser. Se Detaljer." : null);
+            // text som programmet har tagit bort ska synas utan klick: hela beskedet står i tipsrutan och under Detaljer
+            bool hiDone = hiInfo != null && !hiInfo.StartsWith("Ingen");
+            bool plainDone = plainCheck.Checked && plainCount > 0;
+            chipHi.Visible = hiDone || plainDone;
+            chipHi.Text = hiDone && plainDone ? "Text för hörselskadade och formatering borttagen" : hiDone ? "Text för hörselskadade borttagen" : "Formatering borttagen på " + plainCount + (plainCount == 1 ? " rad" : " rader");
+            tips.SetToolTip(chipHi, (hiDone ? hiInfo + " " : "") + (plainDone ? "Kursiv och annan formatering borttagen på " + plainCount + (plainCount == 1 ? " rad" : " rader") + ". Kryssa ur rutan i Inställningar för att få tillbaka den." : ""));
             foreach (Control c in chips.Controls) c.ForeColor = Theme.Fg;
 
             // ---- varningar: syns alltid
