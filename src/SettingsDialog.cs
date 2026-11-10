@@ -15,9 +15,17 @@ namespace TextSync
         public bool DetectFps { get { return fpsCheck.Checked; } }
         public bool RemoveHi { get { return hiCheck.Checked; } }
         public bool StripFormatting { get { return plainCheck.Checked; } }
+        public int SrtFormat { get { return Math.Max(0, formatCombo.SelectedIndex); } }   // Srt.FormatUtf8Bom, FormatUtf8 eller FormatLegacy
+        readonly ComboBox formatCombo;
+
+        // valen i listan "SRT-filen sparas för", i samma ordning som Srt.Format-konstanterna
+        public static readonly string[] FormatNames = {
+            "De flesta spelare – Plex, Jellyfin, VLC, Kodi, TV (UTF-8 med BOM)",
+            "UTF-8 utan BOM – om första raden börjar med skräptecken",
+            "Mycket gamla spelare – Windows-teckentabell efter språket" };
 
         // showTheme = false i högkontrastläge, där Windows färger alltid används
-        public SettingsDialog(int themeIndex, bool showTheme, bool detectFps, bool removeHi, bool stripFormatting)
+        public SettingsDialog(int themeIndex, bool showTheme, bool detectFps, bool removeHi, bool stripFormatting, int srtFormat)
         {
             SuspendLayout();
             AutoScaleDimensions = new SizeF(96F, 96F);
@@ -60,6 +68,15 @@ namespace TextSync
             t.Controls.Add(plainCheck);
             t.Controls.Add(note("Gäller det som visas, spelas upp och sparas. Kryssar du ur rutan kommer formateringen tillbaka."));
             t.Controls.Add(note("Kodade tecken som &amp; och trasig formatering rättas alltid när en text läses in. Sådana rader är märkta ✎ i listan."));
+
+            t.Controls.Add(head("Spara"));
+            formatCombo = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 500, Margin = new Padding(0, 2, 0, 4), AccessibleName = "SRT-filen sparas för" };
+            formatCombo.Items.AddRange(FormatNames);
+            formatCombo.SelectedIndex = Math.Max(0, Math.Min(FormatNames.Length - 1, srtFormat));
+            t.Controls.Add(new Label { Text = "SRT-&filen sparas för:", AutoSize = true, Margin = new Padding(0, 2, 0, 2) });
+            t.Controls.Add(formatCombo);
+            t.Controls.Add(note("Det första valet fungerar nästan överallt. Välj det sista bara om å, ä och ö blir fel i en gammal dvd-spelare eller TV: " +
+                "då sparas filen i den teckentabell som passar textens språk, och tecken som inte finns där (t.ex. ♪) byts mot liknande. Lägg in i MKV… påverkas inte."));
 
             var ok = new Button { Text = "OK", Width = 90, Height = 30, DialogResult = DialogResult.OK };
             var cancel = new Button { Text = "Avbryt", Width = 90, Height = 30, DialogResult = DialogResult.Cancel };

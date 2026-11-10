@@ -7,7 +7,7 @@ Text Sync är inte signerat med ett köpt certifikat.
 
 **Hur gör jag?**
 1. Dra in filmen (MKV) och den svenska SRT-filen i fönstret. Det går också att klicka var som helst i ruta 1 eller 2 och välja filen.
-2. Klicka **Synka**. Medan programmet arbetar är samma knapp **Avbryt**.
+2. Klicka **Synka**. Medan programmet arbetar är knappen du klickade på **Avbryt** (också **Lägg in i MKV…**).
 3. Titta på några rader i listan. Den engelska texten bredvid ska betyda samma sak, och **Synkad start** ska ligga nära **Referenstid**. **Före synk** visar tiden i din osynkade fil, och **Flyttad** hur mycket raden flyttades. Ett plötsligt hopp i Flyttad betyder ett klipp i filmen. Kontrollera gärna raderna där.
 4. Klicka **Spara SRT…**. Filen sparas som `Filmnamn.sv.srt` bredvid filmen, och då hittar VLC, Plex och Kodi den automatiskt.
 
@@ -47,6 +47,14 @@ Under beskedet står siffrorna på en rad, med samma färger som raderna i lista
 
 **Var står förskjutningen, och vad färgerna betyder?**
 Klicka **Detaljer** till höger om beskedet. Där står hur synken gjordes (metod, förskjutning eller avsnitt), vad färgerna och märkena i listan betyder och hur du redigerar i listan. **Dölj detaljer** fäller ihop rutan igen, så att listan får mer plats. Programmet kommer ihåg om du hade Detaljer öppet.
+
+**Å, ä och ö blir fel i min spelare. Vad gör jag?**
+Klicka **Inställningar…** och välj under **Spara** vad SRT-filen sparas för:
+- **De flesta spelare** (förvalt): UTF-8 med BOM. Fungerar i Plex, Jellyfin, VLC, Kodi och de flesta TV-apparater. Prova alltid det först.
+- **UTF-8 utan BOM:** om första raden börjar med skräptecken i ett program.
+- **Mycket gamla spelare:** för en gammal dvd-spelare eller TV som inte kan UTF-8. Filen sparas då i den Windows-teckentabell som passar textens språk: västeuropeisk för svenska och engelska, kyrillisk för ryska och så vidare. Tecken som inte finns i tabellen byts mot liknande, till exempel ♪ mot #, och programmet säger hur många.
+
+Spara sedan filen igen med **Spara SRT…**. Valen går inte att blanda, eftersom en fil bara kan ha en teckenkodning. Det första valet är det som fungerar på flest ställen: nya spelare struntar i BOM, och äldre TV-apparater behöver den. **Lägg in i MKV…** påverkas inte, där är texten alltid UTF-8.
 
 **Kommer programmet ihåg fönstrets storlek?**
 Ja. Storlek, plats och om fönstret var maximerat sparas när du stänger programmet.

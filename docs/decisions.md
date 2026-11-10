@@ -2,6 +2,27 @@
 
 Nyast först.
 
+## 2026-11-10 – 2.4.1: val av hur SRT-filen sparas, Lägg in i MKV blir Avbryt, versionsnummer i varje commit
+- **Område:** GUI / filformat
+- **Önskemål (ägaren):** en inställning för hur SRT-filen sparas, så att tecken utanför ASCII (å, ä, ö med flera) visas rätt i olika spelare. Lägg in i MKV… ska bli en avbrytknapp när man trycker på den. Versionsnumret ska öka i varje commit.
+- **Frågor och svar:**
+  - *Kan man blanda formaten för att öka kompatibiliteten?* Nej, en fil har bara en teckenkodning. UTF-8 med BOM är det som fungerar på flest ställen: nya spelare struntar i BOM, och äldre TV-apparater behöver den för att förstå att filen är UTF-8. Programmet sparade redan så, och det är fortfarande förvalt.
+  - *Vilka val ska finnas?* **Svar:** tre.
+  - *Hur väljs teckentabellen för mycket gamla spelare?* **Svar:** automatiskt efter texten.
+  - *Hur ska versionsnumret öka?* **Svar:** ett tredje led per commit (2.4.1, 2.4.2 …). 2.5 sparas till större ändringar som ägaren säger till om.
+  - *Behövs fler teckenkodningar i listan i ruta 2?* Nej, inte för nordiska och europeiska texter. Automatisk klarar UTF-8, UTF-16 och gissar mellan västeuropeisk, centraleuropeisk, kyrillisk och grekisk. Det som saknas är hebreiska, arabiska och östasiatiska tabeller, och de läggs till om någon behöver dem.
+  - *Upptäck bildfrekvensfel ikryssad som standard?* Den är redan det (`fps` saknas i settings.txt tills man ändrar den, och då gäller ikryssad). Ingen ändring behövdes.
+- **Beslut:**
+  - **Inställningar → Spara → "SRT-filen sparas för":** De flesta spelare (UTF-8 med BOM, förvalt), UTF-8 utan BOM, eller Mycket gamla spelare (Windows-teckentabell). Sparas i settings.txt (`srtformat` 0, 1 eller 2). Ett annat val än det förvalda står på raden under Metod, så att det inte glöms.
+  - **Mycket gamla spelare:** programmet väljer den tabell som saknar minst tecken i texten, i ordningen 1252, 1250, 1251, 1253, 1254, 1257. Tecken som saknas byts mot liknande (… mot ..., typografiska citattecken mot ", tankstreck mot -, ♪ mot #), annars mot ?. Efter Spara SRT… säger statusraden vilken tabell som valdes och hur många tecken som byttes. Texten i programmet ändras inte, bara filen.
+  - **Gäller** Spara SRT…, Spara synkad originaltext… och Spara igenkänd text…. **Gäller inte** Lägg in i MKV… (MKV kräver UTF-8) och programmets egna tillfälliga filer.
+  - **Lägg in i MKV… är Avbryt** medan MKV-filen skapas, med samma skydd mot dubbelklick som Synka. Synka-knappen är då avstängd. Vid synk och nedladdning är det som förut Synka som är Avbryt.
+- **Teknik:** `Srt.Encode`, `Srt.SaveFormat` och `Srt.CodepageName` i `Engine.cs`, `WriteSafely` och `LastSaveNote` i `MainForm.Save.cs`, `busyBtn` i `MainForm.cs`, listan i `SettingsDialog.cs`.
+- **Test:** 130 av 130 kontroller (9 nya: BOM och inte BOM, svensk text i 1252, rysk i 1251, polsk i 1250, utbytta tecken, a + ring, och hela vägen via inställningen). Provat i programmet (formuläret i samma process, 200 % skalning): Lägg in i MKV… som Avbryt och Avbryter…, knapparna tillbaka efteråt, och dialogen Inställningar med det nya valet.
+- **Ej provat:** en riktig gammal spelare, ett riktigt MKV-arbete som avbryts, och klick i dialogen (valet sattes av testet).
+- **Product-check:** Claude granskade själv (en ny inställning med förvalt värde som förut). Kan vänta: statusraden efter Spara synkad originaltext… och Spara igenkänd text… säger inte vilken teckentabell som valdes (det står i loggen).
+- **Nivå:** LIVE
+
 ## 2026-11-10 – Två oberoende granskningar av ombyggnaden: orsaken till skalningsfelet och rättningar
 - **Område:** GUI
 - **Bakgrund:** ägaren bad om hjälp av subagenter. En granskade layoutkoden och en granskade ändringen som en icke-teknisk användare. Ingen hittade något blockerande.

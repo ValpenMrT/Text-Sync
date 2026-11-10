@@ -36,10 +36,18 @@ namespace TextSync
         }
 
         // Skriv via temporär fil så att en krasch aldrig lämnar en halvskriven undertext
+        // Texten kodas efter inställningen "SRT-filen sparas för" (Srt.SaveFormat). LastSaveNote säger efteråt om något särskilt hände,
+        // t.ex. vilken teckentabell som valdes för en mycket gammal spelare och hur många tecken som byttes ut.
+        public static string LastSaveNote = "";
         static void WriteSafely(string path, string text)
         {
             string tmp = path + ".textsync-tmp";
-            File.WriteAllText(tmp, text, new UTF8Encoding(true));
+            int cp, replaced;
+            byte[] bytes = Srt.Encode(text, Srt.SaveFormat, out cp, out replaced);
+            LastSaveNote = cp == 65001 ? "" : "  Sparad för mycket gamla spelare, " + Srt.CodepageName(cp) + "." +
+                (replaced > 0 ? "  " + replaced + (replaced == 1 ? " tecken som saknas där byttes" : " tecken som saknas där byttes") + " mot liknande (t.ex. ♪ mot #)." : "");
+            if (cp != 65001) Log.Info("Sparad i Windows-" + cp + ", " + replaced + " tecken utbytta: " + path);
+            File.WriteAllBytes(tmp, bytes);
             if (File.Exists(path)) File.Replace(tmp, path, null);
             else File.Move(tmp, path);
         }
@@ -83,7 +91,7 @@ namespace TextSync
                     if (mkvPath != null && SamePath(Path.GetDirectoryName(path), Path.GetDirectoryName(mkvPath))
                         && Path.GetFileName(path).StartsWith(Path.GetFileNameWithoutExtension(mkvPath) + ".", StringComparison.OrdinalIgnoreCase))
                         auto = "  Spelare som VLC, Plex och Kodi hittar den automatiskt.";
-                    SetStatus("✔ Sparad: " + Path.GetFileName(path) + "." + auto + backupNote, true);
+                    SetStatus("✔ Sparad: " + Path.GetFileName(path) + "." + auto + backupNote + LastSaveNote, true);
                     openLink.Visible = true; undoLink.Visible = false;
                     Log.Info("Sparad: " + path);
                 }
@@ -198,6 +206,7 @@ namespace TextSync
 
             cts = new CancellationTokenSource();
             var token = cts.Token;
+            busyBtn = muxBtn;   // Avbryt hamnar på knappen som startade arbetet
             SetBusy(true, "Skapar MKV…");
             var log = new StringBuilder();
             int code = -1;

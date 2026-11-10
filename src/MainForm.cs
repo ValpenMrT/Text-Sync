@@ -87,6 +87,7 @@ namespace TextSync
         int hiUndoDepth;               // ångra-nivån där den synkade texten rensades i efterhand (0 = inte gjort)
         bool hiQuiet;                  // rutan ändras av programmet, inte av användaren
         Button syncBtn, saveBtn, muxBtn, refBtn, tgtBtn;
+        Button busyBtn;                // knappen som startade arbetet och är Avbryt så länge (null = Synka)
         ProgressBar progress;
         ListView list;
         TimelinePanel timeline;
@@ -281,6 +282,10 @@ namespace TextSync
                 else SetStatus("Formateringen är tillbaka.", false);
                 Log.Info("Ta bort formatering: " + (plainCheck.Checked ? "på, " + plainCount + " rader" : "av"));
             };
+
+            // hur SRT-filen sparas (dialogen Inställningar): 0 = UTF-8 med BOM, 1 = UTF-8 utan BOM, 2 = mycket gamla spelare
+            int sf;
+            Srt.SaveFormat = int.TryParse(Tools.GetSetting("srtformat", "0"), out sf) && sf >= Srt.FormatUtf8Bom && sf <= Srt.FormatLegacy ? sf : Srt.FormatUtf8Bom;
 
             syncBtn = MakeButton("&Synka", true);
             syncBtn.Width = 120; syncBtn.Height = 34; syncBtn.Margin = new Padding(0, 2, 12, 0);
@@ -610,7 +615,12 @@ namespace TextSync
             saveBtn.Click += (s, e) => SaveSrt();
             ctrls.Add(saveBtn);
             muxBtn = MakeButton("Lägg in i &MKV…", false); muxBtn.Enabled = false; muxBtn.Width = 140; muxBtn.Height = 34;
-            muxBtn.Click += async (s, e) => await MuxIntoMkv();
+            // samma knapp är Avbryt medan MKV-filen skapas, med samma skydd mot dubbelklick som Synka
+            muxBtn.Click += async (s, e) =>
+            {
+                if (!busy) await MuxIntoMkv();
+                else if (busyBtn == muxBtn && unchecked(Environment.TickCount - busySince) > 700) CancelWork();
+            };
             ctrls.Add(muxBtn);
             // tabell (FlowLayoutPanel placerar NumericUpDown fel vid hög DPI)
             var brow = new TableLayoutPanel { AutoSize = true, Dock = DockStyle.Top, ColumnCount = ctrls.Count + 2, RowCount = 1, Margin = new Padding(0, 8, 0, 0) };
@@ -663,9 +673,18 @@ namespace TextSync
         void OpenSettings()
         {
             if (busy) return;
-            using (var d = new SettingsDialog(themeIndex, !HC, fpsCheck.Checked, hiCheck.Checked, plainCheck.Checked))
+            using (var d = new SettingsDialog(themeIndex, !HC, fpsCheck.Checked, hiCheck.Checked, plainCheck.Checked, Srt.SaveFormat))
             {
                 if (d.ShowDialog(this) != DialogResult.OK) return;
+                if (d.SrtFormat != Srt.SaveFormat)
+                {
+                    Srt.SaveFormat = d.SrtFormat;
+                    Tools.SetSetting("srtformat", Srt.SaveFormat.ToString());
+                    Log.Info("SRT-filen sparas för: " + SettingsDialog.FormatNames[Srt.SaveFormat]);
+                    UpdateOptInfo();
+                    // en fil som redan är sparad ändras inte av inställningen
+                    if (synced != null && !busy) { SetStatus("Gäller nästa gång du sparar. Klicka Spara SRT… för att spara om filen.", false); openLink.Visible = false; }
+                }
                 if (d.ThemeIndex != themeIndex)
                 {
                     themeIndex = d.ThemeIndex;
@@ -686,6 +705,8 @@ namespace TextSync
             if (hiCheck.Checked) parts.Add("text för hörselskadade tas bort");
             if (plainCheck.Checked) parts.Add("kursiv och annan formatering tas bort");
             if (!fpsCheck.Checked) parts.Add("bildfrekvensfel upptäcks inte");
+            if (Srt.SaveFormat == Srt.FormatUtf8) parts.Add("SRT sparas som UTF-8 utan BOM");
+            if (Srt.SaveFormat == Srt.FormatLegacy) parts.Add("SRT sparas för mycket gamla spelare");
             optInfo.Text = parts.Count == 0 ? "" : "Inställningar: " + string.Join("  ·  ", parts);
             optInfo.Visible = parts.Count > 0;
         }
@@ -1087,9 +1108,11 @@ namespace TextSync
         {
             if (syncBtn == null) return;
             bool haveRef = refSrtCues != null || (mkvPath != null && trackCombo.SelectedItem != null);
-            syncBtn.Enabled = busy ? !cancelling : haveRef && tgtCues != null;   // medan programmet arbetar är knappen Avbryt
+            // medan programmet arbetar är knappen som startade arbetet Avbryt (Synka om inget annat är sagt)
+            var owner = busyBtn ?? syncBtn;
+            syncBtn.Enabled = busy ? owner == syncBtn && !cancelling : haveRef && tgtCues != null;
             saveBtn.Enabled = !busy && synced != null;
-            muxBtn.Enabled = !busy && synced != null;
+            muxBtn.Enabled = busy ? owner == muxBtn && !cancelling : synced != null;
             foreach (Control c in new Control[] { refBtn, tgtBtn, trackCombo, modeCombo, settingsBtn, extraNum, langBox, encCombo, gpuCombo, audioCombo, origLink })
                 if (c != null) c.Enabled = !busy;
             gpuCombo.Enabled = !busy && !gpuPending;
@@ -1099,6 +1122,7 @@ namespace TextSync
         {
             if (b && !busy) busySince = Environment.TickCount;
             busy = b; cancelling = false;
+            if (!b) busyBtn = null;
             progress.Visible = b; progress.Value = 0;
             ShowSyncButton();
             if (b) { openLink.Visible = false; undoLink.Visible = false; }
@@ -1110,13 +1134,17 @@ namespace TextSync
 
         // Synka-knappen är Avbryt så länge programmet arbetar (synk, nedladdning, lägga in i MKV): samma knapp på samma plats,
         // grå i stället för blå. Efter ett klick står det Avbryter… och knappen går inte att klicka förrän arbetet har stannat.
+        // Startades arbetet med Lägg in i MKV… är det den knappen som blir Avbryt (busyBtn), så att Avbryt finns där man just klickade.
         void ShowSyncButton()
         {
-            syncBtn.Text = !busy ? "&Synka" : cancelling ? "Avbryter…" : "■  &Avbryt";
+            var owner = busy ? (busyBtn ?? syncBtn) : null;
+            string cancelText = cancelling ? "Avbryter…" : "■  &Avbryt";
+            syncBtn.Text = owner == syncBtn ? cancelText : "&Synka";
+            if (muxBtn != null) muxBtn.Text = owner == muxBtn ? cancelText : "Lägg in i &MKV…";
             if (HC) return;
-            syncBtn.Tag = busy ? "secondary" : "primary";
+            syncBtn.Tag = owner == syncBtn ? "secondary" : "primary";
             Theme.Apply(syncBtn, null);   // färgerna följer Tag
-            syncBtn.ForeColor = busy ? Theme.Fg : Color.White;
+            syncBtn.ForeColor = owner == syncBtn ? Theme.Fg : Color.White;
         }
 
         void Progress(int p, string s)
@@ -1131,7 +1159,7 @@ namespace TextSync
         {
             if (cts != null) cts.Cancel();
             cancelling = true;
-            ShowSyncButton(); syncBtn.Enabled = false;
+            ShowSyncButton(); (busyBtn ?? syncBtn).Enabled = false;
             statusLabel.Text = "Avbryter…";
             var p = muxProc;
             if (p != null) { try { if (!p.HasExited) p.Kill(); } catch { } }

@@ -276,6 +276,38 @@ namespace TextSync
                 bool noTmp = Directory.GetFiles(sd, "*.textsync-tmp").Length == 0;
                 Console.WriteLine("Save+backup: first={0} keepsOriginal={1} noBackupForOther={2} noTempLeft={3}", ok1, ok2, ok3, noTmp);
                 Check("Spara med säkerhetskopia: originalet kopieras en gång och skrivs aldrig över", ok1 && ok2 && ok3 && noTmp);
+
+                // ---- hur SRT-filen sparas: UTF-8 med BOM, UTF-8 utan BOM, eller Windows-teckentabell för mycket gamla spelare
+                int cp, rep;
+                string sv = "1\r\n00:00:01,000 --> 00:00:02,000\r\nÅsa sjöng: ”Hej då…” – ♪ la la ♪\r\n\r\n";
+                byte[] e0 = Srt.Encode(sv, Srt.FormatUtf8Bom, out cp, out rep);
+                Check("Spara, UTF-8 med BOM: filen börjar med BOM och inga tecken byts ut", e0[0] == 0xEF && e0[1] == 0xBB && e0[2] == 0xBF && cp == 65001 && rep == 0 && Encoding.UTF8.GetString(e0, 3, e0.Length - 3) == sv);
+                byte[] e1 = Srt.Encode(sv, Srt.FormatUtf8, out cp, out rep);
+                Check("Spara, UTF-8 utan BOM: filen börjar med texten", e1[0] == (byte)'1' && cp == 65001 && rep == 0 && Encoding.UTF8.GetString(e1) == sv);
+                byte[] e2 = Srt.Encode(sv, Srt.FormatLegacy, out cp, out rep);
+                string legacyText = Encoding.GetEncoding(1252).GetString(e2);
+                Console.WriteLine("Spara för gamla spelare: Windows-" + cp + ", " + rep + " tecken utbytta: " + legacyText.Split('\n')[2].Trim());
+                Check("Spara, gamla spelare: svensk text sparas i Windows-1252 med å, ä och ö som en byte var",
+                    cp == 1252 && e2.Length == legacyText.Length && legacyText.Contains("Åsa sjöng") && Array.IndexOf(e2, (byte)0xC5) > 0 && Array.IndexOf(e2, (byte)0xF6) > 0);
+                Check("Spara, gamla spelare: tecken som finns i tabellen behålls (” … –), och ♪ byts mot # och räknas",
+                    rep == 2 && legacyText.Contains("”Hej då…” – # la la #"));
+                Srt.Encode("Привет, как дела? ♪", Srt.FormatLegacy, out cp, out rep);
+                Check("Spara, gamla spelare: rysk text ger kyrillisk teckentabell (1251)", cp == 1251 && rep == 1);
+                Srt.Encode("Zażółć gęślą jaźń", Srt.FormatLegacy, out cp, out rep);
+                Check("Spara, gamla spelare: polsk text ger centraleuropeisk teckentabell (1250) utan utbytta tecken", cp == 1250 && rep == 0);
+                byte[] e3 = Srt.Encode("Åsa och 中", Srt.FormatLegacy, out cp, out rep);
+                Check("Spara, gamla spelare: a + ring blir å, och ett tecken utan motsvarighet blir ?", Encoding.GetEncoding(1252).GetString(e3) == "Åsa och ?" && rep == 1);
+                // hela vägen: inställningen styr filen som sparas, och den går att läsa in igen
+                Srt.SaveFormat = Srt.FormatLegacy;
+                string legacyFile = Path.Combine(sd, "Gammal.srt");
+                MainForm.SaveWithBackup(legacyFile, orig, new List<Cue> { new Cue(1000, 2000, "Räksmörgås på en ö ♪") });
+                byte[] lf = File.ReadAllBytes(legacyFile);
+                Check("Spara, gamla spelare: filen har ingen BOM, läses in rätt igen och beskedet säger vad som hände",
+                    lf[0] == (byte)'1' && Srt.Load(legacyFile)[0].Text == "Räksmörgås på en ö #" && MainForm.LastSaveNote.Contains("Windows-1252") && MainForm.LastSaveNote.Contains("1 tecken"));
+                Srt.SaveFormat = Srt.FormatUtf8Bom;
+                MainForm.SaveWithBackup(legacyFile, orig, new List<Cue> { new Cue(1000, 2000, "Räksmörgås ♪") });
+                Check("Spara, förvalt: UTF-8 med BOM, texten oförändrad och inget extra besked",
+                    File.ReadAllBytes(legacyFile)[0] == 0xEF && Srt.Load(legacyFile)[0].Text == "Räksmörgås ♪" && MainForm.LastSaveNote == "");
             }
 
             // MKV

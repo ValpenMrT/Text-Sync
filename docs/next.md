@@ -81,7 +81,7 @@ Alla punkter är åtgärdade i 2.1 (se beslutsloggen 2026-11-09, "Rättningar fr
 ## Kvar från ombyggnaden av gränssnittet 2026-11-10 (kan vänta)
 - **Litet fönster:** i det minsta fönstret (940 × 600 vid 100 %, till exempel hela skärmen på en bärbar dator med 1920 × 1200 och 200 % skalning) syns nästan ingenting av listan efter en synk. Förslag: göm tidslinjen när höjden inte räcker, eller låt hela fönstret rulla.
 - **Skalning:** 125 % och 150 % är inte provade efter ombyggnaden.
-- **Frågor till ägaren från granskningen:** (1) Ska programmet fråga innan en ny fil eller en ny synk kastar ändringar som är gjorda för hand? Klickytan för att välja fil är stor nu. (2) Ska Detaljer vara öppet första gången? (3) Avbryt sitter uppe vid Synka även när arbetet startades med Lägg in i MKV… längst ner. Ska statusraden säga var Avbryt finns?
+- **Frågor till ägaren från granskningen:** (1) Ska programmet fråga innan en ny fil eller en ny synk kastar ändringar som är gjorda för hand? Klickytan för att välja fil är stor nu. (2) Ska Detaljer vara öppet första gången?
 - **Tomt läge:** Synka är grå utan förklaring när en fil saknas. Förslag: "Välj en referens och en undertext först." i statusraden.
 - **Fel fil i en ruta** står kvar som vald, med röd text under. Förslag: visa "Ingen fil vald" eller behåll den förra filen.
 - **Maximerat läge glöms** om fönstret stängs medan det är minimerat. Storleken sparas i bildpunkter och följer inte en ändrad skalning.

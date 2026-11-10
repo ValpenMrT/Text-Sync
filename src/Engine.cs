@@ -194,6 +194,68 @@ namespace TextSync
         {
             File.WriteAllText(path, ToSrt(cues), new UTF8Encoding(true));
         }
+
+        // ---- Hur SRT-filen sparas åt användaren (inställningen "srtformat"). Programmets egna tillfälliga filer är alltid UTF-8 med BOM.
+        // En fil har bara en teckenkodning, så valen går inte att blanda. UTF-8 med BOM är det som fungerar på flest ställen:
+        // nya spelare struntar i BOM, och äldre TV-apparater behöver den för att förstå att filen är UTF-8.
+        public const int FormatUtf8Bom = 0;   // de flesta spelare (förvalt)
+        public const int FormatUtf8 = 1;      // UTF-8 utan BOM, för program som visar BOM som skräptecken på första raden
+        public const int FormatLegacy = 2;    // mycket gamla spelare: Windows-teckentabell, vald efter texten
+        public static int SaveFormat = FormatUtf8Bom;
+
+        // teckentabeller som provas för mycket gamla spelare, i den här ordningen (den första som rymmer flest tecken väljs)
+        static readonly int[] LegacyOrder = { 1252, 1250, 1251, 1253, 1254, 1257 };
+
+        // tecken som byts mot liknande när teckentabellen saknar dem
+        static readonly Dictionary<char, string> LookAlike = new Dictionary<char, string> {
+            {'…', "..."}, {'“', "\""}, {'”', "\""}, {'„', "\""}, {'«', "\""}, {'»', "\""}, {'‘', "'"}, {'’', "'"}, {'‚', "'"},
+            {'–', "-"}, {'—', "-"}, {'−', "-"}, {'‐', "-"}, {'‑', "-"}, {'♪', "#"}, {'♫', "#"}, {'♬', "#"}, {'♩', "#"},
+            {'•', "*"}, {' ', " "}, {' ', " "}, {' ', " "}, {'​', ""}, {'‎', ""}, {'‏', ""}, {'﻿', ""} };
+
+        public static string CodepageName(int codepage)
+        {
+            foreach (var e in Encodings) if ((int)e[0] == codepage) { string n = (string)e[1]; int p = n.IndexOf(" ("); return (p > 0 ? n.Substring(0, p) : n).ToLowerInvariant() + " teckentabell (Windows-" + codepage + ")"; }
+            return "Windows-" + codepage;
+        }
+
+        // Gör om texten till de byte som sparas. codepage = teckentabellen som valdes (65001 = UTF-8),
+        // replaced = antal tecken som inte fanns i teckentabellen och byttes mot liknande (eller mot ? när inget liknande finns).
+        public static byte[] Encode(string text, int format, out int codepage, out int replaced)
+        {
+            codepage = 65001; replaced = 0;
+            if (format != FormatLegacy)
+            {
+                var utf8 = new UTF8Encoding(format == FormatUtf8Bom);
+                return utf8.GetPreamble().Concat(utf8.GetBytes(text)).ToArray();
+            }
+            text = text.Normalize(NormalizationForm.FormC);   // a + ring blir å, som finns i teckentabellen
+            var counts = new Dictionary<char, int>();
+            foreach (char ch in text) if (ch > 127) { int c; counts.TryGetValue(ch, out c); counts[ch] = c + 1; }
+            // välj tabellen som saknar minst: västeuropeisk för svenska och engelska, kyrillisk för ryska och så vidare
+            HashSet<char> missing = null; long fewest = long.MaxValue; Encoding best = null;
+            foreach (int cp in LegacyOrder)
+            {
+                var enc = Encoding.GetEncoding(cp, EncoderFallback.ExceptionFallback, DecoderFallback.ReplacementFallback);   // utan fallback gissar Windows tyst (ł blir l)
+                var miss = new HashSet<char>(); long n = 0;
+                foreach (var kv in counts)
+                {
+                    try { enc.GetBytes(new[] { kv.Key }); }
+                    catch (EncoderFallbackException) { miss.Add(kv.Key); n += kv.Value; }
+                }
+                if (n < fewest) { fewest = n; missing = miss; best = enc; codepage = cp; }
+                if (n == 0) break;
+            }
+            if (missing.Count == 0) return best.GetBytes(text);
+            var sb = new StringBuilder(text.Length);
+            foreach (char ch in text)
+            {
+                if (!missing.Contains(ch)) { sb.Append(ch); continue; }
+                string to;
+                sb.Append(LookAlike.TryGetValue(ch, out to) ? to : "?");
+                replaced++;
+            }
+            return best.GetBytes(sb.ToString());
+        }
     }
 
     // ------------------------------------------------------------------ Synk
