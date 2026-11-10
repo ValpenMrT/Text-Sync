@@ -455,6 +455,29 @@ namespace TextSync
                 Check("Diskutrymme: nedladdningen kräver mer än paketens storlek (zip + uppackat)", need > Tools.WhisperGpu.Size * 2 + Tools.ModelTurbo.Size);
             }
 
+            // ---- fönstrets storlek och plats sparas till nästa gång
+            {
+                var R = new Func<int, int, int, int, System.Drawing.Rectangle>((x, y, w, h) => new System.Drawing.Rectangle(x, y, w, h));
+                var min = new System.Drawing.Size(940, 600);
+                var main = R(0, 0, 1920, 1040); var ext = R(1920, 0, 2560, 1400);
+                System.Drawing.Rectangle b, area; bool mx;
+                Check("Fönster: sparad plats, storlek och maximerat läge läses tillbaka",
+                    Tools.ParseWindow(Tools.FormatWindow(R(-1800, 40, 1200, 900), true), out b, out mx) && b == R(-1800, 40, 1200, 900) && mx);
+                Check("Fönster: tom eller trasig inställning används inte",
+                    !Tools.ParseWindow("", out b, out mx) && !Tools.ParseWindow("10,10,abc,500,0", out b, out mx) && !Tools.ParseWindow("10,10,0,500,0", out b, out mx) && !Tools.ParseWindow(null, out b, out mx));
+                Check("Fönster: en plats som ryms på skärmen behålls oförändrad",
+                    Tools.FitWindow(R(2000, 100, 1500, 1000), new[] { main, ext }, main, min, out area) == R(2000, 100, 1500, 1000) && area == ext);
+                Check("Fönster: när den externa skärmen är borta flyttas fönstret in på skärmen som finns kvar och krymps till den",
+                    Tools.FitWindow(R(2000, 100, 2400, 1300), new[] { main }, main, min, out area) == R(0, 0, 1920, 1040) && area == main);
+                Check("Fönster: en sparad plats helt utanför alla skärmar ger ett fönster mitt på skärmen",
+                    Tools.FitWindow(R(5000, 5000, 1000, 700), new[] { main }, main, min, out area) == R(460, 170, 1000, 700));
+                Check("Fönster: ett fönster som sticker ut utanför kanten flyttas in helt",
+                    Tools.FitWindow(R(1500, 800, 1000, 700), new[] { main }, main, min, out area) == R(920, 340, 1000, 700));
+                Check("Fönster: blir aldrig mindre än minsta storleken, men heller aldrig större än en liten skärm",
+                    Tools.FitWindow(R(10, 10, 300, 200), new[] { main }, main, min, out area).Size == min &&
+                    Tools.FitWindow(R(0, 0, 300, 200), new[] { R(0, 0, 800, 560) }, R(0, 0, 800, 560), min, out area) == R(0, 0, 800, 560));
+            }
+
             // ---- varning för fel avsnitt och besked om hur säker synken är
             {
                 Func<string, string> ep = s => { var e = EpisodeId.Parse(s); return e == null ? "-" : e.Season + "/" + e.Episode; };

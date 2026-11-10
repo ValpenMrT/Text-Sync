@@ -2,6 +2,17 @@
 
 Nyast först.
 
+## 2026-11-10 – Fönstrets storlek och plats sparas
+- **Område:** GUI
+- **Önskemål (ägaren):** "Kom ihåg fönsterstorlek, och om den var maximerad sist."
+- **Beslut:** när programmet stängs sparas fönstrets plats, storlek och om det var maximerat (`window` i settings.txt, som `x,y,bredd,höjd,maximerat`). Nästa start öppnas fönstret likadant. Var fönstret maximerat sparas storleken det hade före, så att Återställ ger den tillbaka.
+- **Skydd:** fönstret läggs alltid helt inom en skärm som finns. Är den sparade skärmen borta (t.ex. en bortkopplad extern skärm) öppnas fönstret mitt på skärmen där muspekaren är. Det blir aldrig större än skärmen. Första gången, eller om inställningen är trasig, öppnas det som förut (1080 × 1000, mitt på skärmen).
+- **Teknik:** `Tools.FormatWindow`, `Tools.ParseWindow` och `Tools.FitWindow`, som används i `MainForm.OnLoad` och `OnFormClosing`.
+- **Test:** 121 av 121 kontroller (7 nya). Provat i programmet (formuläret kört i samma process): storleken 1300 × 850 på plats 100,80 kom tillbaka, maximerat kom tillbaka med rätt storlek för Återställ, och en plats utanför skärmen flyttades in. settings.txt återställdes efteråt.
+- **Ej provat:** två skärmar på riktigt, och byte av skalning (t.ex. 100 % → 150 %) mellan två starter. Storleken sparas i bildpunkter, så fönstret blir då lika stort på skärmen men rymmer mindre.
+- **Product-check:** Claude granskade själv (liten ändring). Rättat: en plats utanför alla skärmar hamnade i skärmens hörn, nu mitt på skärmen.
+- **Nivå:** LIVE
+
 ## 2026-11-10 – .gitattributes för enhetliga radslut
 - **Område:** projektstruktur
 - **Fråga (från README, "Obesvarade frågor"):** ska en `.gitattributes` läggas till för enhetliga radslut? **Svar (ägaren):** ja ("skapa en sån fil").

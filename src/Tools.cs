@@ -171,6 +171,42 @@ namespace TextSync
             catch { }
         }
 
+        // Fönstrets plats och storlek sparas som "x,y,bredd,höjd,maximerat" (`window` i settings.txt)
+        public static string FormatWindow(System.Drawing.Rectangle b, bool maximized)
+        {
+            return b.X + "," + b.Y + "," + b.Width + "," + b.Height + "," + (maximized ? "1" : "0");
+        }
+
+        public static bool ParseWindow(string s, out System.Drawing.Rectangle b, out bool maximized)
+        {
+            b = System.Drawing.Rectangle.Empty; maximized = false;
+            var p = (s ?? "").Split(',');
+            int x, y, w, h;
+            if (p.Length != 5 || !int.TryParse(p[0], out x) || !int.TryParse(p[1], out y) || !int.TryParse(p[2], out w) || !int.TryParse(p[3], out h) || w <= 0 || h <= 0) return false;
+            b = new System.Drawing.Rectangle(x, y, w, h);
+            maximized = p[4] == "1";
+            return true;
+        }
+
+        // Lägger det sparade fönstret på den skärm det överlappar mest (area = skärmens arbetsyta), och helt inom den.
+        // Finns skärmen inte kvar (t.ex. en bortkopplad extern skärm) hamnar fönstret på fallback.
+        // Fönstret blir aldrig större än arbetsytan, och aldrig mindre än min om arbetsytan räcker till.
+        public static System.Drawing.Rectangle FitWindow(System.Drawing.Rectangle saved, System.Drawing.Rectangle[] areas, System.Drawing.Rectangle fallback, System.Drawing.Size min, out System.Drawing.Rectangle area)
+        {
+            area = fallback;
+            long best = 0;
+            foreach (var a in areas)
+            {
+                var i = System.Drawing.Rectangle.Intersect(a, saved);
+                long sz = (long)i.Width * i.Height;
+                if (sz > best) { best = sz; area = a; }
+            }
+            int w = Math.Min(Math.Max(saved.Width, min.Width), area.Width), h = Math.Min(Math.Max(saved.Height, min.Height), area.Height);
+            int x = Math.Max(area.Left, Math.Min(saved.X, area.Right - w)), y = Math.Max(area.Top, Math.Min(saved.Y, area.Bottom - h));
+            if (best == 0) { x = area.Left + (area.Width - w) / 2; y = area.Top + (area.Height - h) / 2; }   // skärmen finns inte kvar: mitt på fallback
+            return new System.Drawing.Rectangle(x, y, w, h);
+        }
+
         // Språkmodell efter var Whisper körs: turbo på grafikkortet (bäst), small på processorn (snabbare där)
         public static ToolPackage ModelFor(bool gpu) { return gpu ? ModelTurbo : ModelSmall; }
 

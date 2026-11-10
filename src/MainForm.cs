@@ -641,12 +641,23 @@ namespace TextSync
             Invalidate(true);
         }
 
-        // Fönstret får aldrig bli större än skärmen (t.ex. laptop med 150 % skalning)
+        // Fönstret får aldrig bli större än skärmen (t.ex. laptop med 150 % skalning).
+        // Storlek, plats och maximerat läge från förra gången används om de finns (`window` i settings.txt),
+        // annars hamnar fönstret mitt på skärmen där muspekaren är.
         protected override void OnLoad(EventArgs e)
         {
             base.OnLoad(e);
             var wa = Screen.FromPoint(Cursor.Position).WorkingArea;
+            Rectangle saved, fit = Rectangle.Empty; bool max;
+            bool have = Tools.ParseWindow(Tools.GetSetting("window", ""), out saved, out max);
+            if (have) fit = Tools.FitWindow(saved, Screen.AllScreens.Select(s => s.WorkingArea).ToArray(), wa, MinimumSize, out wa);
             MinimumSize = new Size(Math.Min(MinimumSize.Width, wa.Width), Math.Min(MinimumSize.Height, wa.Height));
+            if (have)
+            {
+                Bounds = fit;
+                if (max) WindowState = FormWindowState.Maximized;
+                return;
+            }
             Size = new Size(Math.Min(Width, wa.Width), Math.Min(Height, wa.Height));
             Location = new Point(wa.Left + (wa.Width - Width) / 2, wa.Top + (wa.Height - Height) / 2);
         }
@@ -927,6 +938,9 @@ namespace TextSync
                 if (a != DialogResult.Yes) { e.Cancel = true; return; }
             }
             StopPlay();
+            // kom ihåg storlek och plats till nästa gång. Är fönstret maximerat sparas storleken det hade före.
+            if (WindowState != FormWindowState.Minimized || !RestoreBounds.IsEmpty)
+                Tools.SetSetting("window", Tools.FormatWindow(WindowState == FormWindowState.Normal ? Bounds : RestoreBounds, WindowState == FormWindowState.Maximized));
             base.OnFormClosing(e);
         }
     }
