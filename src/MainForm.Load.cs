@@ -38,7 +38,7 @@ namespace TextSync
         {
             if (busy) return;
             path = (path ?? "").Trim().Trim('"');
-            refBox.Text = path; refLoadedPath = path;
+            refBox.Text = path; refLoadedPath = path; playMovie = null;
             mkvPath = null; refSrtCues = null;
             trackCombo.Items.Clear(); trackCombo.Visible = trackLabel.Visible = false;
             audioFilling = true; audioCombo.Items.Clear(); audioFilling = false; audioRow.Visible = false; refAudioIndex = 0;
@@ -168,7 +168,7 @@ namespace TextSync
             if (busy) return;
             path = (path ?? "").Trim().Trim('"');
             if (!SamePath(path, tgtLoadedPath) && encCombo.SelectedIndex != 0) { encReset = true; encCombo.SelectedIndex = 0; encReset = false; } // ny fil → automatisk igen
-            tgtBox.Text = path; tgtLoadedPath = path;
+            tgtBox.Text = path; tgtLoadedPath = path; playMovie = null;
             tgtCues = null; ClearResult();
             if (path.Length == 0) { tgtInfo.Text = ""; return; }
             try
@@ -213,6 +213,7 @@ namespace TextSync
             if (viewInfo != null) viewInfo.Text = "";
             if (acceptAllLink != null) acceptAllLink.Visible = false;
             if (resBox != null) resBox.Visible = false;
+            StopPlay();
             quality = null; weakStops = new List<int>(); cueWeak = null;
             if (openLink != null) openLink.Visible = false;
             undo.Clear(); rowMatched = null; transcript = null; origSynced = null; origUsed = null; if (saveTextBtn != null) saveTextBtn.Visible = false;

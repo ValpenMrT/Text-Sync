@@ -145,6 +145,7 @@ namespace TextSync
                 { UndoChange(); e.Handled = true; }
                 else if (e.KeyCode == Keys.F3 && synced != null) { NextUnmatched(); e.Handled = true; }
                 else if (e.KeyCode == Keys.F4 && !e.Alt && synced != null) { JumpWeak(e.Shift ? -1 : 1); e.Handled = true; }
+                else if (e.KeyCode == Keys.Escape && StopPlay()) { if (statusLabel.Text.StartsWith("▶")) SetStatus("", true); e.Handled = true; }   // Esc stoppar uppspelningen även härifrån
             };
             root.Controls.Add(head, 0, 0);
 
@@ -277,6 +278,7 @@ namespace TextSync
             {
                 var it = list.GetItemAt(e.X, e.Y);
                 int i = it != null ? it.Index : -1;
+                list.Cursor = !busy && OnPlayCell(e.Location) != null ? Cursors.Hand : Cursors.Default;   // play-knappen
                 if (i == hotRow) return;
                 int old = hotRow; hotRow = i;
                 redrawRow(old); redrawRow(i);
@@ -298,14 +300,41 @@ namespace TextSync
             };
             // true = programmet ritar raden: markerad i mörkt läge, eller under muspekaren (och inte markerad)
             Func<ListViewItem, bool> ownRow = it => (Theme.Dark && it.Selected) || (it.Index == hotRow && !it.Selected);
-            list.DrawItem += (s, e) => e.DrawDefault = !ownRow(e.Item);
+            // DrawDefault = false här, så att DrawSubItem anropas för varje cell
+            list.DrawItem += (s, e) => e.DrawDefault = false;
             list.DrawSubItem += (s, e) =>
             {
-                if (!ownRow(e.Item)) { e.DrawDefault = true; return; }
+                bool own = ownRow(e.Item);
+                // Programmet ritar alla celler (play-knappen i länkfärg, texten i radens färg), utom på en markerad rad i ljust läge, som Windows ritar
+                // (play-knappen ritas alltid av programmet, eftersom cellens text är till för skärmläsare: "Spela rad 12")
+                bool winSel = !own && e.Item.Selected;
+                if (winSel && e.ColumnIndex != 0) { e.DrawDefault = true; return; }
                 bool sel = e.Item.Selected;
                 // första kolumnen får hela radens yta: begränsa till kolumnens bredd
                 var b = e.ColumnIndex == 0 ? new Rectangle(e.Bounds.X, e.Bounds.Y, e.Header.Width, e.Bounds.Height) : e.Bounds;
-                using (var bg = new SolidBrush(sel ? Theme.SelBg : Theme.HotBg)) e.Graphics.FillRectangle(bg, b);
+                Color cellBg = winSel ? (list.Focused ? SystemColors.Highlight : SystemColors.Control) : !own ? list.BackColor : sel ? Theme.SelBg : Theme.HotBg;
+                using (var bg = new SolidBrush(cellBg)) e.Graphics.FillRectangle(bg, b);
+                // fokusramen (t.ex. efter Ctrl+pil) ritade Windows förut
+                if (e.Item.Focused && list.Focused && !sel)
+                {
+                    // en ram runt hela raden: ritas cell för cell, klippt till cellen
+                    var clip = e.Graphics.Clip;
+                    e.Graphics.SetClip(b);
+                    ControlPaint.DrawFocusRectangle(e.Graphics, e.Item.Bounds);
+                    e.Graphics.Clip = clip;
+                }
+                if (e.ColumnIndex == 0)
+                {
+                    // en triangel i länkfärgen, lite större när muspekaren är över raden
+                    float h = b.Height * (e.Item.Index == hotRow ? 0.62f : 0.5f), w = h * 0.9f;
+                    float x0 = b.X + (b.Width - w) / 2f, y0 = b.Y + (b.Height - h) / 2f;
+                    var old = e.Graphics.SmoothingMode;
+                    e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+                    using (var br = new SolidBrush(winSel ? (list.Focused ? SystemColors.HighlightText : Theme.Link) : sel ? Color.White : Theme.Link))
+                        e.Graphics.FillPolygon(br, new[] { new PointF(x0, y0), new PointF(x0 + w, y0 + h / 2f), new PointF(x0, y0 + h) });
+                    e.Graphics.SmoothingMode = old;
+                    return;
+                }
                 var flags = TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix |
                     (e.Header.TextAlign == HorizontalAlignment.Right && e.ColumnIndex > 0 ? TextFormatFlags.Right : TextFormatFlags.Left);   // Windows vänsterjusterar alltid första kolumnen
                 // radens egen färg (röd, blå, grå) behålls när muspekaren är över
@@ -315,7 +344,8 @@ namespace TextSync
             };
             float k = 1f;
             using (var gr = CreateGraphics()) k = gr.DpiX / 96f;
-            list.Columns.Add("#", (int)(85 * k), HorizontalAlignment.Right);   // "Dela? 12" / "Ihop? 12" på förslagsrader
+            list.Columns.Add("▶", (int)(34 * k));   // play-knapp på varje rad: spelar filmen runt raden
+            list.Columns.Add("#", (int)(95 * k), HorizontalAlignment.Right);   // "Dela? 12" / "Ihop? 12" på förslagsrader, ⚠ på svaga ställen
             list.Columns.Add("Före synk", (int)(95 * k));
             list.Columns.Add("Synkad start", (int)(95 * k));
             list.Columns.Add("Synkad slut", (int)(95 * k));
@@ -327,9 +357,9 @@ namespace TextSync
             list.ClientSizeChanged += (s, e) =>
             {
                 int fixedW = 0;
-                foreach (ColumnHeader ch in list.Columns) if (ch.Index != 5 && ch.Index != 7) fixedW += ch.Width;
+                foreach (ColumnHeader ch in list.Columns) if (ch.Index != 6 && ch.Index != 8) fixedW += ch.Width;
                 int w = Math.Max((int)(150 * k), (list.ClientSize.Width - fixedW - 2) / 2);
-                list.Columns[5].Width = w; list.Columns[7].Width = w;
+                list.Columns[6].Width = w; list.Columns[8].Width = w;
             };
             list.SelectedIndexChanged += (s, e) =>
             {
@@ -345,16 +375,24 @@ namespace TextSync
             // redigera rader: dubbelklick/Enter = ändra, Insert = lägg till, Delete = ta bort, F3 = nästa röda rad, Ctrl+Z = ångra
             list.MultiSelect = true;
             list.ShowItemToolTips = true;
-            list.DoubleClick += (s, e) => EditSelected();
+            list.DoubleClick += (s, e) => { if (OnPlayCell(list.PointToClient(Cursor.Position)) == null) EditSelected(); };   // inte vid dubbelklick på play-knappen
+            list.MouseUp += (s, e) =>
+            {
+                if (e.Button != MouseButtons.Left) return;
+                var it = OnPlayCell(e.Location);
+                if (it != null) PlayRow(it.Index);
+            };
             list.KeyDown += (s, e) =>
             {
                 if (e.KeyCode == Keys.Delete) { DeleteSelected(); e.Handled = true; }
                 else if (e.KeyCode == Keys.Return) { EditSelected(); e.Handled = true; }
                 else if (e.KeyCode == Keys.Insert) { AddRow(); e.Handled = true; }
+                else if (e.KeyCode == Keys.P && !e.Control && !e.Alt) { PlaySelected(); e.Handled = true; e.SuppressKeyPress = true; }
                 else if (e.Control && e.KeyCode == Keys.A) { foreach (ListViewItem it in list.Items) it.Selected = true; e.Handled = true; }
             };
             var menu = new ContextMenuStrip();
             var miEdit = new ToolStripMenuItem("Ändra rad…", null, (s, e) => EditSelected()) { ShortcutKeyDisplayString = "Enter" };
+            var miPlay = new ToolStripMenuItem("Spela upp i filmen", null, (s, e) => PlaySelected()) { ShortcutKeyDisplayString = "P" };
             var miAdd = new ToolStripMenuItem("Lägg till rad…", null, (s, e) => AddRow()) { ShortcutKeyDisplayString = "Insert" };
             var miDel = new ToolStripMenuItem("Ta bort markerade rader", null, (s, e) => DeleteSelected()) { ShortcutKeyDisplayString = "Delete" };
             var miNext = new ToolStripMenuItem("Gå till nästa röda rad", null, (s, e) => NextUnmatched()) { ShortcutKeyDisplayString = "F3" };
@@ -363,7 +401,7 @@ namespace TextSync
             var miReject = new ToolStripMenuItem("Avvisa förslaget", null, (s, e) => RejectProposals(SelectedProposals()));
             var miAcceptAll = new ToolStripMenuItem("Godkänn alla förslag", null, (s, e) => AcceptProposals(proposals));
             var propSep = new ToolStripSeparator();
-            menu.Items.AddRange(new ToolStripItem[] { miEdit, miAdd, miDel, new ToolStripSeparator(), miNext, miUndo, propSep, miAccept, miReject, miAcceptAll });
+            menu.Items.AddRange(new ToolStripItem[] { miPlay, new ToolStripSeparator(), miEdit, miAdd, miDel, new ToolStripSeparator(), miNext, miUndo, propSep, miAccept, miReject, miAcceptAll });
             menu.Opening += (s, e) =>
             {
                 if (synced == null || busy) { e.Cancel = true; return; }
@@ -371,6 +409,7 @@ namespace TextSync
                 bool refOnly = list.SelectedIndices.Count == 1 && rowCue != null && rowCue[list.SelectedIndices[0]] < 0;
                 miEdit.Text = refOnly ? "Lägg till rad här…" : "Ändra rad…";
                 miEdit.Enabled = (n == 1 && list.SelectedIndices.Count == 1) || refOnly;
+                miPlay.Enabled = list.SelectedIndices.Count == 1;
                 miDel.Enabled = n > 0;
                 miDel.Text = n > 1 ? "Ta bort " + n + " markerade rader" : "Ta bort markerad rad";
                 miNext.Enabled = rowMatched != null && rowMatched.Any(m => !m);
@@ -460,6 +499,13 @@ namespace TextSync
             // "Som Windows": följ med när mörkt läge slås på eller av i Windows
             SystemEvents.UserPreferenceChanged += OnUserPreferenceChanged;
             ResumeLayout(true);
+        }
+
+        // Raden vars play-knapp (första kolumnen) ligger under punkten, annars null. HitTest tar hänsyn till rullning.
+        ListViewItem OnPlayCell(Point pt)
+        {
+            var hit = list.HitTest(pt);
+            return hit.Item != null && hit.SubItem == hit.Item.SubItems[0] ? hit.Item : null;
         }
 
         void OnUserPreferenceChanged(object sender, UserPreferenceChangedEventArgs e)
@@ -735,6 +781,7 @@ namespace TextSync
                 "2. Välj undertexten som inte går i takt.\n" +
                 "3. Klicka Synka. Beskedet ovanför listan säger om synken blev bra. Står det \"Kontrollera\" hoppar du mellan ställena med länkarna bredvid (märkta ⚠ i listan).\n" +
                 "4. Spara SRT: sparas som Filmnamn.sv.srt bredvid filmen, så hittar spelaren den.\n\n" +
+                "Klicka på ▶ på en rad (eller tryck P) för att spela filmen 5 sekunder före och efter raden, med texten ovanpå. Esc stänger filmfönstret.\n\n" +
                 "Har filmen ingen engelsk text men du har en engelsk SRT som inte går i takt: klicka \"Lägg till undertext på filmens originalspråk\" " +
                 "(eller dra in filmen och båda SRT-filerna). Den engelska synkas då mot filmens ljud och kontrolleras med Whisper, och sedan synkas den svenska mot den.\n\n" +
                 "Tips: dra in båda filerna samtidigt. Rödmarkerade rader saknar engelsk text samtidigt – ofta helt i sin ordning (t.ex. utrop).\n" +
@@ -758,6 +805,7 @@ namespace TextSync
                 var a = MessageBox.Show(this, "Text Sync arbetar fortfarande. Vill du avbryta och stänga?", Caption, MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
                 if (a != DialogResult.Yes) { e.Cancel = true; return; }
                 CancelWork();
+                StopPlay();
                 var p = muxProc;
                 if (p != null) { try { p.WaitForExit(5000); } catch { } }
                 CleanupMux(true);
@@ -767,6 +815,7 @@ namespace TextSync
                 var a = MessageBox.Show(this, "Den synkade undertexten är inte sparad. Vill du stänga ändå?", Caption, MessageBoxButtons.YesNo, MessageBoxIcon.Question);
                 if (a != DialogResult.Yes) { e.Cancel = true; return; }
             }
+            StopPlay();
             base.OnFormClosing(e);
         }
     }

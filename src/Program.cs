@@ -44,7 +44,7 @@ namespace TextSync
             {
                 var old = DateTime.Now.AddHours(-6);
                 var files = new List<string>();
-                foreach (var pat in new[] { "TextSync_*.wav", "TextSync_w_*.srt", "TextSync_*.srt" })
+                foreach (var pat in new[] { "TextSync_*.wav", "TextSync_w_*.srt", "TextSync_*.srt", "TextSync_play_*.mkv" })
                     files.AddRange(System.IO.Directory.GetFiles(System.IO.Path.GetTempPath(), pat));
                 string dl = System.IO.Path.Combine(Tools.Root, "downloads");
                 if (System.IO.Directory.Exists(dl)) files.AddRange(System.IO.Directory.GetFiles(dl, "*.part"));

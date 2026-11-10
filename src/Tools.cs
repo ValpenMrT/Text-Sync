@@ -206,6 +206,7 @@ namespace TextSync
 
         public static string FindFfmpeg() { return FindExe("ffmpeg.exe"); }
         public static string FindFfprobe() { return FindExe("ffprobe.exe"); }
+        public static string FindFfplay() { return FindExe("ffplay.exe"); }   // spelar upp filmen runt en rad (följer med i ffmpeg-paketet)
 
         static string FindExe(string exe)
         {

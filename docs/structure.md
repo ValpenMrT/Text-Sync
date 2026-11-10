@@ -14,6 +14,7 @@ src/
   MainForm.Audio.cs  Listorna Ljudspår och Grafikkort, nedladdning av verktyg, spara igenkänd text
   MainForm.Sync.cs   Synken (DoSync), resultatrutan och förhandsvisningen i listan
   MainForm.Save.cs   Spara SRT med säkerhetskopia, lägga in i MKV
+  MainForm.Play.cs   Spela upp filmen runt en rad med ffplay (▶ i listan), med de synkade raderna ovanpå
   Timeline.cs      Tidslinjen under listan (TimelinePanel)
   CueDialog.cs     Dialog för att ändra eller lägga till en rad (start, slut, text)
   Align.cs         Förslag om att slå ihop (2↔1) eller dela (1↔2) rader efter referensens radindelning (dynamisk programmering på tider)

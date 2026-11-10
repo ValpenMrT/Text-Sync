@@ -17,7 +17,7 @@
 5. **Synka en hel säsong på en gång** (önskemål 2026-11-09). Man drar in en mapp, eller flera filmer och SRT-filer. Programmet parar ihop dem efter avsnittsnummer i namnet (S04E01, 4x01 m.m.), visar parningen så att man kan rätta den, synkar dem i kö och sparar varje fil bredvid sitt avsnitt.
    - Visa en sammanfattning per avsnitt efteråt: klart, osäkert (se punkt 7) eller misslyckat med en svensk förklaring.
    - Avbryt ska stoppa kön efter det avsnitt som pågår och behålla det som redan är klart.
-6. **Granska i filmen** (önskemål 2026-11-09). Man klickar på en rad i listan och spelar upp filmen några sekunder runt repliken, med den synkade texten ovanpå. Det kontrollerar att texten stämmer med det som sägs, inte bara att tiderna har ändrats.
+6. ~~**Granska i filmen.**~~ **Klart 2026-11-10**, se beslutsloggen. Planen var: Man klickar på en rad i listan och spelar upp filmen några sekunder runt repliken, med den synkade texten ovanpå. Det kontrollerar att texten stämmer med det som sägs, inte bara att tiderna har ändrats.
    - Undersök ffplay (från samma ffmpeg-källa som i dag, fast URL + SHA-256) mot att öppna en vanlig spelare (VLC/mpv) med tid och textfil. ffplay kräver ingen installation hos vännerna.
    - Texten ska visas från osparade ändringar (tillfällig SRT), så att man kan granska före sparandet.
 7. ~~**Säg hur säker synken är.**~~ **Klart 2026-11-10**, se beslutsloggen. Planen var: Efter synken visas ett tydligt besked: grönt "Bra", gult "Kontrollera de markerade ställena" eller rött "Osäkert". Gult och rött har knappar för att hoppa till föregående och nästa svaga ställe i listan.
@@ -42,6 +42,13 @@
 - **Rekommendera Ljud A utan NVIDIA-grafikkort:** en kort förklaring bredvid valet när datorn saknar NVIDIA-kort.
 - **Markera rättningar från Whisper-kontrollen i listan**, så att man kan granska dem.
 - **Testutdata på svenska** ("offset", "cuts", "Route" m.fl.): översätts efter hand när testfilerna ändras.
+
+## Kvar från product-check 2026-11-10 (uppspelning, kan vänta)
+- **Uppspelningen är inte provad med riktiga verktyg.** Se beslutsloggen 2026-11-10 för vad ägaren ska prova.
+- **Kraschar Text Sync** medan ett klipp spelas blir ffplay-fönstret kvar överst tills klippet är slut (högst cirka 20 s) eller man trycker Esc.
+- **Filer utan bild** (t.ex. `.mka`) går inte att spela upp. Felmeddelandet säger att filmen kan sakna bild.
+- **Smart App Control** kan blockera ffmpeg och ffplay hos vännerna. Då visas en förklaring, och uppspelningen går inte att använda där.
+- **Tangenten P** står i hjälpen och i högerklicksmenyn, men inte bredvid knappen.
 
 ## Kvar från product-check 2026-11-10 (besked och varning för fel avsnitt, kan vänta)
 - **Beskedet mot ljud är inte mätt mot en riktig film.** Ett fel avsnitt ger där troligen Kontrollera eller Bra, inte Osäkert. Texten vid Bra säger därför att beskedet är mindre säkert mot ljud.

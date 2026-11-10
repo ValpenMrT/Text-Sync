@@ -318,7 +318,7 @@ namespace TextSync
                     var r = extraRef[ei++];
                     // i "Bara förslag" visas de grå rader som ingår i ett förslag, så att man ser båda referensraderna
                     if (view != ViewAll && !(view == ViewProposals && propRefs.Contains(r))) continue;
-                    var it = new ListViewItem(new[] { "", "", "", "", "", "",
+                    var it = new ListViewItem(new[] { HC ? "▶" : "Spela referensraden", "", "", "", "", "", "",
                         Srt.FormatTime(r.Start), r.Text.Replace("\n", " / ") });
                     it.ForeColor = RefOnlyRow;
                     it.ToolTipText = "Referensrad utan egen synkad rad – sparas inte. Dubbelklicka för att lägga till en rad på samma tid.";
@@ -333,7 +333,7 @@ namespace TextSync
                     if (view == ViewProposals && cueProp[i] < 0) continue;
                     // förslagsrader märks med text också, inte bara med färg
                     string mark = (cueWeak[i] ? "⚠ " : "") + (cueProp[i] < 0 ? "" : proposals[cueProp[i]].IsMerge ? "Ihop?  " : "Dela?  ");
-                    var it = new ListViewItem(new[] { mark + (i + 1),
+                    var it = new ListViewItem(new[] { HC ? "▶" : "Spela rad " + (i + 1), mark + (i + 1),
                         double.IsNaN(c.OrigStart) ? "— (ny rad)" : Srt.FormatTime(c.OrigStart),
                         Srt.FormatTime(c.Start), Srt.FormatTime(c.End),
                         // flyttad efter bildfrekvensomräkning – samma tal som "Avsnitt" i resultatet

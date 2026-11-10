@@ -508,6 +508,36 @@ namespace TextSync
                     qc.Verdict == Verdict.Check && qc.Weak.Count > 0);
             }
 
+            // ---- spela upp filmen runt en rad
+            {
+                string pa = MainForm.BuildClipArgs(@"C:\Film\Min film.mkv", "TextSync_play_abc.srt", "TextSync_play_abc.mkv", 61500, 13250, 0);
+                Console.WriteLine("Uppspelning: ffmpeg " + pa);
+                Check("Uppspelning: klippet får start och längd i sekunder med punkt före filmen, texten inbränd och första ljudspåret",
+                    pa.Contains(" -ss 61.500 -t 13.250 -i \"C:\\Film\\Min film.mkv\" ") && pa.Contains("-vf \"scale=960:-2,subtitles=TextSync_play_abc.srt\"") &&
+                    pa.Contains(" -map 0:v:0 -map 0:a:0? ") && pa.EndsWith(" TextSync_play_abc.mkv"));
+                string pb = MainForm.BuildClipArgs(@"C:\Film\a.mkv", null, "k.mkv", 0, 12000, 2);
+                Check("Uppspelning: valt ljudspår används, och utan rader i fönstret används inget textfilter",
+                    pb.Contains(" -map 0:a:2? ") && pb.Contains("-vf \"scale=960:-2\"") && !pb.Contains("subtitles"));
+                string pp = MainForm.BuildPlayArgs("TextSync_play_abc.mkv", "Text Sync – 00:01:06 (Esc stänger)");
+                Check("Uppspelning: spelaren stänger sig själv när klippet är slut", pp.Contains("-autoexit") && pp.EndsWith(" TextSync_play_abc.mkv") && pp.Contains("-window_title \"Text Sync – 00:01:06 (Esc stänger)\""));
+                var pc = new List<Cue> { new Cue(1000, 3000, "ett"), new Cue(9000, 11000, "två"), new Cue(20000, 22000, "tre"), new Cue(40000, 41000, "fyra"), new Cue(12000, 13000, " ") };
+                var win = MainForm.PlayCues(pc, 9000 - MainForm.PlayMarginMs, 11000 + MainForm.PlayMarginMs);
+                Check("Uppspelning: fönstret är 5 s före och efter raden, bara rader med text följer med, och tiderna räknas från klippets början",
+                    MainForm.PlayMarginMs == 5000 && win.Count == 1 && win[0].Text == "två" && win[0].Start == 5000 && win[0].End == 7000 && MainForm.PlayCues(pc, 0, 16000).Count == 2);
+                var cut = MainForm.PlayCues(pc, 2000, 10000);
+                Check("Uppspelning: rader som sticker ut ur klippet kapas vid klippets början och slut",
+                    cut.Count == 2 && cut[0].Start == 0 && cut[0].End == 1000 && cut[1].Start == 7000 && cut[1].End == 8000);
+                var vids = new[] { @"C:\F\Serie.S04E01.1080p.mkv", @"C:\F\Serie.S04E02.1080p.mkv", @"C:\F\Annan film.mp4" };
+                Check("Uppspelning: filmen med samma avsnittsnummer som texten väljs",
+                    MainForm.PickMovie(vids, @"C:\F\Serie.S04E02.en.srt", @"C:\F\serie 4x02 sv.srt") == vids[1]);
+                Check("Uppspelning: en ensam film i mappen väljs, och filmen med samma namn som texten",
+                    MainForm.PickMovie(new[] { vids[2] }, @"C:\F\ref.srt", @"C:\F\text.srt") == vids[2] &&
+                    MainForm.PickMovie(new[] { vids[2], @"C:\F\Tredje.mkv" }, @"C:\F\ref.srt", @"C:\F\Annan film.sv.srt") == vids[2]);
+                Check("Uppspelning: går det inte att avgöra väljs ingen film (användaren får frågan)",
+                    MainForm.PickMovie(new[] { vids[2], @"C:\F\Tredje.mkv" }, @"C:\F\ref.srt", @"C:\F\text.srt") == null &&
+                    MainForm.PickMovie(new[] { vids[0] }, @"C:\F\ref.srt", @"C:\F\Serie.S04E02.srt") == null);
+            }
+
             Console.WriteLine();
             if (muxSkipped) Console.WriteLine("OBS: testet av \"Lägg in i MKV\" hoppades över, eftersom mkvmerge (MKVToolNix) inte är installerat.");
             if (failed == 0) Console.WriteLine("RESULTAT: alla {0} kontroller gick igenom.", checks);

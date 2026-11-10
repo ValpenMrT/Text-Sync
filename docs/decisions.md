@@ -2,6 +2,22 @@
 
 Nyast först.
 
+## 2026-11-10 – Spela upp filmen runt en rad (▶ i listan)
+- **Område:** GUI
+- **Önskemål (ägaren):** en liten play-knapp på varje textrad som spelar 5 sekunder före och 5 sekunder efter, så att man kan kontrollera att texten stämmer med det som sägs.
+- **Beslut:**
+  - En smal kolumn **▶** längst till vänster i listan, på varje rad (även de grå referensraderna). Klick, tangenten **P** eller högerklick → "Spela upp i filmen" spelar från 5 s före radens start till 5 s efter radens slut.
+  - **ffmpeg klipper ut stället** till en liten tillfällig film (960 px bred, med texten inbränd), och **ffplay spelar den** i ett eget fönster som ligger överst och stänger sig själv när klippet är slut. Esc stänger det, också från Text Sync-fönstret. Båda verktygen följer med i ffmpeg-paketet som ljudsynken redan använder (fast URL + SHA-256), så vännerna behöver inte installera något. Saknas de frågar programmet först (cirka 110 MB). VLC och mpv valdes bort eftersom de kräver installation.
+  - **Varför två steg:** att låta ffplay hoppa direkt i filmen (`-ss`, `-t`, `-autoexit`) prövades först på papperet. Granskningen visade att ffplay då läser till filens slut innan fönstret stängs (minuter på en film på 14 GB), att starten hamnar på närmaste nyckelbild och att texten kan hamna fel i format där tiderna inte börjar på 0 (.ts). Ett utklippt klipp börjar exakt och på tiden 0. Priset är några sekunders väntan ("Förbereder…" i statusraden).
+  - **Texten ovanpå är de synkade raderna som de är just nu**, även osparade ändringar. De skrivs till en tillfällig SRT i `%TEMP%` med tider räknade från klippets början. Verktygen startas i den mappen och får bara filnamn, så att sökvägen inte behöver skrivas om för ffmpegs filter. Klippet och SRT-filen tas bort när uppspelningen är slut, och rester rensas vid nästa start.
+  - **Ljudspåret** är det som är valt i listan Ljudspår.
+  - **Filmen:** referensfilmen. Är referensen en SRT letar programmet bredvid filerna (samma avsnittsnummer, annars den enda filmen i mappen, annars samma namn som texten). Går det inte att avgöra får man välja filmen, en gång.
+  - En ny uppspelning stoppar den förra. Uppspelningen stoppas när en ny fil läses in och när programmet stängs.
+- **Teknik:** listan ritar nu alla celler själv (utom i högkontrast, och utom texten på en markerad rad i ljust läge), eftersom Windows annars inte anropar ritningen per cell. Play-knappen är en triangel i länkfärgen. Cellens text är "Spela rad N", så att en skärmläsare säger vad knappen gör.
+- **Test:** 76 av 76 kontroller (8 nya: argumenten till ffmpeg och ffplay, vilka rader som följer med och deras tider, val av film). Listan kontrollerades på skärmbilder i ljust och mörkt läge.
+- **Ej provat: själva uppspelningen.** ffmpeg och ffplay finns inte på utvecklingsdatorn, och nedladdade program får inte köras i Claudes miljö. Ägaren provar på sin dator: en rad mitt i en stor film, en rad nära början, valt ljudspår 2 och hur lång tid "Förbereder…" tar på en 4K-film.
+- **Product-check (oberoende granskning):** ett blockerande fynd (fönstret stängdes inte i tid), löst med de två stegen ovan. Rättat också: klickytan följer med vid rullning (HitTest), skärmläsartext på play-knappen, fokusramen ritas igen, dubbelklick startar inte om uppspelningen, play-knappen ritas rätt på en markerad rad i ljust läge, länken Ångra kommer tillbaka efter nedladdningen, vanlig muspekare medan en synk pågår. Kan vänta (docs/next.md): uppspelningen blir kvar om Text Sync kraschar, ingen uppspelning av filer utan bild.
+- **Nivå:** LIVE
 ## 2026-11-10 – Besked om hur säker synken är, och varning för fel avsnitt
 - **Område:** GUI / synk
 - **Önskemål (ägaren):** programmet ska säga hur säker synken är och varna för fel avsnitt.
