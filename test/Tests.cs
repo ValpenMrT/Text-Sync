@@ -575,6 +575,67 @@ namespace TextSync
                 Check("Hörselskadade: konstig indata hänger inte programmet", sw2.ElapsedMilliseconds < 2000);
             }
 
+            // ---- kodade tecken (&amp;) och taggar (<i>, <b>, <u>, <s>, <font>)
+            {
+                Func<string, string> F = Markup.Fix;
+                Func<string, string> S0 = Markup.Strip;
+                Check("Tecken: &amp; &lt; &gt; &quot; &#39; och numeriska koder blir riktiga tecken",
+                    F("Tom &amp; Jerry") == "Tom & Jerry" && F("3 &lt; 5 &gt; 2") == "3 < 5 > 2" && F("&quot;Hej&quot;") == "\"Hej\"" && F("Det&#39;s") == "Det's" &&
+                    F("caf&#233; caf&#xE9; caf&eacute;") == "café café café" && F("Vänta&hellip;") == "Vänta…");
+                Check("Tecken: &nbsp; blir ett vanligt blanksteg, och dubbelt kodade tecken avkodas helt",
+                    F("Hej&nbsp;du") == "Hej du" && F("Tom &amp;amp; Jerry") == "Tom & Jerry" && F("&amp;lt;i&amp;gt;Hej&amp;lt;/i&amp;gt;") == "<i>Hej</i>");
+                Check("Tecken: vanliga &-tecken och okända koder står kvar",
+                    F("AT&T; nu") == "AT&T; nu" && F("Q&A") == "Q&A" && F("Tom & Jerry; sedan") == "Tom & Jerry; sedan" && F("&abc; &;") == "&abc; &;" && F("&#0; &#13;") == "&#0; &#13;");
+                Check("Taggar: hela taggar lämnas exakt som de är (kursiv, fetstil, understruken, genomstruken, färg, flera i varandra, över flera rader)",
+                    F("<i>Hej</i>") == "<i>Hej</i>" && F("<b>Hej</b> och <u>hej</u> och <s>hej</s>") == "<b>Hej</b> och <u>hej</u> och <s>hej</s>" &&
+                    F("<font color=\"#ffff00\">Gul</font>") == "<font color=\"#ffff00\">Gul</font>" && F("<b><i>Båda</i></b>") == "<b><i>Båda</i></b>" &&
+                    F("<i>Rad ett\nrad två</i>") == "<i>Rad ett\nrad två</i>" && F("- <i>Hej.</i>\n- <i>Hej då.</i>") == "- <i>Hej.</i>\n- <i>Hej då.</i>" &&
+                    F("{\\an8}<i>Överst</i>") == "{\\an8}<i>Överst</i>" && F("Han sa <i>nej </i>till mig.") == "Han sa <i>nej </i>till mig.");
+                Check("Taggar: tecken som inte är taggar står kvar",
+                    F("3 < 5 och 7 > 6") == "3 < 5 och 7 > 6" && F("I <3 you") == "I <3 you" && F("<island> <bra>") == "<island> <bra>" && Markup.Strip("3 < 5 och 7 > 6") == "3 < 5 och 7 > 6");
+                Check("Taggar: stora bokstäver, blanksteg och <em>/<strong> rättas",
+                    F("<I>Hej</I>") == "<i>Hej</i>" && F("<i >Hej</ i >") == "<i>Hej</i>" && F("<B>Hej</B>") == "<b>Hej</b>" && F("<em>Hej</em> <strong>du</strong>") == "<i>Hej</i> <b>du</b>" &&
+                    F("<FONT COLOR=\"red\">Röd</FONT>") == "<font COLOR=\"red\">Röd</font>");
+                Check("Taggar: en tagg som inte stängs stängs sist, och en som inte öppnas öppnas först",
+                    F("<i>Hej") == "<i>Hej</i>" && F("Hej</i>") == "<i>Hej</i>" && F("<b>Rad ett\nrad två") == "<b>Rad ett\nrad två</b>" && F("{\\an8}Hej</i>") == "{\\an8}<i>Hej</i>" &&
+                    F("<font color=\"red\">Röd") == "<font color=\"red\">Röd</font>" && F("<i>Hej<i/>") == "<i>Hej</i>");
+                Check("Taggar: fel ordning, dubbla och tomma taggar rättas (flera sorter samtidigt)",
+                    F("<i><b>Hej</i></b>") == "<i><b>Hej</b></i>" && F("<i><i>Hej</i>") == "<i>Hej</i>" && F("<i><i>Hej</i></i>") == "<i>Hej</i>" && F("Hej <i></i>du") == "Hej du" &&
+                    F("<b>Fet <i>båda</b> kursiv</i>") == "<b>Fet <i>båda</i></b><i> kursiv</i>" && F("<b><u>Hej") == "<b><u>Hej</u></b>");
+                Check("Taggar: rester från WebVTT tas bort", F("<c.yellow>Hej</c> <v Anna>du</v>") == "Hej du" && F("Hej <00:01:02.500>du") == "Hej du");
+                bool plainOk = true;
+                foreach (string t in new[] { "<I morgon åker vi.>", "<I am your father>", "<I love you>\nsa hon.", "Skylten: <S Bahn>", "<U turn>", "<V for Vendetta>", "vitamin <C> och <K>",
+                    "a < b > c", "if a<b and c>d", "x < s och y > 2", "<font size>", "< i >" })
+                    if (F(t) != t || S0(t) != t) { plainOk = false; Console.WriteLine("    ändrades: " + t.Replace("\n", " / ") + "  →  " + F(t).Replace("\n", " / ")); }
+                Check("Taggar: vanlig text inom vinkelparenteser som börjar med I, B, U, S, C eller V är inte taggar", plainOk);
+                Check("Taggar: en stängning för mycket tas bort, och en lagad text ändras inte om den lagas igen",
+                    F("<i>A</i> B</i>") == "<i>A</i> B" && new[] { "<i>A</i> B</i>", "Hej</i>", "<b>Fet <i>båda</b> kursiv</i>", "<i><b>Hej</i></b>", "x</i> y</b>", "<b>a</i> b</b>" }.All(t => F(F(t)) == F(t)));
+                Check("Tecken: tecken utanför grundplanet, stora bokstäver i koden och radbrytningar",
+                    F("Ja &#128512;") == "Ja 😀" && F("&#55357;") == "&#55357;" && F("Tom &AMP; Jerry &Amp; co") == "Tom & Jerry & co" && F("Rad&#10;&#10;två") == "Rad\ntvå" && F("Hej&nbsp;") == "Hej");
+                Func<string, string> S = Markup.Strip;
+                Check("Ta bort formatering: alla sorter tas bort och texten står kvar",
+                    S("<i>Hej</i>") == "Hej" && S("<b>Fet</b>, <u>understruken</u>, <s>struken</s>") == "Fet, understruken, struken" && S("<font color=\"#ffff00\" size=\"20\">Gul</font>") == "Gul" &&
+                    S("<b><i>Båda</i></b>") == "Båda" && S("{\\an8}<i>Överst</i>") == "Överst" && S("- <i>Hej.</i>\n- <b>Hej då.</b>") == "- Hej.\n- Hej då." && S("<I>Hej") == "Hej");
+                Check("Ta bort formatering: text utan formatering ändras inte, och klamrar utan kod står kvar",
+                    S("Hej  du ") == "Hej  du " && S("{text}") == "{text}" && S("♪ La la ♪") == "♪ La la ♪");
+                int fe, ft, fs;
+                var fl = Markup.FixAll(new List<Cue> { new Cue(0, 1000, "Tom &amp; Jerry"), new Cue(2000, 3000, "<i>Hej"), new Cue(4000, 5000, "&lt;I&gt;Hej &amp; hå"), new Cue(6000, 7000, "<i>Orörd</i>") }, out fe, out ft);
+                var fp = Markup.StripAll(fl, out fs);
+                Check("Tecken och taggar: antalet rättade rader räknas, och antalet rader och tiderna behålls",
+                    fe == 2 && ft == 2 && fl.Count == 4 && fl[2].Text == "<i>Hej & hå</i>" && fl[1].Start == 2000 && fs == 3 && fp.Count == 4 && fp[3].Text == "Orörd" && fl[3].Text == "<i>Orörd</i>" &&
+                    Markup.Summary(fe, ft) == "Rättat: kodade tecken (t.ex. &amp;) på 2 rader, trasig formatering (t.ex. <i> utan avslut) på 2 rader." && Markup.Summary(0, 0) == "" && Markup.Summary(1, 0) == "Rättat: kodade tecken (t.ex. &amp;) på 1 rad.");
+                var fpath = Path.Combine(dir, "markup.srt");
+                File.WriteAllText(fpath, "1\r\n00:00:01,000 --> 00:00:02,000\r\n<i>Tom &amp; Jerry\r\n\r\n", new UTF8Encoding(false));
+                var fsrt = Srt.ToSrt(Markup.FixAll(Srt.Load(fpath)));
+                Check("Tecken och taggar: en SRT-fil som läses, rättas och skrivs får riktiga tecken och hela taggar", fsrt.Contains("<i>Tom & Jerry</i>\r\n"));
+                var sw3 = System.Diagnostics.Stopwatch.StartNew();
+                F(string.Concat(Enumerable.Repeat("<i>", 3000)) + "x"); F(string.Concat(Enumerable.Repeat("</b>", 3000))); F(new string('<', 20000) + "i"); F(string.Concat(Enumerable.Repeat("&amp;", 5000))); S(string.Concat(Enumerable.Repeat("{\\", 5000)));
+                F("<" + new string(' ', 20000) + "x"); F(string.Concat(Enumerable.Repeat("<" + new string('\t', 5000) + "x", 20)));
+                int big = F(string.Concat(Enumerable.Repeat("<font color=\"red\">", 2000)) + string.Concat(Enumerable.Repeat("</i>", 2000))).Length;
+                Check("Tecken och taggar: orimligt djupa taggar blåser inte upp texten", big < 200000);
+                Check("Tecken och taggar: konstig indata hänger inte programmet", sw3.ElapsedMilliseconds < 2000);
+            }
+
             Console.WriteLine();
             if (muxSkipped) Console.WriteLine("OBS: testet av \"Lägg in i MKV\" hoppades över, eftersom mkvmerge (MKVToolNix) inte är installerat.");
             if (failed == 0) Console.WriteLine("RESULTAT: alla {0} kontroller gick igenom.", checks);

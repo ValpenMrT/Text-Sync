@@ -95,7 +95,10 @@ namespace TextSync
             using (var d = new CueDialog("Ändra rad " + (i + 1), shown.Start, shown.End, shown.Text))
             {
                 if (d.ShowDialog(this) != DialogResult.OK) return;
-                var nc = new Cue(d.StartMs - extra, d.EndMs - extra, d.CueText) { OrigStart = result.Output[i].OrigStart };
+                // Orörd text (bara tiden ändrades) behåller formateringen som rutan "Ta bort kursiv och annan formatering" döljer.
+                // Ny text lagas som vid inläsningen (kodade tecken, taggar som inte stängs).
+                string text = d.CueText == shown.Text ? result.Output[i].Text : Markup.Fix(d.CueText);
+                var nc = new Cue(d.StartMs - extra, d.EndMs - extra, text) { OrigStart = result.Output[i].OrigStart };
                 var list2 = new List<Cue>(result.Output);
                 list2[i] = nc;
                 Changed(list2, nc, "Rad " + (i + 1) + " ändrad.", "Ändrade rad " + (i + 1));
@@ -118,7 +121,7 @@ namespace TextSync
             using (var d = new CueDialog("Lägg till rad", start, end, ""))
             {
                 if (d.ShowDialog(this) != DialogResult.OK) return;
-                var nc = new Cue(d.StartMs - extra, d.EndMs - extra, d.CueText);
+                var nc = new Cue(d.StartMs - extra, d.EndMs - extra, Markup.Fix(d.CueText));
                 var list2 = new List<Cue>(result.Output); list2.Add(nc);
                 Changed(list2, nc, "Rad tillagd.", "Lade till rad vid " + Srt.FormatTime(d.StartMs));
             }
@@ -148,7 +151,8 @@ namespace TextSync
             foreach (var p in ps)
             {
                 for (int k = 0; k < p.Count; k++) replaced.Add(p.First + k);
-                foreach (var c in p.NewCues) added.Add(new Cue(c.Start - extra, c.End - extra, c.Text) { OrigStart = c.OrigStart });
+                // en delad rad kan få halva taggar ("<i>Rad ett." och "Rad två.</i>"): de lagas
+                foreach (var c in p.NewCues) added.Add(new Cue(c.Start - extra, c.End - extra, Markup.Fix(c.Text)) { OrigStart = c.OrigStart });
             }
             var list2 = result.Output.Where((c, i) => !replaced.Contains(i)).Concat(added).ToList();
             int merged = ps.Count(p => p.IsMerge), splits = ps.Count - merged;

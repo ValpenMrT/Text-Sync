@@ -43,6 +43,14 @@
 - **Markera rättningar från Whisper-kontrollen i listan**, så att man kan granska dem.
 - **Testutdata på svenska** ("offset", "cuts", "Route" m.fl.): översätts efter hand när testfilerna ändras.
 
+## Kvar från product-check 2026-11-10 (kodade tecken och taggar, kan vänta)
+- **Inte provat mot en riktig SRT-fil** med kodade tecken från en undertextsajt, eller på en TV som visar taggar som text.
+- **Tomma rader ligger kvar.** En rad som bara bestod av formatering (`<i> </i>`, eller `{\an8}` med rutan ikryssad) blir tom och sparas som ett numrerat block utan text. Ska de tas bort när filen sparas?
+- **Avvisade förslag kommer tillbaka** när rutan "Ta bort kursiv och annan formatering" kryssas i eller ur, eftersom förslagets nyckel (`AlignProposal.Key`) innehåller radens text.
+- **Det syns inte vilka rader som rättades** vid inläsningen, bara hur många. En felaktig lagning går därför inte att upptäcka utan att jämföra med originalet.
+- **Okända taggar** som `<br>` och `<sup>` rörs inte, inte heller av rutan.
+- **Text för hörselskadade** (`src/Sdh.cs`) räknar fortfarande allt mellan `<` och `>` som en tagg.
+
 ## Kvar från product-check 2026-11-10 (text för hörselskadade, kan vänta)
 - **Inte provat mot en riktig text för hörselskadade** (svensk eller engelsk). Prova en och se att rätt saker tas bort.
 - **Originaltexten** (separat SRT på filmens språk) rensas inte, så "Spara synkad originaltext" behåller `[MUSIC]`.

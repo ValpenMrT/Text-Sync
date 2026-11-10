@@ -52,7 +52,7 @@ namespace TextSync
                 bool video = IsMkv(path) || Audio.IsVideo(path);
                 if (!video && LooksLikeText(path)) // MKV börjar alltid med byte 0x1A
                 {
-                    refSrtCues = Srt.Load(path);
+                    refSrtCues = Markup.FixAll(Srt.Load(path));
                     if (refSrtCues.Count == 0) { refSrtCues = null; throw new InvalidDataException("Hittade inga repliker – är det en SRT-fil?"); }
                     refInfo.Text = refSrtCues.Count + " repliker, " + Duration(refSrtCues);
                 }
@@ -136,7 +136,7 @@ namespace TextSync
             {
                 if (IsMkv(path) || Audio.IsVideo(path) || !LooksLikeText(path)) throw new InvalidDataException("Det måste vara en undertext (SRT).");
                 if (SamePath(path, tgtLoadedPath)) throw new InvalidDataException("Det är samma fil som undertexten som ska synkas i fält 2. Välj undertexten på filmens originalspråk (t.ex. engelska).");
-                cues = Srt.Load(path);
+                cues = Markup.FixAll(Srt.Load(path));   // originaltexten kan också sparas, så den rättas på samma sätt
                 if (cues.Count < 5) throw new InvalidDataException("Hittade nästan inga repliker (" + cues.Count + ") – är det en SRT-fil?");
             }
             catch (Exception ex)
@@ -174,9 +174,13 @@ namespace TextSync
             try
             {
                 if (IsMkv(path) || Audio.IsVideo(path)) throw new InvalidDataException("Här ska undertexten (SRT) som ska synkas ligga. Lägg filmen i fält 1.");
-                tgtCues = Srt.Load(path, (int)Srt.Encodings[encCombo.SelectedIndex][0]);
+                // kodade tecken (&amp;) och trasiga taggar rättas alltid, redan vid inläsningen
+                int fixedEnt, fixedTags;
+                tgtCues = Markup.FixAll(Srt.Load(path, (int)Srt.Encodings[encCombo.SelectedIndex][0]), out fixedEnt, out fixedTags);
+                string fixedInfo = Markup.Summary(fixedEnt, fixedTags);
+                if (fixedInfo.Length > 0) Log.Info(fixedInfo + " (" + path + ")");
                 tgtInfo.ForeColor = Muted;
-                tgtInfo.Text = tgtCues.Count + " repliker, " + Duration(tgtCues);
+                tgtInfo.Text = tgtCues.Count + " repliker, " + Duration(tgtCues) + (fixedInfo.Length > 0 ? ".  " + fixedInfo : "");
                 if (tgtCues.Count == 0) { tgtInfo.ForeColor = ErrColor; tgtInfo.Text = "Hittade inga repliker – är det en SRT-fil?"; tgtCues = null; }
                 string guess = GuessLang(path);
                 if (guess != null) langBox.Text = guess;

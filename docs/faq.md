@@ -61,6 +61,17 @@ Ja. Kryssa i **Ta bort text för hörselskadade** bredvid Metod. Då tas ljudbes
 - Kryssar du i den efter synken rensas den synkade texten direkt. Statusraden säger hur många rader som ändrades och togs bort, och **Ctrl+Z** ångrar (rutan kryssas då ur igen).
 - Originalfilen ändras inte förrän du sparar, och då sparas en kopia av originalet. Valet gäller tills du kryssar ur rutan, även nästa gång du startar programmet.
 
+**Det står &amp;amp; eller andra konstiga koder i texten.**
+Det är tecken som har kodats för webben och blivit kvar i filen. Text Sync gör alltid om dem till riktiga tecken när filen läses in (&amp;amp; blir &, &amp;quot; blir "). Raden under fält 2 säger hur många rader som rättades. Du behöver inte göra något.
+
+**Min TV visar &lt;i&gt; och &lt;/i&gt; som text.**
+Det är taggar för kursiv stil. De flesta spelare på datorn (VLC, Plex, Kodi) visar texten kursiv, men en del TV-apparater visar taggarna som de står. Kryssa i **Ta bort kursiv och annan formatering** bredvid Metod. Då tas kursiv, fetstil, understruken och genomstruken text, färger och typsnitt bort, liksom koder som `{\an8}` (text överst i bilden). Själva texten står kvar.
+- Rutan gäller det som visas i listan, spelas upp och sparas. Kryssar du ur den kommer formateringen tillbaka, så du kan prova utan risk.
+- Ändrar du texten på en rad för hand, eller slår ihop eller delar rader via ett förslag, medan rutan är ikryssad får de raderna inte tillbaka formateringen när du kryssar ur den. Ändrar du bara tiden behålls den.
+- Är rutan inte ikryssad behålls formateringen. Trasig formatering lagas alltid vid inläsningen, till exempel en kursiv som aldrig avslutas. Raden under fält 2 säger hur många rader som lagades.
+- Vanlig text inom vinkelparenteser, till exempel "\<I morgon åker vi.\>", är inte formatering och står alltid kvar.
+- Valet gäller tills du kryssar ur rutan, även nästa gång du startar programmet.
+
 **Kan jag ändra, lägga till eller ta bort rader?**
 Ja, i listan:
 - **Dubbelklick** eller **Enter** ändrar text och tid.

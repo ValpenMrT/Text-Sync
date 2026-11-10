@@ -160,7 +160,8 @@ namespace TextSync
                 if (d.ShowDialog(this) != DialogResult.OK) return;
                 try
                 {
-                    string backup = SaveWithBackup(d.FileName, origUsed.Path, origSynced);
+                    int stripped;
+                    string backup = SaveWithBackup(d.FileName, origUsed.Path, plainCheck.Checked ? Markup.StripAll(origSynced, out stripped) : origSynced);
                     lastOutput = d.FileName;
                     SetStatus("✔ Originaltext sparad: " + Path.GetFileName(d.FileName) + "." + (backup != null ? "  Originalet finns kvar i mappen \"" + BackupFolder + "\"." : ""), true);
                     openLink.Visible = true;

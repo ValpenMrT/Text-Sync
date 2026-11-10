@@ -67,7 +67,8 @@ namespace TextSync
         ComboBox trackCombo, modeCombo, encCombo;
         Label refInfo, tgtInfo, statusLabel, resultLabel, trackLabel;
         LinkLabel openLink, helpLink;
-        CheckBox fpsCheck, hiCheck;
+        CheckBox fpsCheck, hiCheck, plainCheck;
+        int plainCount;                // rader där formatering (kursiv m.m.) tas bort av rutan "Ta bort kursiv och annan formatering"
         string hiInfo;                 // vad som togs bort som text för hörselskadade (visas i resultatet)
         int hiUndoDepth;               // ångra-nivån där den synkade texten rensades i efterhand (0 = inte gjort)
         bool hiQuiet;                  // rutan ändras av programmet, inte av användaren
@@ -203,7 +204,7 @@ namespace TextSync
             tgtBox = MakePathBox(); tgtBox.Leave += (s, e) => { if (!busy && tgtBox.Text != tgtLoadedPath) LoadTarget(tgtBox.Text); };
             tgtBtn = MakeButton("Bläddra…", false);
             tgtBtn.Click += (s, e) => BrowseTarget();
-            tgtInfo = new Label { AutoSize = true, ForeColor = Muted, Margin = new Padding(0, 7, 0, 0), Text = "Dra in SRT-filen hit." };
+            tgtInfo = new Label { AutoSize = true, ForeColor = Muted, Margin = new Padding(0, 7, 0, 0), Text = "Dra in SRT-filen hit.", UseMnemonic = false };   // texten kan innehålla "&amp;"
             // teckenkodning: automatisk räcker nästan alltid; manuellt val om å/ä/ö eller t.ex. kyrilliska tecken blir fel
             encCombo = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 260, Margin = new Padding(0, 3, 0, 0), AccessibleName = "Teckenkodning" };
             foreach (var en in Srt.Encodings) encCombo.Items.Add(en[1]);
@@ -254,6 +255,22 @@ namespace TextSync
                 else if (hiInfo != null && !hiInfo.StartsWith("Ingen")) SetStatus("Rutan gäller från nästa synk. Synka igen för att få tillbaka texten som togs bort.", false);
             };
             opts.Controls.Add(hiCheck);
+            // formatering: <i>, <b>, <u>, <s>, <font> och {\an8}. Inte ikryssad från början, valet sparas till nästa gång.
+            // Rutan ändrar inte result.Output, utan bara det som visas, spelas upp och sparas (se RefreshPreview).
+            // Därför kommer formateringen tillbaka när rutan kryssas ur.
+            plainCheck = new CheckBox { Text = "Ta bort kursiv och annan formatering (för TV som visar <i> som text)", AutoSize = true, Margin = new Padding(0, 8, 16, 0), Checked = Tools.GetSetting("striptags", "0") == "1" };
+            plainCheck.CheckedChanged += (s, e) =>
+            {
+                Tools.SetSetting("striptags", plainCheck.Checked ? "1" : "0");
+                if (busy || result == null) return;
+                int before = plainCount;
+                RefreshPreview();
+                if (before != plainCount) { unsaved = true; openLink.Visible = false; }   // bara om texten som sparas ändrades
+                if (plainCheck.Checked) SetStatus(plainCount == 0 ? "Texten har ingen formatering att ta bort." : "Formatering borttagen på " + plainCount + (plainCount == 1 ? " rad" : " rader") + ". Kryssa ur rutan för att få tillbaka den.", plainCount == 0);
+                else SetStatus("Formateringen är tillbaka.", false);
+                Log.Info("Ta bort formatering: " + (plainCheck.Checked ? "på, " + plainCount + " rader" : "av"));
+            };
+            opts.Controls.Add(plainCheck);
 
             syncBtn = MakeButton("&Synka", true);
             syncBtn.Width = 120; syncBtn.Height = 34; syncBtn.Margin = new Padding(0, 2, 12, 0);
@@ -788,7 +805,7 @@ namespace TextSync
             syncBtn.Enabled = !busy && haveRef && tgtCues != null;
             saveBtn.Enabled = !busy && synced != null;
             muxBtn.Enabled = !busy && synced != null;
-            foreach (Control c in new Control[] { refBox, tgtBox, refBtn, tgtBtn, trackCombo, modeCombo, fpsCheck, hiCheck, extraNum, langBox, encCombo, gpuCombo, audioCombo, origLink })
+            foreach (Control c in new Control[] { refBox, tgtBox, refBtn, tgtBtn, trackCombo, modeCombo, fpsCheck, hiCheck, plainCheck, extraNum, langBox, encCombo, gpuCombo, audioCombo, origLink })
                 if (c != null) c.Enabled = !busy;
             gpuCombo.Enabled = !busy && !gpuPending;
         }
@@ -834,6 +851,8 @@ namespace TextSync
                 "Har filmen ingen engelsk text men du har en engelsk SRT som inte går i takt: klicka \"Lägg till undertext på filmens originalspråk\" " +
                 "(eller dra in filmen och båda SRT-filerna). Den engelska synkas då mot filmens ljud och kontrolleras med Whisper, och sedan synkas den svenska mot den.\n\n" +
                 "Rutan \"Ta bort text för hörselskadade\" tar bort [MUSIK], (skrattar) och talarnamn som JOHN: ur texten. Resultatet säger hur många rader som togs bort.\n\n" +
+                "Kodade tecken som &amp; i texten görs alltid om till riktiga tecken (&), och trasig formatering som <i> utan avslut lagas. " +
+                "Visar din TV <i> som text? Kryssa i \"Ta bort kursiv och annan formatering\". Kryssar du ur rutan kommer formateringen tillbaka.\n\n" +
                 "Tips: dra in båda filerna samtidigt. Rödmarkerade rader saknar engelsk text samtidigt – ofta helt i sin ordning (t.ex. utrop).\n" +
                 "Kryssa i \"Föreslå radindelning som referensen\" så föreslår programmet att dela eller slå ihop rader som de engelska (blå, \"Dela?\"/\"Ihop?\") – högerklicka för att godkänna. " +
                 "Under varje förslag står hur raden blir om du godkänner det (→ blir). " +

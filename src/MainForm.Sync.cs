@@ -116,7 +116,7 @@ namespace TextSync
                                 return Tuple.Create(cues, f.Truncated);
                             }
                         });
-                        refc = res.Item1; truncated = res.Item2;
+                        refc = Markup.FixAll(res.Item1); truncated = res.Item2;   // WebVTT-spår i MKV har ofta &amp;
                         if (!truncated) trackCache[key] = refc;
                     }
                     if (refc.Count < 5) throw new InvalidDataException("Spåret innehåller nästan inga repliker (" + refc.Count + "). Välj ett annat spår.");
@@ -242,6 +242,7 @@ namespace TextSync
             }
             if (r.FpsText.Length > 0) sb.Append(r.FpsText + "\n");
             if (hiInfo != null) sb.Append(hiInfo + "\n");
+            if (plainCheck.Checked && plainCount > 0) sb.Append("Kursiv och annan formatering borttagen på " + plainCount + (plainCount == 1 ? " rad" : " rader") + ". Kryssa ur rutan för att få tillbaka den.\n");
             foreach (var n in r.Notes) sb.Append("⚠  " + n + "\n");
             if (!good) sb.Append("Under 95 % av raderna har referenstext samtidigt – granska de röda raderna (F3 hoppar till nästa).\n");
             if (proposals.Count > 0)
@@ -266,6 +267,9 @@ namespace TextSync
                 selCue = rowCue[row]; if (selCue < 0) selRef = rowRef[row];
             }
             synced = SyncEngine.ApplyExtra(result.Output, (double)extraNum.Value);
+            // formateringen tas bort ur det som visas, spelas upp och sparas. result.Output behåller den, så att den kommer tillbaka när rutan kryssas ur.
+            plainCount = 0;
+            if (plainCheck.Checked) synced = Markup.StripAll(synced, out plainCount);
             var refc = refCuesUsed ?? new List<Cue>();
             int ri = 0, lost = 0;
             rowMatched = new bool[synced.Count];
