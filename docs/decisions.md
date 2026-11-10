@@ -2,6 +2,20 @@
 
 Nyast först.
 
+## 2026-11-10 – Svar på de obesvarade frågorna
+- **Område:** GUI / ljudsynk / struktur
+- **Beslut (ägaren godkände Claudes förslag):**
+  - **Smart App Control:** ljudsynken döljs inte. Det svenska felmeddelandet räcker.
+  - **Nedladdning:** NVIDIA-användare får ingen extra fråga om ett mindre paket. Den som vill ha det väljer processorn i listan Grafikkort.
+  - **Ljud A rekommenderas** när datorn saknar NVIDIA-grafikkort, med en kort förklaring bredvid valet. (Inte byggt än, se docs/next.md.)
+  - **Ingen knapp för att ta bort verktygen.** Hjälptexten räcker.
+  - **Rättningar från Whisper-kontrollen markeras i listan**, så att man kan granska dem. (Inte byggt än.)
+  - **Testutdata översätts till svenska** efter hand, när testfilerna ändras.
+  - **`MainForm.cs` delas upp** i delar (partial class), med tidslinjen i en egen fil, innan nästa större funktion.
+  - **"Ta bort text för hörselskadade" är inte ikryssad från början.** Valet sparas till nästa gång.
+- **Kvar:** frågan om `.gitattributes`. Ägaren svarar senare.
+- **Nivå:** LIVE
+
 ## 2026-11-09 – Rättningar från product-check: ljudspår, grafikkort, nedladdning, felmeddelanden
 - **Område:** GUI / ljudsynk / drift
 - **Beslut (ägarens svar):** listan **Ljudspår** visas bara när filmen har mer än ett ljudspår och referensen använder ljudet (Ljud A/B/A+B eller Whisper-kontroll). Engelska väljs först, annars standardspåret, men aldrig ett kommentarspår eller syntolkning om det finns något annat. Valet gäller alla val i listan Referens. För MKV läses spåren ur filen, och för andra format med ffprobe i bakgrunden.

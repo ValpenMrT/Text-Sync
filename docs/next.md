@@ -31,12 +31,17 @@
     - Gäller både texten som sparas och texten som synkas, eftersom ljudbeskrivningar inte motsvarar tal och kan störa ljudsynken.
     - Visa hur många rader som ändrades eller togs bort, och gör ändringen ångringsbar som annan redigering.
     - Tester: en `Check(...)` per mönster ovan, plus kontroller av att vanlig dialog med parenteser eller versaler (t.ex. "FBI" eller "Han (min bror) kom hem") inte förstörs.
-    - Fråga 9 i README.md (om rutan är ikryssad från början) besvaras innan arbetet börjar.
+    - Rutan är inte ikryssad från början (ägarens svar 2026-11-10).
 11. **Varna för fel avsnitt** (önskemål 2026-11-09). Programmet varnar innan det synkar om texten verkar höra till ett annat avsnitt eller en annan version av filmen. Ett exempel är S04E02.srt mot S04E01.mkv. Varningen stoppar inte synken: rutan har knapparna "Synka ändå" och "Avbryt".
     - Kontroller: avsnittsnummer i filnamnen skiljer sig (samma tolkning som i punkt 5), textens längd skiljer sig mycket från filmens längd, eller synken hittar ingen tydlig matchning alls (den globala sökningen har ingen tydlig topp).
     - Meddelandet ska vara på svenska och säga vad som inte stämmer, t.ex. "Texten verkar höra till avsnitt 2, men filmen är avsnitt 1."
     - I kön för en hel säsong (punkt 5) blir varningen ett "osäkert"-besked för avsnittet i stället för en ruta som stoppar kön.
     - Gränserna sätts mot testerna och testfilmen, så att varningen inte visas för vanliga filmer med förtexter eller eftertexter som saknar text.
+
+## Beslutat 2026-11-10, inte byggt än
+- **Rekommendera Ljud A utan NVIDIA-grafikkort:** en kort förklaring bredvid valet när datorn saknar NVIDIA-kort.
+- **Markera rättningar från Whisper-kontrollen i listan**, så att man kan granska dem.
+- **Testutdata på svenska** ("offset", "cuts", "Route" m.fl.): översätts efter hand när testfilerna ändras.
 
 ## Kvar från product-check 2026-11-09
 Alla punkter är åtgärdade i 2.1 (se beslutsloggen 2026-11-09, "Rättningar från product-check"). Det som återstår:

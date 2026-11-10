@@ -50,22 +50,9 @@ Kopiera den senaste `TextSync-<version>.exe` från `Build\` till ett USB-minne. 
 Programmet är inte signerat (se [docs/decisions.md](docs/decisions.md)). Versionen står i filnamnet och i fönstrets rubrik, och sätts bara i `Program.Version` i [src/Program.cs](src/Program.cs) (plus de två `Assembly…Version`-raderna, som bygget kontrollerar).
 
 ### Obesvarade frågor (tas upp vid nästa körning)
-Från granskningen 2026-11-09 (product-check):
-1. Vänner med Smart App Control: ska ljudsynken döljas, eller räcker det svenska felmeddelandet som finns nu?
-2. Sedan 2.1 hämtas bara det som behövs för valt grafikkort: cirka 1,4 GB med NVIDIA-kort och 0,6 GB med processorn. Räcker det, eller ska NVIDIA-användare också få frågan om de vill ha det mindre paketet?
-3. Ska programmet rekommendera Ljud A när det inte finns något NVIDIA-grafikkort?
-4. Hjälptext om hur man tar bort de nedladdade verktygen finns sedan 2.1 (Hjälp-rutan och docs/faq.md). Behövs också en knapp i programmet?
-5. Ska rättningar från Whisper-kontrollen markeras i listan så att man kan granska dem?
-
 Från genomgången av projektstrukturen 2026-11-09:
 
-6. Ska testutdata översättas till svenska ("offset", "cuts", "Route" m.fl.), enligt regeln i CLAUDE.md?
-7. Ska en `.gitattributes` läggas till för enhetliga radslut? `src/Mkv.cs` har blandade radslut.
-8. Ska `MainForm.cs` (cirka 2 000 rader) delas upp, med tidslinjen i en egen fil och resten i delar (partial class)?
-
-Från planen för att ta bort text för hörselskadade 2026-11-09 (se docs/next.md, punkt 10):
-
-9. Ska inställningen "Ta bort text för hörselskadade" vara ikryssad från början? Förslag: inte ikryssad, så att ingen text försvinner utan att man har valt det. Valet sparas till nästa gång.
+1. Ska en `.gitattributes` läggas till för enhetliga radslut? `src/Mkv.cs` har blandade radslut. Förslag: ja. (Ägaren svarar senare, 2026-11-10.)
 
 ### Dokumentation
 
