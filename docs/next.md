@@ -78,6 +78,10 @@ Alla punkter är åtgärdade i 2.1 (se beslutsloggen 2026-11-09, "Rättningar fr
 - **Diskutrymmet för den tillfälliga ljudfilen** (cirka 230 MB för 2 timmar film i `%TEMP%`) kontrolleras inte. Fullt utrymme ger felmeddelandet om att filen inte kunde läsas eller skrivas (kan vänta).
 - **Ordningen på ljudspåren** i MKV antas vara samma som ffmpegs `0:a:n`. Det stämmer enligt Matroska och ffmpeg, men är inte provat på en riktig film med flera ljudspår.
 
+## Kvar från ombyggnaden av gränssnittet 2026-11-10 (kan vänta)
+- **Litet fönster:** i det minsta fönstret (940 × 600 vid 100 %, till exempel hela skärmen på en bärbar dator med 1920 × 1200 och 200 % skalning) syns nästan ingenting av listan efter en synk. Förslag: göm tidslinjen när höjden inte räcker, eller låt hela fönstret rulla.
+- **Skalning:** 125 % och 150 % är inte provade efter ombyggnaden. Varför rubriken i ruta 1 fick dubbel marginal vid 200 % är inte utrett (kringgått i `FitLabelHeight`).
+
 ## Frågor till ägaren
 Obesvarade frågor står i README.md under "Obesvarade frågor (tas upp vid nästa körning)". Flytta svaren hit eller till beslutsloggen när de är besvarade.
 

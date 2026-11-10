@@ -323,7 +323,8 @@ namespace TextSync
             // rad 2: siffrorna, med samma färger som raderna i listan
             // rad 3: varningar (visas alltid), och under Detaljer resten: hur synken gjordes, färgerna och hur man redigerar
             verdictLabel = new Label { AutoSize = true, Font = new Font("Segoe UI Semibold", 11.5F), Margin = new Padding(0, 0, 14, 0) };
-            summaryLabel = new Label { AutoSize = true, UseMnemonic = false, Margin = new Padding(0, 4, 14, 0) };
+            summaryLabel = new Label { Anchor = AnchorStyles.Left | AnchorStyles.Right, UseMnemonic = false, Margin = new Padding(0, 4, 14, 0) };
+            FitLabelHeight(summaryLabel);
             prevWeakLink = new LinkLabel { Text = "◀ Föregående ställe", AutoSize = true, Margin = new Padding(0, 4, 14, 0), Visible = false, LinkColor = Accent };
             nextWeakLink = new LinkLabel { Text = "Nästa ställe ▶", AutoSize = true, Margin = new Padding(0, 4, 14, 0), Visible = false, LinkColor = Accent };
             prevWeakLink.LinkClicked += (s, e) => JumpWeak(-1);
@@ -352,7 +353,8 @@ namespace TextSync
             chips = new FlowLayoutPanel { AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, Dock = DockStyle.Top, WrapContents = true, Margin = new Padding(10, 6, 10, 6) };
             chips.Controls.AddRange(new Control[] { chipPct, chipRed, chipProp, chipGrey, chipFixed, chipSeg });
             FitFlowHeight(chips);
-            notesLabel = new Label { AutoSize = true, UseMnemonic = false, ForeColor = Theme.Warn, Margin = new Padding(10, 0, 10, 6), Visible = false };
+            notesLabel = new Label { Anchor = AnchorStyles.Left | AnchorStyles.Right, UseMnemonic = false, ForeColor = Theme.Warn, Margin = new Padding(10, 0, 10, 6), Visible = false };
+            FitLabelHeight(notesLabel);
 
             detailsSep = new Panel { Height = 1, Dock = DockStyle.Top, Margin = new Padding(10, 0, 10, 0), BackColor = Theme.BtnBorder, Visible = false };
             detailsPanel = new TableLayoutPanel { AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, Dock = DockStyle.Top, ColumnCount = 3, RowCount = 2, Margin = new Padding(10, 8, 10, 10), Visible = false };
@@ -362,7 +364,8 @@ namespace TextSync
             {
                 detailsPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, DetailPct[i]));
                 detailHead[i] = new Label { Text = heads[i], AutoSize = true, Font = new Font("Segoe UI Semibold", 9.5F), Margin = new Padding(0, 0, 16, 4) };
-                detailBody[i] = new Label { AutoSize = true, UseMnemonic = false, Margin = new Padding(0, 0, 16, 0) };
+                detailBody[i] = new Label { Anchor = AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Top, UseMnemonic = false, Margin = new Padding(0, 0, 16, 0) };
+                FitLabelHeight(detailBody[i]);
                 detailsPanel.Controls.Add(detailHead[i], i, 0); detailsPanel.Controls.Add(detailBody[i], i, 1);
             }
             detailBody[2].Text = "Dubbelklicka – ändra text och tid\nInsert – lägg till en rad\nDelete – ta bort raden\nCtrl+Z – ångra";
@@ -591,6 +594,7 @@ namespace TextSync
             root.Controls.Add(split, 0, 5);
             Shown += (s, e) => BeginInvoke(new Action(() =>
             {
+                RelayoutAll(root);   // höjder som sattes medan fönstret skalades (t.ex. 200 %) ska gälla innan listan får sin plats
                 try { split.SplitterDistance = Math.Max(80, split.Height - (int)(105 * k)); } catch { }
             }));
 
@@ -752,7 +756,7 @@ namespace TextSync
             zone.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             zone.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
             for (int i = 0; i < 3; i++) zone.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-            var cap = new Label { Text = caption, AutoSize = true, Font = new Font("Segoe UI Semibold", 10F), Margin = new Padding(0, 0, 0, 6), MaximumSize = new Size(400, 0) };
+            var cap = new Label { Text = caption, Anchor = AnchorStyles.Left | AnchorStyles.Right, Font = new Font("Segoe UI Semibold", 10F), Margin = new Padding(0) };   // luften under läggs till i FitLabelHeight: som marginal blev den dubbelt så stor i ruta 1 vid 200 % skalning
             zone.Controls.Add(cap, 0, 0); zone.SetColumnSpan(cap, 3);
             // ett litet pappersark i länkfärgen framför filnamnet
             var icon = new Panel { Size = new Size(16, 20), Margin = new Padding(1, 5, 8, 0) };
@@ -768,14 +772,10 @@ namespace TextSync
             };
             btn.Margin = new Padding(0);
             zone.Controls.Add(icon, 0, 1); zone.Controls.Add(name, 1, 1); zone.Controls.Add(btn, 2, 1);
-            info.Margin = new Padding(0, 6, 0, 0); info.MaximumSize = new Size(400, 0);
+            info.Margin = new Padding(0, 6, 0, 0); info.Anchor = AnchorStyles.Left | AnchorStyles.Right;
             zone.Controls.Add(info, 0, 2); zone.SetColumnSpan(info, 3);
             // rubriken och beskedet bryts efter rutans bredd
-            zone.SizeChanged += (s, e) =>
-            {
-                var max = new Size(Math.Max(100, zone.ClientSize.Width - zone.Padding.Horizontal), 0);
-                cap.MaximumSize = max; info.MaximumSize = max;
-            };
+            FitLabelHeight(cap, 6); FitLabelHeight(info);
             card.Controls.Add(zone, 0, 0);
             if (extra != null) { extra.Dock = DockStyle.Top; extra.Margin = new Padding(12, 0, 12, 10); card.Controls.Add(extra, 0, 1); }
 
@@ -822,6 +822,40 @@ namespace TextSync
             return t;
         }
 
+        // En etikett som fyller sin cell på bredden och bryter texten efter den. Höjden räknas ut här.
+        // En AutoSize-etikett i en tabell mäts ibland som om den vore några bildpunkter bred: vid 200 % skalning
+        // blev ruta 1 och 2 då flera tusen bildpunkter höga och fyllde hela fönstret.
+        // below = luft under texten, i bildpunkter vid 100 % skalning
+        static void FitLabelHeight(Label l, int below = 0)
+        {
+            l.AutoSize = false;
+            EventHandler fit = (s, e) =>
+            {
+                var flags = TextFormatFlags.WordBreak | (l.UseMnemonic ? TextFormatFlags.Default : TextFormatFlags.NoPrefix);
+                int w = Math.Max(20, l.ClientSize.Width - l.Padding.Horizontal);
+                int h = TextRenderer.MeasureText(l.Text.Length == 0 ? " " : l.Text, l.Font, new Size(w, 0), flags).Height + l.Padding.Vertical
+                    + below * l.Font.Height / 18;   // följer skalningen via typsnittets höjd (cirka 18 bildpunkter vid 100 %)
+                if (l.Height != h) { l.Height = h; RelayoutLater(l); }
+            };
+            l.SizeChanged += fit; l.TextChanged += fit; l.FontChanged += fit;
+            fit(l, EventArgs.Empty);
+        }
+
+        // När höjden ändras mitt i förälderns egen layout (den har just satt bredden) räknar föräldern inte om sina rader,
+        // och raden behåller den gamla höjden. Därför görs layouten om strax efteråt, hela vägen upp till fönstret.
+        static void RelayoutLater(Control c)
+        {
+            if (!c.IsHandleCreated) return;   // före visning: RelayoutAll körs när fönstret visas
+            c.BeginInvoke(new Action(() => { for (var p = c.Parent; p != null && !(p is Form); p = p.Parent) p.PerformLayout(); }));
+        }
+
+        // Gör om layouten inifrån och ut, så att varje tabell räknar sina rader efter delarnas slutliga höjd
+        static void RelayoutAll(Control c)
+        {
+            foreach (Control ch in c.Controls) RelayoutAll(ch);
+            if (c.Controls.Count > 0) c.PerformLayout();
+        }
+
         // En FlowLayoutPanel med AutoSize i en tabell mäts som om varje del stod på en egen rad, och då blir det tomrum under den.
         // Höjden sätts därför här, efter den bredd panelen faktiskt har (flera rader bara när delarna inte får plats på en).
         static void FitFlowHeight(FlowLayoutPanel p)
@@ -830,7 +864,7 @@ namespace TextSync
             EventHandler fit = (s, e) =>
             {
                 int h = p.GetPreferredSize(new Size(p.ClientSize.Width, 0)).Height;
-                if (p.Height != h) p.Height = h;
+                if (p.Height != h) { p.Height = h; RelayoutLater(p); }
             };
             p.Layout += (s, e) => fit(s, e);
             p.SizeChanged += fit;
@@ -866,7 +900,7 @@ namespace TextSync
             LayoutResult();
         }
 
-        // Texterna i resultatrutan bryts efter fönstrets bredd (AutoSize-etiketter bryter bara vid en satt största bredd)
+        // Meningen efter beskedet flyttas till en egen rad när den inte får plats bredvid. Texterna bryts av FitLabelHeight.
         void LayoutResult()
         {
             if (resBox == null || !resBox.Visible) return;
@@ -885,9 +919,6 @@ namespace TextSync
                 summaryLabel.Margin = below ? new Padding(0, 4, 0, 0) : new Padding(0, 4, 14, 0);
                 vrow.ResumeLayout();
             }
-            summaryLabel.MaximumSize = new Size(below ? w : Math.Max(160, w - used), 0);
-            notesLabel.MaximumSize = new Size(w, 0);
-            for (int i = 0; i < 3; i++) detailBody[i].MaximumSize = new Size(Math.Max(120, w * DetailPct[i] / 100 - 16), 0);
         }
 
         Button MakeButton(string text, bool primary)

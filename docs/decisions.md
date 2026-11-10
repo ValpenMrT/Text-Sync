@@ -2,6 +2,19 @@
 
 Nyast först.
 
+## 2026-11-10 – Rättat: ruta 1 och 2 fyllde hela fönstret vid 200 % skalning
+- **Område:** GUI
+- **Fel (ägaren):** "när man startar programmet så tar val av fil upp hela rutan". På ägarens skärm (3840 × 2400, 200 % skalning, fönstret maximerat) blev ruta 1 och 2 nästan 5 000 bildpunkter höga, så att resten av fönstret hamnade utanför. Felet kom med ombyggnaden samma dag och syntes inte vid 100 % skalning, som skärmbilderna då togs i.
+- **Orsak:** rubriken och beskedet i rutorna var etiketter med AutoSize i nästlade tabeller. Vid skalningen mättes de som om de vore några bildpunkter breda, och raderna behöll den höjden. Resultatrutan hade samma fel i mindre skala (tomrum under siffrorna).
+- **Beslut:** etiketter som ska bryta text får sin höjd uträknad av programmet efter den bredd de faktiskt har (`FitLabelHeight`), på samma sätt som raderna med knappar och siffror (`FitFlowHeight`). När en höjd ändras görs layouten om strax efteråt (`RelayoutLater`), och en gång när fönstret visas (`RelayoutAll`).
+- **Också rättat:** rubriken i ruta 1 fick dubbelt så stor marginal under sig som ruta 2 vid 200 %, så att filnamnen hamnade på olika höjd. Varför marginalen skalades två gånger i just ruta 1 är inte utrett. Luften under rubriken räknas nu ut efter typsnittets höjd i stället.
+- **Test:** 121 av 121 kontroller. Provat med formuläret i samma process, nu med samma skalning som det riktiga programmet (`SetProcessDPIAware`) och ägarens sparade fönster (maximerat, 3840 × 2259): tomt fönster, efter synk, Detaljer öppet. Rutorna är lika höga och listan får resten av fönstret.
+- **Kvar att veta:** i det minsta fönstret (940 × 600 vid 100 %, alltså hela skärmen på en bärbar dator med 1920 × 1200 och 200 % skalning) syns nästan ingenting av listan efter en synk: rubrik, rutor, resultat, tidslinje och spara-rad tar hela höjden. Det var så även före ombyggnaden. Förslag i `docs/next.md`.
+- **Ej provat:** 125 % och 150 % skalning, och att flytta fönstret mellan skärmar med olika skalning.
+- **Lärdom för test:** skärmbilder av fönstret ska tas med `SetProcessDPIAware` anropat först, annars körs testet i 100 % oavsett skärm.
+- **Product-check:** två oberoende granskningar (layoutkoden och användarens upplevelse) startades samtidigt. Deras fynd förs in i nästa post.
+- **Nivå:** LIVE
+
 ## 2026-11-10 – Kompakt resultatruta, Synka blir Avbryt, ruta 1 och 2 bredvid varandra
 - **Område:** GUI
 - **Önskemål (ägaren):** resultatrutan var svårläst och tog plats från listan ("minska ner detta och göra mer plats till själva srt överskådningen"), Synka-knappen ska bli en avbrytknapp när man trycker på den, steg 1 och 2 ska stå bredvid varandra, och man ska kunna klicka var som helst i rutan för att välja fil. En mockup gjordes först och godkändes ("designen såg bra ut. implementera den").
