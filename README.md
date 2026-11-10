@@ -33,7 +33,7 @@ Programmet jämför *när* det pratas och *när* repliker börjar, inte vad som 
 ```
 powershell -ExecutionPolicy Bypass -File build.ps1
 ```
-Det skapar `Build\TextSync-<version>.exe`, till exempel `Build\TextSync-2.1.exe`. Versionen läses ur `Program.Version` i [src/Program.cs](src/Program.cs), och bygget avbryts om `AssemblyVersion` och `AssemblyFileVersion` inte stämmer med den. Äldre versioner ligger kvar i `Build\`. Kräver bara Windows, med .NET Framework 4.8 som redan finns i Windows 10/11.
+Det skapar `Build\TextSync-<version>.exe`, till exempel `Build\TextSync-2.2.exe`. Versionen läses ur `Program.Version` i [src/Program.cs](src/Program.cs), och bygget avbryts om `AssemblyVersion` och `AssemblyFileVersion` inte stämmer med den. Äldre versioner ligger kvar i `Build\`. Kräver bara Windows, med .NET Framework 4.8 som redan finns i Windows 10/11.
 
 - **Lägg in i MKV…** kräver [MKVToolNix](https://mkvtoolnix.download/). Det behövs bara för den knappen.
 - Ljudsynk och Whisper behöver ffmpeg, whisper.cpp och en språkmodell. Programmet frågar och laddar ner dem första gången, och kontrollerar varje fil mot en SHA-256-summa. De hamnar i `%LOCALAPPDATA%\TextSync\tools`, cirka 1,4 GB med NVIDIA-grafikkort och 0,6 GB med processorn (det som hämtas följer valet i listan Grafikkort). Loggen och cachen ligger också i `%LOCALAPPDATA%\TextSync`.
