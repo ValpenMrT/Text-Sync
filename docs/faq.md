@@ -64,6 +64,9 @@ Ja. Kryssa i **Ta bort text för hörselskadade** bredvid Metod. Då tas ljudbes
 **Det står &amp;amp; eller andra konstiga koder i texten.**
 Det är tecken som har kodats för webben och blivit kvar i filen. Text Sync gör alltid om dem till riktiga tecken när filen läses in (&amp;amp; blir &, &amp;quot; blir "). Raden under fält 2 säger hur många rader som rättades. Du behöver inte göra något.
 
+**Vad betyder ✎ framför radnumret?**
+Raden rättades när filen lästes in: kodade tecken gjordes om till riktiga tecken, trasig formatering lagades eller `<br>` gjordes om till en radbrytning. Håll muspekaren över raden för att se vad som stod i filen. Välj **Bara rättade rader** i **Visa** ovanför listan för att se alla sådana rader. Rader där ingen text blev kvar, till exempel en rad med bara `<i></i>`, tas bort helt och sparas inte.
+
 **Min TV visar &lt;i&gt; och &lt;/i&gt; som text.**
 Det är taggar för kursiv stil. De flesta spelare på datorn (VLC, Plex, Kodi) visar texten kursiv, men en del TV-apparater visar taggarna som de står. Kryssa i **Ta bort kursiv och annan formatering** bredvid Metod. Då tas kursiv, fetstil, understruken och genomstruken text, färger och typsnitt bort, liksom koder som `{\an8}` (text överst i bilden). Själva texten står kvar.
 - Rutan gäller det som visas i listan, spelas upp och sparas. Kryssar du ur den kommer formateringen tillbaka, så du kan prova utan risk.

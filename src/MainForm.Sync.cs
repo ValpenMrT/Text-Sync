@@ -243,6 +243,8 @@ namespace TextSync
             if (r.FpsText.Length > 0) sb.Append(r.FpsText + "\n");
             if (hiInfo != null) sb.Append(hiInfo + "\n");
             if (plainCheck.Checked && plainCount > 0) sb.Append("Kursiv och annan formatering borttagen på " + plainCount + (plainCount == 1 ? " rad" : " rader") + ". Kryssa ur rutan för att få tillbaka den.\n");
+            int fixedRows = r.Output.Count(c => c.Raw != null);
+            if (fixedRows > 0) sb.Append((fixedRows == 1 ? "1 rad rättades" : fixedRows + " rader rättades") + " vid inläsningen (märkta ✎ i listan). Håll muspekaren över en sådan rad för att se vad som stod i filen, eller välj Bara rättade rader i Visa.\n");
             foreach (var n in r.Notes) sb.Append("⚠  " + n + "\n");
             if (!good) sb.Append("Under 95 % av raderna har referenstext samtidigt – granska de röda raderna (F3 hoppar till nästa).\n");
             if (proposals.Count > 0)
@@ -357,8 +359,9 @@ namespace TextSync
                     var c = synced[i]; var bc = best[i];
                     if (view == ViewOnlyRed && bc != null) continue;
                     if (view == ViewProposals && cueProp[i] < 0) continue;
+                    if (view == ViewFixed && c.Raw == null) continue;
                     // förslagsrader märks med text också, inte bara med färg
-                    string mark = (cueWeak[i] ? "⚠ " : "") + (cueProp[i] < 0 ? "" : proposals[cueProp[i]].IsMerge ? "Ihop?  " : "Dela?  ");
+                    string mark = (cueWeak[i] ? "⚠ " : "") + (c.Raw != null ? "✎ " : "") + (cueProp[i] < 0 ? "" : proposals[cueProp[i]].IsMerge ? "Ihop?  " : "Dela?  ");
                     var it = new ListViewItem(new[] { HC ? "▶" : "Spela rad " + (i + 1), mark + (i + 1),
                         double.IsNaN(c.OrigStart) ? "— (ny rad)" : Srt.FormatTime(c.OrigStart),
                         Srt.FormatTime(c.Start), Srt.FormatTime(c.End),
@@ -374,6 +377,8 @@ namespace TextSync
                         it.ForeColor = PropRow;
                         it.ToolTipText = proposals[cueProp[i]].Describe() + "\nHögerklicka för att godkänna eller avvisa.";
                     }
+                    // rättad vid inläsningen (kodade tecken, trasig formatering): visa vad som stod i filen
+                    if (c.Raw != null) it.ToolTipText = (string.IsNullOrEmpty(it.ToolTipText) ? "" : it.ToolTipText + "\n\n") + "✎ Rättad vid inläsningen. I filen stod:\n" + (c.Raw.Length > 400 ? c.Raw.Substring(0, 400) + "…" : c.Raw);
                     rowCue[row] = i; rowRef[row] = bc; cueRow[i] = row;
                     items.Add(it);
                     int pk = cueProp[i];
@@ -401,6 +406,7 @@ namespace TextSync
             // tom lista: säg varför, så att det inte ser ut som att synken misslyckades
             else if (view == ViewOnlyRed) viewInfo.Text = "Inga röda rader. Välj Alla rader i Visa för att se listan.";
             else if (view == ViewProposals && !proposeCheck.Checked) viewInfo.Text = "Förslag är avstängda. Kryssa i rutan bredvid, eller välj Alla rader.";
+            else if (view == ViewFixed) viewInfo.Text = "Inga rader rättades vid inläsningen. Välj Alla rader i Visa för att se listan.";
             else if (view == ViewProposals) viewInfo.Text = "Inga förslag" + (refIsText ? "" : " (görs bara mot text, inte mot ljud)") + ". Välj Alla rader i Visa.";
             else viewInfo.Text = "Inga rader att visa. Välj Alla rader i Visa.";
             list.BeginUpdate();

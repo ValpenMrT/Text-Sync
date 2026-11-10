@@ -17,8 +17,9 @@ namespace TextSync
         public double End;   // ms
         public string Text;
         public double OrigStart = double.NaN; // tiden i filen före synk (NaN = okänd, t.ex. en tillagd rad)
+        public string Raw;                    // texten som stod i filen, om den rättades vid inläsningen (Markup.FixAll). null = inte rättad
         public Cue(double s, double e, string t) { Start = s; End = e; Text = t ?? ""; }
-        public Cue Clone() { return new Cue(Start, End, Text) { OrigStart = OrigStart }; }
+        public Cue Clone() { return new Cue(Start, End, Text) { OrigStart = OrigStart, Raw = Raw }; }
     }
 
     public struct Iv
@@ -181,6 +182,7 @@ namespace TextSync
             foreach (var c in cues)
             {
                 if (c.End <= 0) continue;
+                if ((c.Text ?? "").Trim().Length == 0) continue;   // en rad utan text sparas inte (t.ex. bara formatering som togs bort)
                 sb.Append(n++).Append("\r\n");
                 sb.Append(FormatTime(c.Start)).Append(" --> ").Append(FormatTime(c.End)).Append("\r\n");
                 sb.Append((c.Text ?? "").Replace("\r\n", "\n").Replace("\n", "\r\n")).Append("\r\n\r\n");
@@ -575,7 +577,7 @@ namespace TextSync
 
             // output[i] hör till tgtCues[i] här (sorteras först nedan) → spara tiden före synk
             if (output.Count == tgtCues.Count)
-                for (int i = 0; i < output.Count; i++) output[i].OrigStart = tgtCues[i].Start;
+                for (int i = 0; i < output.Count; i++) { output[i].OrigStart = tgtCues[i].Start; output[i].Raw = tgtCues[i].Raw; }
             foreach (var c in output) { if (c.Start < 0) c.Start = 0; if (c.End < c.Start) c.End = c.Start; }
             output.Sort((x, y) => x.Start.CompareTo(y.Start));
             res.Output = output;
@@ -907,7 +909,7 @@ namespace TextSync
 
         public static List<Cue> ApplyExtra(List<Cue> cues, double extraMs)
         {
-            return cues.Select(c => new Cue(Math.Max(0, c.Start + extraMs), Math.Max(0, c.End + extraMs), c.Text) { OrigStart = c.OrigStart }).ToList();
+            return cues.Select(c => new Cue(Math.Max(0, c.Start + extraMs), Math.Max(0, c.End + extraMs), c.Text) { OrigStart = c.OrigStart, Raw = c.Raw }).ToList();
         }
     }
 }

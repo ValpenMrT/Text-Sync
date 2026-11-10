@@ -4,7 +4,7 @@
 ```
 powershell -ExecutionPolicy Bypass -File build.ps1
 ```
-Resultat: `Build\TextSync-<version>.exe` (cirka 165 kB), till exempel `Build\TextSync-2.3.exe`. Versionen läses ur `Program.Version` i `src\Program.cs`. Bygget avbryts med ett svenskt felmeddelande om versionen inte hittas, eller om `AssemblyVersion` och `AssemblyFileVersion` inte stämmer med den. Äldre versioner i `Build\` ligger kvar och tas aldrig bort av bygget. Inga beroenden utöver .NET Framework 4.8, som finns i Windows 10/11.
+Resultat: `Build\TextSync-<version>.exe` (cirka 165 kB), till exempel `Build\TextSync-2.4.exe`. Versionen läses ur `Program.Version` i `src\Program.cs`. Bygget avbryts med ett svenskt felmeddelande om versionen inte hittas, eller om `AssemblyVersion` och `AssemblyFileVersion` inte stämmer med den. Äldre versioner i `Build\` ligger kvar och tas aldrig bort av bygget. Inga beroenden utöver .NET Framework 4.8, som finns i Windows 10/11.
 
 ## Testa
 ```
@@ -36,7 +36,7 @@ Testerna (`Tests.cs`) täcker:
 ## Smart App Control på byggdatorn
 Smart App Control är påslaget på utvecklingsdatorn och blockerar ofta varje *nybyggd* exe-fil i flera minuter, ibland längre. Det gäller alltså även din egen dator. För att testa direkt kan programmet köras inifrån PowerShell (byt versionen mot den du har byggt):
 ```
-powershell -STA -Command "$a=[Reflection.Assembly]::Load([IO.File]::ReadAllBytes('Build\TextSync-2.3.exe')); $a.GetType('TextSync.Program').GetMethod('Main',[Reflection.BindingFlags]'Static,NonPublic').Invoke($null,@(,[string[]]@()))"
+powershell -STA -Command "$a=[Reflection.Assembly]::Load([IO.File]::ReadAllBytes('Build\TextSync-2.4.exe')); $a.GetType('TextSync.Program').GetMethod('Main',[Reflection.BindingFlags]'Static,NonPublic').Invoke($null,@(,[string[]]@()))"
 ```
 
 ## Dela ut

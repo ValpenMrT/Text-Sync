@@ -2,6 +2,21 @@
 
 Nyast först.
 
+## 2026-11-10 – 2.4: rader utan text tas bort, rättade rader märks, \<br\> blir radbrytning
+- **Område:** text / GUI
+- **Önskemål (ägaren, svar på det som stod kvar efter posten nedan):** ta bort rader som bara bestod av formatering. Markera vilka rader som har rättats. `<br>` brukar betyda ny rad. Version 2.4.
+- **Beslut:**
+  - **Rader utan text tas bort.** Blir ingen text kvar när en rad rättas vid inläsningen (den bestod bara av formatering, `&nbsp;` eller `<br>`) tas raden bort, och raden under fält 2 säger hur många ("3 rader utan text borttagna."). En rad som blir tom senare, till exempel `{\an8}` ensam med rutan "Ta bort kursiv och annan formatering" ikryssad, sparas inte (`Srt.ToSrt` hoppar över rader utan text). Det gäller alla filer som programmet sparar.
+  - **Rättade rader märks med ✎** i kolumnen # i listan. Verktygstipset på raden visar vad som stod i filen. Resultatrutan säger hur många rader som rättades, och **Visa → Bara rättade rader** visar bara dem. Märkningen följer raden genom synken (`Cue.Raw`). Den försvinner om radens text ändras för hand eller om raden slås ihop eller delas.
+  - **`<br>`, `<br/>` och `<BR />` blir en riktig radbrytning**, alltid vid inläsningen. Ingen spelare tolkar `<br>` i en SRT.
+  - **`<strike>` och `<del>`** görs om till `<s>`, på samma sätt som `<em>` och `<strong>`.
+  - **Version 2.4.**
+- **Claudes tolkning:** "markera" tolkades som en märkning i listan plus ett sätt att se bara de raderna och vad som stod före. Rader som togs bort helt visas inte, eftersom de inte hade någon text.
+- **Kända gränser:** `<br>` och `<strike>` räknas i beskedet som "trasig formatering". Andra taggar från webbsidor (`<p>`, `<span>`, `<a>`, `<sup>`) och koder från andra undertextformat (`\N` som radbrytning, `{y:i}` från MicroDVD, `{\i1}` från ASS) rörs inte.
+- **Test:** 110 av 110 kontroller (4 nya). Provat i programmet med Blacklist-texten med inlagda fel: 37 rader utan text togs bort vid inläsningen, 148 rader märktes med ✎ och visades ensamma med Bara rättade rader, verktygstipset visade originaltexten, och den sparade filen hade 330 block utan `<br>` eller `<strike>`.
+- **Product-check:** Claude granskade själv (mindre tillägg till posten nedan). Inget blockerande.
+- **Nivå:** LIVE
+
 ## 2026-11-10 – Kodade tecken avkodas alltid, taggar lagas, formatering kan tas bort
 - **Område:** text / GUI
 - **Önskemål (ägaren):** vissa SRT-filer har `&amp;` och liknande HTML-kodade tecken, och taggar som `<i>` visas som text i en del spelare. Avkoda tecknen alltid. Behåll `<i>` som standard och laga trasiga taggar. Ta bort taggar som ett val, för den som tittar på en TV som visar dem som text. Ta hänsyn till fler taggar än kursiv, till exempel fetstil. Gärna som en inställning.

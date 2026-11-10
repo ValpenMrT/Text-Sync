@@ -618,8 +618,20 @@ namespace TextSync
                     S("<b><i>Båda</i></b>") == "Båda" && S("{\\an8}<i>Överst</i>") == "Överst" && S("- <i>Hej.</i>\n- <b>Hej då.</b>") == "- Hej.\n- Hej då." && S("<I>Hej") == "Hej");
                 Check("Ta bort formatering: text utan formatering ändras inte, och klamrar utan kod står kvar",
                     S("Hej  du ") == "Hej  du " && S("{text}") == "{text}" && S("♪ La la ♪") == "♪ La la ♪");
-                int fe, ft, fs;
-                var fl = Markup.FixAll(new List<Cue> { new Cue(0, 1000, "Tom &amp; Jerry"), new Cue(2000, 3000, "<i>Hej"), new Cue(4000, 5000, "&lt;I&gt;Hej &amp; hå"), new Cue(6000, 7000, "<i>Orörd</i>") }, out fe, out ft);
+                Check("Taggar: <br> blir en radbrytning, och <strike>/<del> blir <s>",
+                    F("Rad ett<br>rad två") == "Rad ett\nrad två" && F("Rad ett<BR />rad två") == "Rad ett\nrad två" && F("Rad ett <br/> rad två") == "Rad ett\nrad två" &&
+                    F("<i>Rad ett<br>rad två</i>") == "<i>Rad ett\nrad två</i>" && F("<strike>Fel</strike> <del>fel</del>") == "<s>Fel</s> <s>fel</s>" && F("<bra>") == "<bra>");
+                int fe, ft, fs, fg;
+                var fl0 = Markup.FixAll(new List<Cue> { new Cue(0, 1000, "<i> </i>"), new Cue(2000, 3000, "Hej &amp; hå"), new Cue(4000, 5000, "&nbsp;"), new Cue(6000, 7000, "<br>"), new Cue(8000, 9000, "Orörd"), new Cue(10000, 11000, "") }, out fe, out ft, out fg);
+                Check("Tecken och taggar: rader där ingen text blir kvar tas bort, och en rättad rad minns vad som stod i filen",
+                    fg == 3 && fe == 1 && ft == 0 && fl0.Count == 3 && fl0[0].Text == "Hej & hå" && fl0[0].Raw == "Hej &amp; hå" && fl0[0].Clone().Raw == "Hej &amp; hå" && fl0[1].Raw == null && fl0[2].Text == "" &&
+                    Markup.Summary(fe, ft, fg) == "Rättat: kodade tecken (t.ex. &amp;) på 1 rad. 3 rader utan text borttagna." && Markup.Summary(0, 0, 1) == "1 rad utan text borttagen.");
+                var fsync = SyncEngine.Sync(refc, Markup.FixAll(Distort(other, t => t + 3700).Select((c, i) => i == 5 ? new Cue(c.Start, c.End, c.Text + " &amp; mer") : c).ToList()), new SyncOptions(), null);
+                Check("Tecken och taggar: märkningen av rättade rader följer med genom synken och den extra justeringen",
+                    fsync.Output.Count(c => c.Raw != null) == 1 && SyncEngine.ApplyExtra(fsync.Output, 100).Count(c => c.Raw != null && c.Raw.EndsWith("&amp; mer") && c.Text.EndsWith("& mer")) == 1);
+                Check("SRT: en rad utan text sparas inte",
+                    Srt.ToSrt(new List<Cue> { new Cue(0, 1000, "Ett"), new Cue(2000, 3000, " "), new Cue(4000, 5000, "Två") }) == "1\r\n00:00:00,000 --> 00:00:01,000\r\nEtt\r\n\r\n2\r\n00:00:04,000 --> 00:00:05,000\r\nTvå\r\n\r\n");
+                var fl = Markup.FixAll(new List<Cue> { new Cue(0, 1000, "Tom &amp; Jerry"), new Cue(2000, 3000, "<i>Hej"), new Cue(4000, 5000, "&lt;I&gt;Hej &amp; hå"), new Cue(6000, 7000, "<i>Orörd</i>") }, out fe, out ft, out fg);
                 var fp = Markup.StripAll(fl, out fs);
                 Check("Tecken och taggar: antalet rättade rader räknas, och antalet rader och tiderna behålls",
                     fe == 2 && ft == 2 && fl.Count == 4 && fl[2].Text == "<i>Hej & hå</i>" && fl[1].Start == 2000 && fs == 3 && fp.Count == 4 && fp[3].Text == "Orörd" && fl[3].Text == "<i>Orörd</i>" &&

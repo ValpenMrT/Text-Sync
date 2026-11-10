@@ -40,7 +40,7 @@ namespace TextSync
         int[] cueRow;                  // index i synced -> listrad
         Cue[] rowRef;                  // listrad -> referensraden som visas (eller null)
         // vilka rader listan visar: 0 = alla, 1 = dölj grå rader, 2 = bara röda rader (sparas mellan körningar)
-        const int ViewAll = 0, ViewNoGray = 1, ViewOnlyRed = 2, ViewProposals = 3;
+        const int ViewAll = 0, ViewNoGray = 1, ViewOnlyRed = 2, ViewProposals = 3, ViewFixed = 4;
         ComboBox viewCombo; Label viewInfo; LinkLabel acceptAllLink; CheckBox proposeCheck;
         int refOnlyTotal;              // antal grå referensrader, även de som är dolda
         // förslag på att slå ihop eller dela rader så att de följer referensens radindelning (blå rader)
@@ -391,7 +391,7 @@ namespace TextSync
             float k = 1f;
             using (var gr = CreateGraphics()) k = gr.DpiX / 96f;
             list.Columns.Add("▶", (int)(34 * k));   // play-knapp på varje rad: spelar filmen runt raden
-            list.Columns.Add("#", (int)(95 * k), HorizontalAlignment.Right);   // "Dela? 12" / "Ihop? 12" på förslagsrader, ⚠ på svaga ställen
+            list.Columns.Add("#", (int)(110 * k), HorizontalAlignment.Right);   // "Dela? 12" / "Ihop? 12" på förslagsrader, ⚠ på svaga ställen, ✎ på rader som rättades vid inläsningen
             list.Columns.Add("Före synk", (int)(95 * k));
             list.Columns.Add("Synkad start", (int)(95 * k));
             list.Columns.Add("Synkad slut", (int)(95 * k));
@@ -477,7 +477,8 @@ namespace TextSync
                 "Alla rader",
                 "Dölj grå rader (finns bara i referensen)",
                 "Bara röda rader (ingen referenstext samtidigt)",
-                "Bara förslag (blå rader att slå ihop eller dela)" });
+                "Bara förslag (blå rader att slå ihop eller dela)",
+                "Bara rättade rader (märkta ✎, ändrade vid inläsningen)" });
             int view; if (!int.TryParse(Tools.GetSetting("view", "0"), out view) || view < 0 || view >= viewCombo.Items.Count) view = ViewAll;
             viewCombo.SelectedIndex = view;
             viewCombo.SelectedIndexChanged += (s, e) =>
@@ -851,7 +852,7 @@ namespace TextSync
                 "Har filmen ingen engelsk text men du har en engelsk SRT som inte går i takt: klicka \"Lägg till undertext på filmens originalspråk\" " +
                 "(eller dra in filmen och båda SRT-filerna). Den engelska synkas då mot filmens ljud och kontrolleras med Whisper, och sedan synkas den svenska mot den.\n\n" +
                 "Rutan \"Ta bort text för hörselskadade\" tar bort [MUSIK], (skrattar) och talarnamn som JOHN: ur texten. Resultatet säger hur många rader som togs bort.\n\n" +
-                "Kodade tecken som &amp; i texten görs alltid om till riktiga tecken (&), och trasig formatering som <i> utan avslut lagas. " +
+                "Kodade tecken som &amp; i texten görs alltid om till riktiga tecken (&), och trasig formatering som <i> utan avslut lagas. Sådana rader är märkta ✎ i listan: håll muspekaren över raden för att se vad som stod i filen. " +
                 "Visar din TV <i> som text? Kryssa i \"Ta bort kursiv och annan formatering\". Kryssar du ur rutan kommer formateringen tillbaka.\n\n" +
                 "Tips: dra in båda filerna samtidigt. Rödmarkerade rader saknar engelsk text samtidigt – ofta helt i sin ordning (t.ex. utrop).\n" +
                 "Kryssa i \"Föreslå radindelning som referensen\" så föreslår programmet att dela eller slå ihop rader som de engelska (blå, \"Dela?\"/\"Ihop?\") – högerklicka för att godkänna. " +

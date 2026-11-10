@@ -98,7 +98,7 @@ namespace TextSync
                 // Orörd text (bara tiden ändrades) behåller formateringen som rutan "Ta bort kursiv och annan formatering" döljer.
                 // Ny text lagas som vid inläsningen (kodade tecken, taggar som inte stängs).
                 string text = d.CueText == shown.Text ? result.Output[i].Text : Markup.Fix(d.CueText);
-                var nc = new Cue(d.StartMs - extra, d.EndMs - extra, text) { OrigStart = result.Output[i].OrigStart };
+                var nc = new Cue(d.StartMs - extra, d.EndMs - extra, text) { OrigStart = result.Output[i].OrigStart, Raw = d.CueText == shown.Text ? result.Output[i].Raw : null };
                 var list2 = new List<Cue>(result.Output);
                 list2[i] = nc;
                 Changed(list2, nc, "Rad " + (i + 1) + " ändrad.", "Ändrade rad " + (i + 1));

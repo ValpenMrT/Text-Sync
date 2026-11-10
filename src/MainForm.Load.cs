@@ -175,9 +175,9 @@ namespace TextSync
             {
                 if (IsMkv(path) || Audio.IsVideo(path)) throw new InvalidDataException("Här ska undertexten (SRT) som ska synkas ligga. Lägg filmen i fält 1.");
                 // kodade tecken (&amp;) och trasiga taggar rättas alltid, redan vid inläsningen
-                int fixedEnt, fixedTags;
-                tgtCues = Markup.FixAll(Srt.Load(path, (int)Srt.Encodings[encCombo.SelectedIndex][0]), out fixedEnt, out fixedTags);
-                string fixedInfo = Markup.Summary(fixedEnt, fixedTags);
+                int fixedEnt, fixedTags, fixedGone;
+                tgtCues = Markup.FixAll(Srt.Load(path, (int)Srt.Encodings[encCombo.SelectedIndex][0]), out fixedEnt, out fixedTags, out fixedGone);
+                string fixedInfo = Markup.Summary(fixedEnt, fixedTags, fixedGone);
                 if (fixedInfo.Length > 0) Log.Info(fixedInfo + " (" + path + ")");
                 tgtInfo.ForeColor = Muted;
                 tgtInfo.Text = tgtCues.Count + " repliker, " + Duration(tgtCues) + (fixedInfo.Length > 0 ? ".  " + fixedInfo : "");

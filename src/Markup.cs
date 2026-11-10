@@ -20,12 +20,14 @@ namespace TextSync
         // Därför: inget blanksteg direkt efter <, inga attribut utom i <font>, och <font> måste ha attribut med = (eller inga alls).
         // Antalet blanksteg är begränsat, så att mönstret inte kan bli långsamt.
         static readonly Regex Tag = new Regex(
-            @"<(?:(/)[ \t]{0,2})?(?:(i|b|u|s|em|strong)[ \t]{0,2}(/?)|(font)((?:\s(?:[^<>""]|""[^""<>]*"")*)?))>", RegexOptions.IgnoreCase);
+            @"<(?:(/)[ \t]{0,2})?(?:(i|b|u|s|em|strong|strike|del)[ \t]{0,2}(/?)|(font)((?:\s(?:[^<>""]|""[^""<>]*"")*)?))>", RegexOptions.IgnoreCase);
         // Rester från WebVTT som ingen spelare tolkar i en SRT. Tas bara bort när det syns att det är WebVTT:
         // <c.yellow>text</c> och <v Anna>text</v> (stängningen måste finnas), <ruby>/<rt> och tidskoder som <00:01:02.500>.
         static readonly Regex VttClass = new Regex(@"</?c(?:\.[\w.\-]+)?>");
         static readonly Regex VttVoice = new Regex(@"<v\s[^<>]{1,60}>|</v>");
         static readonly Regex VttOther = new Regex(@"</?(?:ruby|rt)>|<\d{1,2}:\d{2}(?::\d{2})?[.,]\d{3}>");
+        // <br>, <br/>, <BR />: radbrytning i HTML. Ingen spelare tolkar den i en SRT, så den görs om till en riktig radbrytning.
+        static readonly Regex Br = new Regex(@"<br[ \t]{0,2}/?>", RegexOptions.IgnoreCase);
         // Koder från ASS-formatet: {\an8} (text överst), {\i1}, {\pos(10,20)}
         static readonly Regex AssTag = new Regex(@"\{\\[^{}]*\}");
         static readonly Regex EmptyPair = new Regex(@"<(i|b|u|s|font)(?:\s[^<>]*)?>(\s*)</\1>");
@@ -76,7 +78,7 @@ namespace TextSync
         {
             bool font = m.Groups[4].Success;
             name = (font ? "font" : m.Groups[2].Value).ToLowerInvariant();
-            if (name == "em") name = "i"; else if (name == "strong") name = "b";
+            if (name == "em") name = "i"; else if (name == "strong") name = "b"; else if (name == "strike" || name == "del") name = "s";
             attrs = font ? m.Groups[5].Value.Trim() : "";
             // <i/> är en felskriven </i>
             close = m.Groups[1].Value == "/" || (!font && m.Groups[3].Value == "/");
@@ -182,7 +184,7 @@ namespace TextSync
             string r = s;
             if (s.IndexOf('<') >= 0)
             {
-                r = RepairTags(RemoveVtt(s));
+                r = RepairTags(RemoveVtt(Br.Replace(s, "\n")));
                 tags = r != s;
             }
             return entities || tags ? Tidy(r) : src;
@@ -205,24 +207,26 @@ namespace TextSync
 
         public static List<Cue> FixAll(List<Cue> cues)
         {
-            int e, t;
-            return FixAll(cues, out e, out t);
+            int e, t, r;
+            return FixAll(cues, out e, out t, out r);
         }
 
-        // Rättar alla rader. Antalet rader och ordningen ändras inte.
-        // entities = rader där kodade tecken rättades, tags = rader där taggar lagades.
-        public static List<Cue> FixAll(List<Cue> cues, out int entities, out int tags)
+        // Rättar alla rader. En rättad rad får Raw = texten som stod i filen, så att listan kan visa vad som ändrades.
+        // entities = rader där kodade tecken rättades, tags = rader där taggar lagades,
+        // removed = rader som togs bort för att ingen text blev kvar (de bestod bara av formatering eller blanksteg).
+        public static List<Cue> FixAll(List<Cue> cues, out int entities, out int tags, out int removed)
         {
-            entities = 0; tags = 0;
+            entities = 0; tags = 0; removed = 0;
             var res = new List<Cue>(cues.Count);
             foreach (var c in cues)
             {
                 bool e, t;
                 string s = Fix(c.Text, out e, out t);
+                if (!e && !t) { res.Add(c); continue; }
+                if (s.Trim().Length == 0) { removed++; continue; }
                 if (e) entities++;
                 if (t) tags++;
-                if (e || t) { var n = c.Clone(); n.Text = s; res.Add(n); }
-                else res.Add(c);
+                var n = c.Clone(); n.Text = s; n.Raw = (c.Text ?? "").Replace("\r\n", "\n"); res.Add(n);
             }
             return res;
         }
@@ -243,7 +247,16 @@ namespace TextSync
 
         // Besked efter inläsningen, t.ex. "Rättat: kodade tecken (t.ex. &amp;) på 14 rader, trasig formatering (t.ex. <i> utan avslut) på 3 rader."
         // Tomt om inget rättades. Visas i en Label: den måste ha UseMnemonic = false, annars blir "&a" ett understruket a.
-        public static string Summary(int entities, int tags)
+        public static string Summary(int entities, int tags) { return Summary(entities, tags, 0); }
+
+        public static string Summary(int entities, int tags, int removed)
+        {
+            string s = Summary2(entities, tags);
+            if (removed > 0) s += (s.Length > 0 ? " " : "") + (removed == 1 ? "1 rad utan text borttagen." : removed + " rader utan text borttagna.");
+            return s;
+        }
+
+        static string Summary2(int entities, int tags)
         {
             var parts = new List<string>();
             if (entities > 0) parts.Add("kodade tecken (t.ex. &amp;) på " + entities + (entities == 1 ? " rad" : " rader"));
