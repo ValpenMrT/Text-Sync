@@ -2,6 +2,26 @@
 
 Nyast först.
 
+## 2026-11-10 – Kompakt resultatruta, Synka blir Avbryt, ruta 1 och 2 bredvid varandra
+- **Område:** GUI
+- **Önskemål (ägaren):** resultatrutan var svårläst och tog plats från listan ("minska ner detta och göra mer plats till själva srt överskådningen"), Synka-knappen ska bli en avbrytknapp när man trycker på den, steg 1 och 2 ska stå bredvid varandra, och man ska kunna klicka var som helst i rutan för att välja fil. En mockup gjordes först och godkändes ("designen såg bra ut. implementera den").
+- **Beslut:**
+  - **Resultatrutan är två rader i stället för upp till nio.** Rad 1: beskedet (Bra / Kontrollera / Osäkert), en mening, länkarna Föregående/Nästa ställe och knappen **Detaljer**. Rad 2: siffrorna, med samma färger som raderna i listan: procent med referenstext samtidigt (med en liten stapel), röda rader, förslag, rader som bara finns i referensen, rättade rader och förskjutning eller antal avsnitt. I ett smalt fönster hamnar meningen på en egen rad.
+  - **Varningar står alltid kvar** under siffrorna (till exempel att MKV-filen är ofullständig). De göms inte under Detaljer.
+  - **Detaljer** (Alt+D) fäller ut resten i tre kolumner: hur synken gjordes (metod, förskjutning eller avsnitten), vad färgerna och märkena i listan betyder (bara de som finns just nu) och hur man redigerar i listan. Programmet minns om Detaljer var öppet (`details` i settings.txt). Från början är det stängt.
+  - **Synka-knappen är Avbryt medan programmet arbetar** (synk, nedladdning, lägga in i MKV): samma knapp på samma plats, grå med en stoppruta, Alt+A. Efter klicket står det **Avbryter…** och knappen går inte att klicka förrän arbetet har stannat. Den separata Avbryt-knappen är borta.
+  - **Skydd mot dubbelklick:** klick på knappen de första 0,7 sekunderna efter starten räknas inte, så att ett dubbelklick på Synka inte avbryter synken direkt.
+  - **Ruta 1 och 2 står bredvid varandra** och delar bredden lika. Listorna (Referens, Grafikkort, Ljudspår, Teckenkodning) står under varandra i rutan och fyller dess bredd. Den öppnade listan är så bred som sin längsta rad.
+  - **Hela övre delen av rutan väljer fil** (rubrik, filnamn, beskedet under): den lyser upp under muspekaren och öppnar Välj fil vid klick. Bläddra… finns kvar, för tangentbordet. En fil som släpps på en ruta hamnar i just den rutan.
+  - **Rutan visar filens namn, inte hela sökvägen.** Sökvägen står i tipsrutan när muspekaren hålls över namnet. Textfältet för sökvägen är borta, så en sökväg kan inte längre skrivas eller klistras in. Dra in filen eller välj den i stället.
+- **Rättat på vägen:** raden med Metod och Synka reserverade tomrum under sig (60–95 bildpunkter), eftersom Windows mätte den som om varje del stod på en egen rad. Det är borta, och listan får den platsen också (`FitFlowHeight`).
+- **Teknik:** `MakeCard`, `ShowFile`, `MakeChip`, `SetDetails`, `LayoutResult` och `ShowSyncButton` i `MainForm.cs`, `ShowResult` i `MainForm.Sync.cs`. `refBox`, `tgtBox`, `cancelBtn`, `resultLabel` och `audioRow` finns inte längre. Etiketten Grafikkort visas nu framför listan (den skapades förut men lades aldrig in i fönstret).
+- **Test:** 121 av 121 kontroller (inga nya, ändringen är bara gränssnitt). Provat i programmet (formuläret kört i samma process, två små SRT-filer, skärmbilder): tomt fönster, efter synk med Bra och med Kontrollera, Detaljer öppet och stängt, knappen som Avbryt och Avbryter…, i 940 × 760, 1280 × 900 och 1500 × 900, mörkt och ljust läge. Listan fick ungefär 105 bildpunkter mer höjd i 1280 × 900 jämfört med första försöket, och mer än så mot den gamla rutan.
+- **Ej provat:** riktiga klick och muspekaren över rutorna (bara koden är läst), att släppa en fil på en ruta, Avbryt under en riktig lång synk (lägena sattes direkt), film med textspår, ljudspår och grafikkort i ruta 1, högkontrast och 150 % skalning.
+- **Kvar att veta:** i det minsta fönstret (940 × 600) med Detaljer öppet får listan nästan ingen plats. Stäng Detaljer eller gör fönstret större.
+- **Product-check:** Claude granskade själv (befintligt innehåll flyttat, inga nya funktioner). Rättat: dubbelklick på Synka avbröt direkt, meningen bröts på fyra rader i ett smalt fönster, tomrum under raden med Synka. Val som Claude gjorde utan svar från ägaren: Detaljer minns sitt läge, och redigeringstipsen står under Detaljer.
+- **Nivå:** LIVE
+
 ## 2026-11-10 – Fönstrets storlek och plats sparas
 - **Område:** GUI
 - **Önskemål (ägaren):** "Kom ihåg fönsterstorlek, och om den var maximerad sist."

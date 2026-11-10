@@ -59,24 +59,34 @@ namespace TextSync
         // besked om hur säker synken är (Bra / Kontrollera / Osäkert) och hopp mellan svaga ställen
         QualityResult quality; List<int> weakStops = new List<int>(); bool[] cueWeak;
         Label verdictLabel; LinkLabel prevWeakLink, nextWeakLink; TableLayoutPanel resBox;
+        // resultatrutan: beskedet på en rad, siffrorna på nästa (chip*), varningar (notesLabel) och resten under Detaljer
+        Label summaryLabel, notesLabel, chipPct, chipRed, chipProp, chipGrey, chipFixed, chipSeg;
+        FlowLayoutPanel chips; TableLayoutPanel detailsPanel; Panel detailsSep; Button detailsBtn;
+        Label[] detailHead, detailBody;
+        static readonly int[] DetailPct = { 36, 40, 24 };   // kolumnernas bredd under Detaljer
+        bool detailsOpen, weakLinks, pctGood; double pctFrac;
+        bool cancelling;               // Avbryt är klickad, arbetet håller på att stanna
+        int busySince;                 // Environment.TickCount när arbetet började (skydd mot dubbelklick på Synka)
+        readonly ToolTip tips = new ToolTip { AutoPopDelay = 20000 };
         Label gpuLabel; ComboBox gpuCombo; List<int> gpuDevices; bool gpuFilling, gpuPending;
         // ljudspår för ljudsynk och Whisper (visas bara när filmen har mer än ett ljudspår)
-        Label audioLabel; ComboBox audioCombo; FlowLayoutPanel audioRow; bool audioFilling;
+        Label audioLabel; ComboBox audioCombo; bool audioFilling;
         List<Cue> transcript; string transcriptLang = ""; // Whisper-text från senaste ljudsynk
         List<Cue> origSynced; OrigSrtOption origUsed; string origLang = "";    // originaltexten (t.ex. engelska) efter synk mot ljudet
         LinkLabel saveTextBtn;
         LinkLabel origLink; int refAudioIndex; string refInfoDefault = "";
 
-        TextBox refBox, tgtBox, langBox;
+        TextBox langBox;
+        Label refName, tgtName;        // filnamnen i ruta 1 och 2 (hela sökvägen står i tipsrutan)
         ComboBox trackCombo, modeCombo, encCombo;
-        Label refInfo, tgtInfo, statusLabel, resultLabel, trackLabel;
+        Label refInfo, tgtInfo, statusLabel, trackLabel;
         LinkLabel openLink, helpLink;
         CheckBox fpsCheck, hiCheck, plainCheck;
         int plainCount;                // rader där formatering (kursiv m.m.) tas bort av rutan "Ta bort kursiv och annan formatering"
         string hiInfo;                 // vad som togs bort som text för hörselskadade (visas i resultatet)
         int hiUndoDepth;               // ångra-nivån där den synkade texten rensades i efterhand (0 = inte gjort)
         bool hiQuiet;                  // rutan ändras av programmet, inte av användaren
-        Button syncBtn, saveBtn, muxBtn, cancelBtn, refBtn, tgtBtn;
+        Button syncBtn, saveBtn, muxBtn, refBtn, tgtBtn;
         ProgressBar progress;
         ListView list;
         TimelinePanel timeline;
@@ -155,11 +165,13 @@ namespace TextSync
             root.Controls.Add(head, 0, 0);
 
             // --- 1. referens
-            refBox = MakePathBox(); refBox.Leave += (s, e) => { if (!busy && refBox.Text != (mkvPath ?? refLoadedPath)) LoadReference(refBox.Text); };
+            // Ruta 1 och 2 står bredvid varandra. Listorna fyller rutans bredd, och den öppnade listan är så bred som den längsta raden.
+            refName = MakeFileLabel(); tgtName = MakeFileLabel();
             refBtn = MakeButton("Bläddra…", false);
             refBtn.Click += (s, e) => BrowseRef();
             trackLabel = new Label { Text = "Referens:", AutoSize = true, Margin = new Padding(0, 7, 6, 0), Visible = false };
-            trackCombo = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 460, Visible = false, Margin = new Padding(0, 3, 12, 0) };
+            trackCombo = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Anchor = AnchorStyles.Left | AnchorStyles.Right, Visible = false, Margin = new Padding(0, 3, 0, 0) };
+            trackCombo.DropDown += WidenDropDown;
             trackCombo.SelectedIndexChanged += (s, e) =>
             {
                 if (!busy) ClearResult();
@@ -168,10 +180,11 @@ namespace TextSync
                 if (oo != null) { refInfo.ForeColor = Muted; refInfo.Text = "Originaltext: " + oo.Cues.Count + " repliker – synkas mot ljudet och kontrolleras med Whisper."; }
                 else if (refInfoDefault.Length > 0 && refInfo.ForeColor != ErrColor) refInfo.Text = refInfoDefault;
             };
-            refInfo = new Label { AutoSize = true, ForeColor = Muted, Margin = new Padding(0, 7, 0, 0), Text = "Dra in en MKV- eller SRT-fil hit, eller klicka Bläddra." };
+            refInfo = new Label { AutoSize = true, ForeColor = Muted, UseMnemonic = false, Text = "Klicka här eller dra in en MKV- eller SRT-fil." };
             // grafikkort för Whisper (visas bara när en ljudmetod med Whisper är vald)
             gpuLabel = new Label { Text = "&Grafikkort:", AutoSize = true, Margin = new Padding(0, 7, 6, 0), Visible = false };
-            gpuCombo = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 280, Margin = new Padding(0, 3, 12, 0), Visible = false, AccessibleName = "Grafikkort för taligenkänning" };
+            gpuCombo = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Anchor = AnchorStyles.Left | AnchorStyles.Right, Margin = new Padding(0, 3, 0, 0), Visible = false, AccessibleName = "Grafikkort för taligenkänning" };
+            gpuCombo.DropDown += WidenDropDown;
             gpuCombo.SelectedIndexChanged += (s, e) =>
             {
                 if (gpuFilling || gpuDevices == null || gpuCombo.SelectedIndex < 0 || gpuCombo.SelectedIndex >= gpuDevices.Count) return;
@@ -179,46 +192,45 @@ namespace TextSync
                 Audio.WhisperDevice = dev;
                 Tools.SetSetting("gpu", dev < 0 ? "cpu" : dev.ToString());
             };
-            var trow = new FlowLayoutPanel { AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, WrapContents = false, Margin = new Padding(0, 4, 0, 0) };
-            trow.Controls.Add(trackLabel); trow.Controls.Add(trackCombo); trow.Controls.Add(gpuCombo);
-            refInfo.Margin = new Padding(0, 4, 16, 0);
             // separat undertext på filmens originalspråk (t.ex. engelska), som synkas mot ljudet och kontrolleras av Whisper
-            origLink = new LinkLabel { Text = "Lägg till undertext på filmens originalspråk (SRT)…", AutoSize = true, Margin = new Padding(0, 4, 0, 0), Visible = false, LinkColor = Accent };
+            origLink = new LinkLabel { Text = "Lägg till undertext på filmens originalspråk (SRT)…", AutoSize = true, Margin = new Padding(0, 6, 0, 0), Visible = false, LinkColor = Accent };
             origLink.LinkClicked += (s, e) => BrowseOrig();
-            var irow = new FlowLayoutPanel { AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, WrapContents = false, Dock = DockStyle.Fill, Margin = new Padding(0) };
-            irow.Controls.Add(refInfo); irow.Controls.Add(origLink);
-            audioLabel = new Label { Text = "Lj&udspår:", AutoSize = true, Margin = new Padding(0, 7, 6, 0) };
-            audioCombo = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 460, Margin = new Padding(0, 3, 12, 0), AccessibleName = "Ljudspår för synk mot ljudet" };
+            audioLabel = new Label { Text = "Lj&udspår:", AutoSize = true, Margin = new Padding(0, 7, 6, 0), Visible = false };
+            audioCombo = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Anchor = AnchorStyles.Left | AnchorStyles.Right, Margin = new Padding(0, 3, 0, 0), Visible = false, AccessibleName = "Ljudspår för synk mot ljudet" };
+            audioCombo.DropDown += WidenDropDown;
             audioCombo.SelectedIndexChanged += (s, e) => { if (!audioFilling && audioCombo.SelectedIndex >= 0) SetAudioIndex(audioCombo.SelectedIndex); };
-            audioRow = new FlowLayoutPanel { AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, WrapContents = false, Margin = new Padding(0, 2, 0, 0), Visible = false };
-            audioRow.Controls.Add(audioLabel); audioRow.Controls.Add(audioCombo);
-            var rinfo = new TableLayoutPanel { AutoSize = true, ColumnCount = 1, RowCount = 3, Dock = DockStyle.Fill, Margin = new Padding(0) };
-            rinfo.Controls.Add(trow, 0, 0); rinfo.Controls.Add(audioRow, 0, 1); rinfo.Controls.Add(irow, 0, 2);
+            // under den klickbara delen: en rad per lista (namn till vänster, listan fyller resten), sist länken för originaltext
+            var rinfo = MakeRows();
+            rinfo.Controls.Add(trackLabel, 0, 0); rinfo.Controls.Add(trackCombo, 1, 0);
+            rinfo.Controls.Add(gpuLabel, 0, 1); rinfo.Controls.Add(gpuCombo, 1, 1);
+            rinfo.Controls.Add(audioLabel, 0, 2); rinfo.Controls.Add(audioCombo, 1, 2);
+            rinfo.Controls.Add(origLink, 0, 3); rinfo.SetColumnSpan(origLink, 2);
             Tools.GpuScan();   // letar efter NVIDIA-kort i bakgrunden redan nu, så att listan Grafikkort är klar när den behövs
-            root.Controls.Add(MakeCard("1.  Referens – undertext i takt med filmen (textspår i MKV eller SRT) eller filmens ljud", refBox, refBtn, rinfo), 0, 1);
+            var refCard = MakeCard("1.  Referens – undertext i takt med filmen (textspår i MKV eller SRT) eller filmens ljud", refName, refBtn, refInfo, rinfo, BrowseRef, LoadReference);
 
             // --- 2. mål
-            tgtBox = MakePathBox(); tgtBox.Leave += (s, e) => { if (!busy && tgtBox.Text != tgtLoadedPath) LoadTarget(tgtBox.Text); };
             tgtBtn = MakeButton("Bläddra…", false);
             tgtBtn.Click += (s, e) => BrowseTarget();
-            tgtInfo = new Label { AutoSize = true, ForeColor = Muted, Margin = new Padding(0, 7, 0, 0), Text = "Dra in SRT-filen hit.", UseMnemonic = false };   // texten kan innehålla "&amp;"
+            tgtInfo = new Label { AutoSize = true, ForeColor = Muted, Text = "Klicka här eller dra in SRT-filen.", UseMnemonic = false };   // texten kan innehålla "&amp;"
             // teckenkodning: automatisk räcker nästan alltid; manuellt val om å/ä/ö eller t.ex. kyrilliska tecken blir fel
-            encCombo = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 260, Margin = new Padding(0, 3, 0, 0), AccessibleName = "Teckenkodning" };
+            encCombo = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Anchor = AnchorStyles.Left | AnchorStyles.Right, Margin = new Padding(0, 3, 0, 0), AccessibleName = "Teckenkodning" };
+            encCombo.DropDown += WidenDropDown;
             foreach (var en in Srt.Encodings) encCombo.Items.Add(en[1]);
             encCombo.SelectedIndex = 0;
             encCombo.SelectedIndexChanged += (s, e) => { if (!busy && !encReset && !string.IsNullOrEmpty(tgtLoadedPath)) LoadTarget(tgtLoadedPath); };
-            var tinfo = new TableLayoutPanel { AutoSize = true, ColumnCount = 4, RowCount = 1, Dock = DockStyle.Fill, Margin = new Padding(0, 2, 0, 0) };
-            tinfo.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-            tinfo.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-            tinfo.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-            tinfo.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-            tgtInfo.Anchor = AnchorStyles.Left; tgtInfo.Margin = new Padding(0);
-            tinfo.Controls.Add(tgtInfo, 0, 0);
-            // en lång text ("… Rättat: kodade tecken på 14 rader, …") bryts på två rader i stället för att hamna under Teckenkodning
-            tinfo.SizeChanged += (s, e) => tgtInfo.MaximumSize = new Size(Math.Max(200, tinfo.ClientSize.Width - encCombo.Width - (int)(150 * DeviceDpi / 96f)), 0);
-            tinfo.Controls.Add(new Label { Text = "&Teckenkodning:", AutoSize = true, Anchor = AnchorStyles.Right, Margin = new Padding(12, 0, 6, 0) }, 2, 0);
-            tinfo.Controls.Add(encCombo, 3, 0);
-            root.Controls.Add(MakeCard("2.  Undertext att synka (SRT som inte går i takt)", tgtBox, tgtBtn, tinfo), 0, 2);
+            var tinfo = MakeRows();
+            tinfo.Controls.Add(new Label { Text = "&Teckenkodning:", AutoSize = true, Margin = new Padding(0, 7, 6, 0) }, 0, 0);
+            tinfo.Controls.Add(encCombo, 1, 0);
+            var tgtCard = MakeCard("2.  Undertext att synka (SRT som inte går i takt)", tgtName, tgtBtn, tgtInfo, tinfo, BrowseTarget, LoadTarget);
+
+            // rutorna delar bredden lika och blir lika höga
+            var cards = new TableLayoutPanel { Dock = DockStyle.Top, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, ColumnCount = 2, RowCount = 1, Margin = new Padding(0) };
+            cards.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50)); cards.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+            cards.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            refCard.Margin = new Padding(0, 0, 4, 8); tgtCard.Margin = new Padding(4, 0, 0, 8);
+            cards.Controls.Add(refCard, 0, 0); cards.Controls.Add(tgtCard, 1, 0);
+            root.Controls.Add(cards, 0, 1);   // rad 2 i root är tom sedan rutorna hamnade bredvid varandra
+            ShowFile(refName, null); ShowFile(tgtName, null);
 
             // --- 3. inställningar + synka
             var opts = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Top, WrapContents = true, Margin = new Padding(0, 4, 0, 4) };
@@ -274,13 +286,16 @@ namespace TextSync
 
             syncBtn = MakeButton("&Synka", true);
             syncBtn.Width = 120; syncBtn.Height = 34; syncBtn.Margin = new Padding(0, 2, 12, 0);
-            syncBtn.Click += async (s, e) => await DoSync();
+            // samma knapp är Avbryt så länge programmet arbetar (se ShowSyncButton)
+            // Ett dubbelklick på Synka ska inte avbryta direkt: klick den första dryga halvsekunden efter starten räknas inte.
+            syncBtn.Click += async (s, e) =>
+            {
+                if (!busy) await DoSync();
+                else if (unchecked(Environment.TickCount - busySince) > 700) CancelWork();
+            };
             opts.Controls.Add(syncBtn);
             progress = new ProgressBar { Width = 160, Height = 10, Margin = new Padding(0, 14, 10, 0), Visible = false };
             opts.Controls.Add(progress);
-            cancelBtn = MakeButton("&Avbryt", false); cancelBtn.Visible = false; cancelBtn.Margin = new Padding(0, 4, 10, 0);
-            cancelBtn.Click += (s, e) => CancelWork();
-            opts.Controls.Add(cancelBtn);
             statusLabel = new Label { AutoSize = true, ForeColor = Muted, Margin = new Padding(0, 9, 6, 0) };
             opts.Controls.Add(statusLabel);
             openLink = new LinkLabel { Text = "Visa i mappen", AutoSize = true, Margin = new Padding(0, 9, 0, 0), Visible = false, LinkColor = Accent };
@@ -299,22 +314,65 @@ namespace TextSync
             optWrap.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             optWrap.RowStyles.Add(new RowStyle(SizeType.AutoSize)); optWrap.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             optWrap.Controls.Add(opts, 0, 0); optWrap.Controls.Add(optInfo, 0, 1);
+            FitFlowHeight(opts);   // annars blir det tomrum mellan den här raden och resultatet
             root.Controls.Add(optWrap, 0, 3);
 
             // --- resultat
-            // överst beskedet (Bra / Kontrollera / Osäkert) med länkar till svaga ställen, under det detaljerna
-            verdictLabel = new Label { AutoSize = true, Font = new Font("Segoe UI Semibold", 11.5F), Margin = new Padding(0, 0, 18, 0) };
+            // Kompakt, så att listan får platsen:
+            // rad 1: beskedet (Bra / Kontrollera / Osäkert), en mening, länkar till svaga ställen och knappen Detaljer
+            // rad 2: siffrorna, med samma färger som raderna i listan
+            // rad 3: varningar (visas alltid), och under Detaljer resten: hur synken gjordes, färgerna och hur man redigerar
+            verdictLabel = new Label { AutoSize = true, Font = new Font("Segoe UI Semibold", 11.5F), Margin = new Padding(0, 0, 14, 0) };
+            summaryLabel = new Label { AutoSize = true, UseMnemonic = false, Margin = new Padding(0, 4, 14, 0) };
             prevWeakLink = new LinkLabel { Text = "◀ Föregående ställe", AutoSize = true, Margin = new Padding(0, 4, 14, 0), Visible = false, LinkColor = Accent };
-            nextWeakLink = new LinkLabel { Text = "Nästa ställe ▶", AutoSize = true, Margin = new Padding(0, 4, 0, 0), Visible = false, LinkColor = Accent };
+            nextWeakLink = new LinkLabel { Text = "Nästa ställe ▶", AutoSize = true, Margin = new Padding(0, 4, 14, 0), Visible = false, LinkColor = Accent };
             prevWeakLink.LinkClicked += (s, e) => JumpWeak(-1);
             nextWeakLink.LinkClicked += (s, e) => JumpWeak(1);
-            var vrow = new FlowLayoutPanel { AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, WrapContents = false, Margin = new Padding(10, 8, 10, 0) };
-            vrow.Controls.Add(verdictLabel); vrow.Controls.Add(prevWeakLink); vrow.Controls.Add(nextWeakLink);
-            resultLabel = new Label { AutoSize = true, Padding = new Padding(10, 4, 10, 8), Margin = new Padding(0), MaximumSize = new Size(4000, 0) };
-            resBox = new TableLayoutPanel { AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, Dock = DockStyle.Top, ColumnCount = 1, RowCount = 2, Margin = new Padding(0, 2, 0, 6), BackColor = Card, Visible = false };
-            resBox.Controls.Add(vrow, 0, 0); resBox.Controls.Add(resultLabel, 0, 1);
+            tips.SetToolTip(prevWeakLink, "Skift+F4"); tips.SetToolTip(nextWeakLink, "F4");
+            detailsBtn = MakeButton("", false); detailsBtn.Width = 124; detailsBtn.Height = 26; detailsBtn.Margin = new Padding(0);
+            detailsBtn.Click += (s, e) => { SetDetails(!detailsOpen); Tools.SetSetting("details", detailsOpen ? "1" : "0"); };
+            var vrow = new TableLayoutPanel { AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, Dock = DockStyle.Top, ColumnCount = 5, RowCount = 2, Margin = new Padding(10, 8, 10, 0) };
+            vrow.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+            vrow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            for (int i = 0; i < 3; i++) vrow.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+            vrow.Controls.Add(verdictLabel, 0, 0); vrow.Controls.Add(summaryLabel, 1, 0); vrow.Controls.Add(prevWeakLink, 2, 0); vrow.Controls.Add(nextWeakLink, 3, 0); vrow.Controls.Add(detailsBtn, 4, 0);
+
+            chipPct = MakeChip(null, 80); chipRed = MakeChip(() => RedRow, 15); chipProp = MakeChip(() => PropRow, 15); chipGrey = MakeChip(() => RefOnlyRow, 15);
+            chipFixed = MakeChip(null, 0); chipSeg = MakeChip(null, 0);
+            // stapeln framför procenttalet: röd under gränsen (95 %), annars grön
+            chipPct.Paint += (s, e) =>
+            {
+                int bw = chipPct.Padding.Left * 72 / 80, bh = Math.Max(5, chipPct.Padding.Left * 7 / 80), y = (chipPct.Height - bh) / 2 + 1;
+                using (var fill = new SolidBrush(HC ? SystemColors.Highlight : pctGood ? OkColor : RedRow)) e.Graphics.FillRectangle(fill, 0, y, (int)Math.Round(bw * Math.Max(0, Math.Min(1, pctFrac))), bh);
+                using (var pen = new Pen(HC ? SystemColors.WindowText : Theme.BtnBorder)) e.Graphics.DrawRectangle(pen, 0, y, bw - 1, bh - 1);
+            };
+            tips.SetToolTip(chipProp, "Blå rader är förslag om att slå ihop eller dela rader. Högerklicka på raden för att godkänna eller avvisa.");
+            tips.SetToolTip(chipGrey, "Grå rader finns bara i referensen och sparas inte.");
+            tips.SetToolTip(chipFixed, "Rader märkta ✎ rättades vid inläsningen. Håll muspekaren över raden för att se vad som stod i filen.");
+            chips = new FlowLayoutPanel { AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, Dock = DockStyle.Top, WrapContents = true, Margin = new Padding(10, 6, 10, 6) };
+            chips.Controls.AddRange(new Control[] { chipPct, chipRed, chipProp, chipGrey, chipFixed, chipSeg });
+            FitFlowHeight(chips);
+            notesLabel = new Label { AutoSize = true, UseMnemonic = false, ForeColor = Theme.Warn, Margin = new Padding(10, 0, 10, 6), Visible = false };
+
+            detailsSep = new Panel { Height = 1, Dock = DockStyle.Top, Margin = new Padding(10, 0, 10, 0), BackColor = Theme.BtnBorder, Visible = false };
+            detailsPanel = new TableLayoutPanel { AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, Dock = DockStyle.Top, ColumnCount = 3, RowCount = 2, Margin = new Padding(10, 8, 10, 10), Visible = false };
+            string[] heads = { "Så gjordes synken", "Färgerna i listan", "Redigera i listan" };
+            detailHead = new Label[3]; detailBody = new Label[3];
+            for (int i = 0; i < 3; i++)
+            {
+                detailsPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, DetailPct[i]));
+                detailHead[i] = new Label { Text = heads[i], AutoSize = true, Font = new Font("Segoe UI Semibold", 9.5F), Margin = new Padding(0, 0, 16, 4) };
+                detailBody[i] = new Label { AutoSize = true, UseMnemonic = false, Margin = new Padding(0, 0, 16, 0) };
+                detailsPanel.Controls.Add(detailHead[i], i, 0); detailsPanel.Controls.Add(detailBody[i], i, 1);
+            }
+            detailBody[2].Text = "Dubbelklicka – ändra text och tid\nInsert – lägg till en rad\nDelete – ta bort raden\nCtrl+Z – ångra";
+
+            resBox = new TableLayoutPanel { AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, Dock = DockStyle.Top, ColumnCount = 1, RowCount = 5, Margin = new Padding(0, 2, 0, 6), BackColor = Card, Visible = false };
+            resBox.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            resBox.Controls.Add(vrow, 0, 0); resBox.Controls.Add(chips, 0, 1); resBox.Controls.Add(notesLabel, 0, 2); resBox.Controls.Add(detailsSep, 0, 3); resBox.Controls.Add(detailsPanel, 0, 4);
             root.Controls.Add(resBox, 0, 4);
-            root.Resize += (s, e) => { if (resBox.Visible) resultLabel.MaximumSize = new Size(Math.Max(200, root.ClientSize.Width - 40), 0); };
+            root.Resize += (s, e) => LayoutResult();
+            SetDetails(Tools.GetSetting("details", "0") == "1");   // minns om Detaljer var utfällt
 
             // --- förhandsvisning
             var split = new SplitContainer { Dock = DockStyle.Fill, Orientation = Orientation.Horizontal, SplitterWidth = 6, BackColor = Bg };
@@ -663,36 +721,173 @@ namespace TextSync
         }
 
         // ------------------------------------------------------------ UI-hjälp
-        TableLayoutPanel MakeCard(string caption, TextBox box, Button btn, Control info)
+        // Ruta för en fil (1 Referens, 2 Undertext att synka).
+        // Den övre delen (rubrik, filnamn, Bläddra och beskedet under) är klickbar överallt och öppnar Välj fil.
+        // Det som ligger i extra (listor och länkar) fungerar som vanligt.
+        // En fil som släpps någonstans på rutan hamnar i just den rutan, vilken sorts fil det än är.
+        TableLayoutPanel MakeCard(string caption, Label name, Button btn, Label info, Control extra, Action browse, Action<string> load)
         {
-            var t = new TableLayoutPanel
+            var card = new TableLayoutPanel
             {
-                Dock = DockStyle.Fill, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, ColumnCount = 2, RowCount = 3,
-                BackColor = Card, Padding = new Padding(12, 8, 12, 10), Margin = new Padding(0, 0, 0, 8)
+                Dock = DockStyle.Fill, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, ColumnCount = 1, RowCount = 2,
+                BackColor = Card, AllowDrop = true
             };
-            t.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-            t.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-            for (int i = 0; i < 3; i++) t.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-            var cap = new Label { Text = caption, AutoSize = true, Font = new Font("Segoe UI Semibold", 10F), Margin = new Padding(0, 0, 0, 6) };
-            t.Controls.Add(cap, 0, 0); t.SetColumnSpan(cap, 2);
-            box.Anchor = AnchorStyles.Left | AnchorStyles.Right;
-            t.Controls.Add(box, 0, 1); t.Controls.Add(btn, 1, 1);
-            t.Controls.Add(info, 0, 2); t.SetColumnSpan(info, 2);
-            return t;
-        }
-
-        TextBox MakePathBox()
-        {
-            var b = new TextBox { AllowDrop = true, Margin = new Padding(0, 4, 8, 0) };
-            b.DragEnter += OnDragEnter;
-            b.DragDrop += (s, e) =>
+            card.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            card.RowStyles.Add(new RowStyle(SizeType.AutoSize)); card.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            card.DragEnter += OnDragEnter;
+            card.DragDrop += (s, e) =>
             {
                 var files = e.Data.GetData(DataFormats.FileDrop) as string[];
                 if (files == null || files.Length == 0) return;
                 if (files.Length > 1) { RouteFiles(files, false); return; }
-                if (s == refBox) LoadReference(files[0]); else LoadTarget(files[0]);
+                load(files[0]);
             };
-            return b;
+
+            var zone = new TableLayoutPanel
+            {
+                Dock = DockStyle.Top, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, ColumnCount = 3, RowCount = 3,
+                BackColor = Card, Padding = new Padding(12, 8, 12, 8), Margin = new Padding(0)
+            };
+            zone.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+            zone.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            zone.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+            for (int i = 0; i < 3; i++) zone.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            var cap = new Label { Text = caption, AutoSize = true, Font = new Font("Segoe UI Semibold", 10F), Margin = new Padding(0, 0, 0, 6), MaximumSize = new Size(400, 0) };
+            zone.Controls.Add(cap, 0, 0); zone.SetColumnSpan(cap, 3);
+            // ett litet pappersark i länkfärgen framför filnamnet
+            var icon = new Panel { Size = new Size(16, 20), Margin = new Padding(1, 5, 8, 0) };
+            icon.Paint += (s, e) =>
+            {
+                var g = e.Graphics; g.SmoothingMode = SmoothingMode.AntiAlias;
+                float w = icon.Width - 3, h = icon.Height - 3, f = w * 0.4f, o = 1.5f;
+                using (var pen = new Pen(HC ? SystemColors.WindowText : Theme.Link, Math.Max(1.2f, icon.Width / 12f)))
+                {
+                    g.DrawLines(pen, new[] { new PointF(o, o), new PointF(o + w - f, o), new PointF(o + w, o + f), new PointF(o + w, o + h), new PointF(o, o + h), new PointF(o, o) });
+                    g.DrawLines(pen, new[] { new PointF(o + w - f, o), new PointF(o + w - f, o + f), new PointF(o + w, o + f) });
+                }
+            };
+            btn.Margin = new Padding(0);
+            zone.Controls.Add(icon, 0, 1); zone.Controls.Add(name, 1, 1); zone.Controls.Add(btn, 2, 1);
+            info.Margin = new Padding(0, 6, 0, 0); info.MaximumSize = new Size(400, 0);
+            zone.Controls.Add(info, 0, 2); zone.SetColumnSpan(info, 3);
+            // rubriken och beskedet bryts efter rutans bredd
+            zone.SizeChanged += (s, e) =>
+            {
+                var max = new Size(Math.Max(100, zone.ClientSize.Width - zone.Padding.Horizontal), 0);
+                cap.MaximumSize = max; info.MaximumSize = max;
+            };
+            card.Controls.Add(zone, 0, 0);
+            if (extra != null) { extra.Dock = DockStyle.Top; extra.Margin = new Padding(12, 0, 12, 10); card.Controls.Add(extra, 0, 1); }
+
+            // klick var som helst i den övre delen väljer fil; den lyser upp när muspekaren är över
+            var parts = new Control[] { zone, cap, icon, name, info };
+            Action<bool> hot = on => { if (HC) return; foreach (var c in parts) c.BackColor = on ? Theme.HotBg : Card; };
+            EventHandler leave = (s, e) => { if (!zone.ClientRectangle.Contains(zone.PointToClient(Cursor.Position))) hot(false); };
+            foreach (var c in parts)
+            {
+                c.Cursor = Cursors.Hand;
+                c.Click += (s, e) => { if (!busy) browse(); };
+                c.MouseEnter += (s, e) => hot(!busy);
+                c.MouseLeave += leave;
+            }
+            btn.MouseLeave += leave;
+            return card;
+        }
+
+        // Filnamnet i en ruta: en rad som kortas med … om den inte får plats
+        Label MakeFileLabel()
+        {
+            return new Label { AutoSize = false, AutoEllipsis = true, UseMnemonic = false, Height = 28, Font = new Font("Segoe UI", 11F), TextAlign = ContentAlignment.MiddleLeft,
+                Anchor = AnchorStyles.Left | AnchorStyles.Right, Margin = new Padding(0, 0, 8, 0) };
+        }
+
+        // Visar filens namn i rutan. Hela sökvägen står i tipsrutan när muspekaren hålls över namnet.
+        void ShowFile(Label name, string path)
+        {
+            bool has = !string.IsNullOrEmpty(path);
+            string file = path;
+            try { if (has) file = Path.GetFileName(path); } catch { }
+            name.Text = has ? file : "Ingen fil vald";
+            name.ForeColor = has ? Theme.Fg : Muted;
+            tips.SetToolTip(name, has ? path : null);
+        }
+
+        // Rader under den klickbara delen av en ruta: namn till vänster, lista som fyller resten
+        static TableLayoutPanel MakeRows()
+        {
+            var t = new TableLayoutPanel { AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, ColumnCount = 2, RowCount = 4 };
+            t.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+            t.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            for (int i = 0; i < 4; i++) t.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            return t;
+        }
+
+        // En FlowLayoutPanel med AutoSize i en tabell mäts som om varje del stod på en egen rad, och då blir det tomrum under den.
+        // Höjden sätts därför här, efter den bredd panelen faktiskt har (flera rader bara när delarna inte får plats på en).
+        static void FitFlowHeight(FlowLayoutPanel p)
+        {
+            p.AutoSize = false;
+            EventHandler fit = (s, e) =>
+            {
+                int h = p.GetPreferredSize(new Size(p.ClientSize.Width, 0)).Height;
+                if (p.Height != h) p.Height = h;
+            };
+            p.Layout += (s, e) => fit(s, e);
+            p.SizeChanged += fit;
+        }
+
+        // Den öppnade listan blir så bred som sin längsta rad, även när själva rutan är smal
+        static void WidenDropDown(object sender, EventArgs e)
+        {
+            var cb = (ComboBox)sender;
+            int w = cb.Width;
+            foreach (var it in cb.Items) w = Math.Max(w, TextRenderer.MeasureText(cb.GetItemText(it), cb.Font).Width + SystemInformation.VerticalScrollBarWidth + 8);
+            cb.DropDownWidth = w;
+        }
+
+        // En siffra i resultatrutan ("51 förslag"). dot = färgen på rutan framför (samma som raderna i listan), pad = plats till vänster om texten.
+        Label MakeChip(Func<Color> dot, int pad)
+        {
+            var l = new Label { AutoSize = true, UseMnemonic = false, Margin = new Padding(0, 0, 22, 2), Padding = new Padding(pad, 0, 0, 0), Visible = false };
+            if (dot != null) l.Paint += (s, e) =>
+            {
+                int d = l.Padding.Left * 9 / 15;
+                using (var b = new SolidBrush(dot())) e.Graphics.FillRectangle(b, 0, (l.Height - d) / 2 + 1, d, d);
+            };
+            return l;
+        }
+
+        // Fäller ut eller ihop Detaljer i resultatrutan
+        void SetDetails(bool open)
+        {
+            detailsOpen = open;
+            detailsPanel.Visible = detailsSep.Visible = open;
+            detailsBtn.Text = open ? "Dölj &detaljer  ▴" : "&Detaljer  ▾";
+            LayoutResult();
+        }
+
+        // Texterna i resultatrutan bryts efter fönstrets bredd (AutoSize-etiketter bryter bara vid en satt största bredd)
+        void LayoutResult()
+        {
+            if (resBox == null || !resBox.Visible) return;
+            int w = Math.Max(300, root.ClientSize.Width - root.Padding.Horizontal - 20);
+            int used = verdictLabel.Width + verdictLabel.Margin.Horizontal + summaryLabel.Margin.Horizontal + detailsBtn.Width
+                + (weakLinks ? prevWeakLink.Width + prevWeakLink.Margin.Horizontal + nextWeakLink.Width + nextWeakLink.Margin.Horizontal : 0);
+            // meningen står bredvid beskedet när den får plats på ungefär en rad där, annars på en egen rad under
+            var vrow = (TableLayoutPanel)summaryLabel.Parent;
+            bool below = w - used < Math.Min(TextRenderer.MeasureText(summaryLabel.Text, summaryLabel.Font).Width + 8, w * 45 / 100);
+            if (below != (vrow.GetRow(summaryLabel) == 1))
+            {
+                vrow.SuspendLayout();
+                vrow.SetColumnSpan(summaryLabel, 1);
+                vrow.SetCellPosition(summaryLabel, new TableLayoutPanelCellPosition(below ? 0 : 1, below ? 1 : 0));
+                vrow.SetColumnSpan(summaryLabel, below ? 5 : 1);
+                summaryLabel.Margin = below ? new Padding(0, 4, 0, 0) : new Padding(0, 4, 14, 0);
+                vrow.ResumeLayout();
+            }
+            summaryLabel.MaximumSize = new Size(below ? w : Math.Max(160, w - used), 0);
+            notesLabel.MaximumSize = new Size(w, 0);
+            for (int i = 0; i < 3; i++) detailBody[i].MaximumSize = new Size(Math.Max(120, w * DetailPct[i] / 100 - 16), 0);
         }
 
         Button MakeButton(string text, bool primary)
@@ -705,7 +900,8 @@ namespace TextSync
             {
                 b.BackColor = Accent; b.ForeColor = Color.White; b.FlatAppearance.BorderColor = Accent;
                 b.Font = new Font("Segoe UI Semibold", 9.5F);
-                b.EnabledChanged += (s, e) => { b.BackColor = b.Enabled ? Accent : Theme.BtnDisabled; b.FlatAppearance.BorderColor = b.BackColor; };
+                // inte medan Synka-knappen är Avbryt (då är den grå, se ShowSyncButton)
+                b.EnabledChanged += (s, e) => { if (!"primary".Equals(b.Tag)) return; b.BackColor = b.Enabled ? Accent : Theme.BtnDisabled; b.FlatAppearance.BorderColor = b.BackColor; };
             }
             else
             {
@@ -853,24 +1049,36 @@ namespace TextSync
         {
             if (syncBtn == null) return;
             bool haveRef = refSrtCues != null || (mkvPath != null && trackCombo.SelectedItem != null);
-            syncBtn.Enabled = !busy && haveRef && tgtCues != null;
+            syncBtn.Enabled = busy ? !cancelling : haveRef && tgtCues != null;   // medan programmet arbetar är knappen Avbryt
             saveBtn.Enabled = !busy && synced != null;
             muxBtn.Enabled = !busy && synced != null;
-            foreach (Control c in new Control[] { refBox, tgtBox, refBtn, tgtBtn, trackCombo, modeCombo, settingsBtn, extraNum, langBox, encCombo, gpuCombo, audioCombo, origLink })
+            foreach (Control c in new Control[] { refBtn, tgtBtn, trackCombo, modeCombo, settingsBtn, extraNum, langBox, encCombo, gpuCombo, audioCombo, origLink })
                 if (c != null) c.Enabled = !busy;
             gpuCombo.Enabled = !busy && !gpuPending;
         }
 
         void SetBusy(bool b, string status)
         {
-            busy = b;
+            if (b && !busy) busySince = Environment.TickCount;
+            busy = b; cancelling = false;
             progress.Visible = b; progress.Value = 0;
-            cancelBtn.Visible = b; cancelBtn.Enabled = b;
+            ShowSyncButton();
             if (b) { openLink.Visible = false; undoLink.Visible = false; }
             statusLabel.ForeColor = Muted;
             statusLabel.Text = status ?? "";
             UseWaitCursor = b;
             UpdateButtons();
+        }
+
+        // Synka-knappen är Avbryt så länge programmet arbetar (synk, nedladdning, lägga in i MKV): samma knapp på samma plats,
+        // grå i stället för blå. Efter ett klick står det Avbryter… och knappen går inte att klicka förrän arbetet har stannat.
+        void ShowSyncButton()
+        {
+            syncBtn.Text = !busy ? "&Synka" : cancelling ? "Avbryter…" : "■  &Avbryt";
+            if (HC) return;
+            syncBtn.Tag = busy ? "secondary" : "primary";
+            Theme.Apply(syncBtn, null);   // färgerna följer Tag
+            syncBtn.ForeColor = busy ? Theme.Fg : Color.White;
         }
 
         void Progress(int p, string s)
@@ -884,7 +1092,8 @@ namespace TextSync
         void CancelWork()
         {
             if (cts != null) cts.Cancel();
-            cancelBtn.Enabled = false;
+            cancelling = true;
+            ShowSyncButton(); syncBtn.Enabled = false;
             statusLabel.Text = "Avbryter…";
             var p = muxProc;
             if (p != null) { try { if (!p.HasExited) p.Kill(); } catch { } }
@@ -894,7 +1103,7 @@ namespace TextSync
         {
             var a = MessageBox.Show(this,
                 "Så här gör du:\n" +
-                "1. Referens: välj filmen (MKV) – eller en SRT som redan går i takt.\n" +
+                "1. Referens: välj filmen (MKV) – eller en SRT som redan går i takt. Klicka i rutan eller dra in filen.\n" +
                 "2. Välj undertexten som inte går i takt.\n" +
                 "3. Klicka Synka. Beskedet ovanför listan säger om synken blev bra. Står det \"Kontrollera\" hoppar du mellan ställena med länkarna bredvid (märkta ⚠ i listan).\n" +
                 "4. Spara SRT: sparas som Filmnamn.sv.srt bredvid filmen, så hittar spelaren den.\n\n" +

@@ -6,8 +6,8 @@ Text Sync är inte signerat med ett köpt certifikat.
 - Står det att *Smart App Control* blockerade programmet: då går det tyvärr inte att köra på den datorn. Stäng inte av Smart App Control för Text Sync skull, för det går inte att slå på igen utan att installera om Windows.
 
 **Hur gör jag?**
-1. Dra in filmen (MKV) och den svenska SRT-filen i fönstret. Det går också att använda **Bläddra…**.
-2. Klicka **Synka**.
+1. Dra in filmen (MKV) och den svenska SRT-filen i fönstret. Det går också att klicka var som helst i ruta 1 eller 2 och välja filen.
+2. Klicka **Synka**. Medan programmet arbetar är samma knapp **Avbryt**.
 3. Titta på några rader i listan. Den engelska texten bredvid ska betyda samma sak, och **Synkad start** ska ligga nära **Referenstid**. **Före synk** visar tiden i din osynkade fil, och **Flyttad** hur mycket raden flyttades. Ett plötsligt hopp i Flyttad betyder ett klipp i filmen. Kontrollera gärna raderna där.
 4. Klicka **Spara SRT…**. Filen sparas som `Filmnamn.sv.srt` bredvid filmen, och då hittar VLC, Plex och Kodi den automatiskt.
 
@@ -42,6 +42,14 @@ Efter synken står ett besked ovanför listan:
 - **✔ Bra:** texten går i takt med referensen.
 - **⚠ Kontrollera de markerade ställena:** på några ställen passar texten sämre. Raderna där är märkta ⚠ i listan. Klicka **Nästa ställe** och **Föregående ställe** för att hoppa mellan dem, eller tryck F4 och Skift+F4.
 - **✖ Osäkert:** texten verkar inte passa. Den kan höra till ett annat avsnitt eller en annan version av filmen.
+
+Under beskedet står siffrorna på en rad, med samma färger som raderna i listan: hur många procent av raderna som har referenstext samtidigt, antal röda rader, förslag, rader som bara finns i referensen och rader som rättades vid inläsningen. Varningar står alltid kvar under siffrorna.
+
+**Var står förskjutningen, och vad färgerna betyder?**
+Klicka **Detaljer** till höger om beskedet. Där står hur synken gjordes (metod, förskjutning eller avsnitt), vad färgerna och märkena i listan betyder och hur du redigerar i listan. **Dölj detaljer** fäller ihop rutan igen, så att listan får mer plats. Programmet kommer ihåg om du hade Detaljer öppet.
+
+**Kommer programmet ihåg fönstrets storlek?**
+Ja. Storlek, plats och om fönstret var maximerat sparas när du stänger programmet.
 
 **Kan jag söka i texten?**
 Ja. Skriv i rutan **Sök** ovanför listan, eller tryck **Ctrl+F**. Programmet letar i både den synkade texten och referensen och markerar första träffen. **Enter** hoppar till nästa träff och **Skift+Enter** till föregående. Det går också att klicka **Föregående** och **Nästa**. **Esc** tömmer rutan. Sökningen gäller raderna som listan visar, så välj Alla rader i Visa om du saknar en träff.

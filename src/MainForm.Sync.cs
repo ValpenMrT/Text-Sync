@@ -189,73 +189,120 @@ namespace TextSync
             return go;
         }
 
+        // Resultatrutan. Beskedet och en mening på första raden, siffrorna på nästa, varningar under dem.
+        // Allt annat (hur synken gjordes, vad färgerna betyder, hur man redigerar) står under Detaljer.
         void ShowResult()
         {
             var r = result;
-            var sb = new StringBuilder();
-            bool good = true;
-            // beskedet: inga siffror här, de står i detaljerna under och i loggen
             var v = quality != null ? quality.Verdict : Verdict.Check;
             bool anyRed = rowMatched != null && rowMatched.Any(m => !m);
+            bool sparse = quality != null && quality.Sparse;
+            bool weak = quality != null && quality.Weak.Count > 0;
+            string more = null;   // fortsättningen på beskedet, under Detaljer
             if (v == Verdict.Good)
             {
                 verdictLabel.Text = "✔  Bra"; verdictLabel.ForeColor = OkColor;
-                sb.Append(refIsText ? "Texten går i takt med referensen.\n" : "Raderna ligger på tal i filmens ljud. Mot ljud är beskedet mindre säkert än mot en text, så kontrollera några rader.\n");
+                summaryLabel.Text = refIsText ? "Texten går i takt med referensen." : "Raderna ligger på tal i filmens ljud. Mot ljud är beskedet mindre säkert än mot en text, så kontrollera några rader.";
             }
             else if (v == Verdict.Check)
             {
-                verdictLabel.Text = weakStops.Count > 0 && !(quality != null && quality.Sparse) ? "⚠  Kontrollera de markerade ställena" : "⚠  Kontrollera resultatet"; verdictLabel.ForeColor = Theme.Warn;
-                if (quality != null && quality.Sparse) sb.Append("Referensen har för lite text för att synken ska kunna bedömas. Kontrollera några rader på olika ställen i filmen.\n");
-                else if (quality != null && quality.Weak.Count > 0) sb.Append((refIsText ? "På några ställen börjar få rader samtidigt som referensen" : "På några ställen ligger få rader på tal i ljudet") +
-                    " (märkta ⚠ i listan). Kontrollera att texten stämmer där. F4 hoppar till nästa ställe, Skift+F4 till föregående.\n");
-                else if (anyRed) sb.Append("Några rader saknar " + (refIsText ? "referenstext samtidigt" : "tal i ljudet samtidigt") + " (röda i listan). Det är ofta i sin ordning, t.ex. utrop. F4 hoppar till nästa.\n");
-                else sb.Append("Synken är inte helt säker. Kontrollera några rader i början, mitten och slutet av filmen.\n");
+                verdictLabel.Text = weakStops.Count > 0 && !sparse ? "⚠  Kontrollera de markerade ställena" : "⚠  Kontrollera resultatet"; verdictLabel.ForeColor = Theme.Warn;
+                if (sparse) summaryLabel.Text = "Referensen har för lite text för att synken ska kunna bedömas. Kontrollera några rader på olika ställen i filmen.";
+                else if (weak)
+                {
+                    summaryLabel.Text = (refIsText ? "På några ställen börjar få rader samtidigt som referensen" : "På några ställen ligger få rader på tal i ljudet") + " (märkta ⚠ i listan). Kontrollera att texten stämmer där.";
+                    more = "F4 hoppar till nästa ställe, Skift+F4 till föregående.";
+                }
+                else if (anyRed)
+                {
+                    summaryLabel.Text = "Några rader saknar " + (refIsText ? "referenstext samtidigt" : "tal i ljudet samtidigt") + " (röda i listan). Det är ofta i sin ordning, t.ex. utrop.";
+                    more = "F4 hoppar till nästa röda rad, Skift+F4 till föregående.";
+                }
+                else summaryLabel.Text = "Synken är inte helt säker. Kontrollera några rader i början, mitten och slutet av filmen.";
             }
             else
             {
                 verdictLabel.Text = "✖  Osäkert"; verdictLabel.ForeColor = ErrColor;
-                sb.Append("Texten verkar inte passa referensen. Den kan höra till ett annat avsnitt eller en annan version av filmen. Kontrollera att du har valt rätt filer.\n");
+                summaryLabel.Text = "Texten verkar inte passa referensen. Kontrollera att du har valt rätt filer.";
+                more = "Texten kan höra till ett annat avsnitt eller en annan version av filmen.";
             }
-            prevWeakLink.Visible = nextWeakLink.Visible = v != Verdict.Good && weakStops.Count > 0 && !(quality != null && quality.Sparse);
-            sb.Append(r.Method);
-            if (rowMatched != null && rowMatched.Length > 0)
+            summaryLabel.ForeColor = Theme.Fg;
+            weakLinks = v != Verdict.Good && weakStops.Count > 0 && !sparse;
+            prevWeakLink.Visible = nextWeakLink.Visible = weakLinks;
+
+            // ---- siffrorna
+            var ao = trackCombo.SelectedItem as AudioRefOption;
+            bool speech = ao != null && ao.Mode != AudioMode.Whisper;   // referensen är tal i ljudet, inte text
+            int n = rowMatched != null ? rowMatched.Length : 0, ok = 0, red = 0;
+            bool good = true;
+            for (int i = 0; i < n; i++)
             {
-                int ok = rowMatched.Count(m => m), n = rowMatched.Length;
-                good = ok >= MatchThreshold * n;
-                var ao = trackCombo.SelectedItem as AudioRefOption;
-                sb.Append((ao != null && ao.Mode != AudioMode.Whisper ? "     Rader som ligger på tal i ljudet: " : "     Rader med referenstext samtidigt: ") + ok + " av " + n + " (" + Fmt(Math.Floor(1000.0 * ok / n) / 10, "0.#") + " %)");
+                if (rowMatched[i]) ok++;
+                else if (cueProp == null || i >= cueProp.Length || cueProp[i] < 0) red++;   // en rad med förslag visas blå, inte röd
             }
-            sb.Append("\n");
+            chipPct.Visible = n > 0;
+            if (n > 0)
+            {
+                good = ok >= MatchThreshold * n;
+                pctFrac = (double)ok / n; pctGood = good;
+                chipPct.Text = Fmt(Math.Floor(1000.0 * ok / n) / 10, "0.#") + " % av raderna " + (speech ? "ligger på tal i ljudet" : "har referenstext samtidigt") + " (" + ok + " av " + n + ")";
+                chipPct.Invalidate();
+            }
+            string redWhy = speech ? "Röda rader ligger inte på tal i ljudet." : "Röda rader har ingen referenstext samtidigt.";
+            chipRed.Visible = red > 0;
+            chipRed.Text = red == 1 ? "1 röd rad" : red + " röda rader";
+            tips.SetToolTip(chipRed, redWhy + " F3 hoppar till nästa.");
+            chipProp.Visible = proposals.Count > 0;
+            chipProp.Text = proposals.Count + " förslag";
+            chipGrey.Visible = refOnlyTotal > 0;
+            chipGrey.Text = refOnlyTotal + " bara i referensen";
+            int fixedRows = r.Output.Count(c => c.Raw != null);
+            chipFixed.Visible = fixedRows > 0;
+            chipFixed.Text = "✎ " + (fixedRows == 1 ? "1 rättad rad" : fixedRows + " rättade rader");
+            bool drift = Math.Abs(r.DriftMsPerHour) >= 1;
+            chipSeg.Visible = true;
+            chipSeg.Text = r.Segments.Count > 1 ? r.Segments.Count + " avsnitt" : "Förskjutning " + FmtOffset(r.OffsetMs) + (drift ? ", drift " + Fmt(r.DriftMsPerHour, "0") + " ms/timme" : "");
+            tips.SetToolTip(chipSeg, r.Segments.Count > 1 ? "Texten har flyttats olika mycket i olika delar av filmen. Se Detaljer." : null);
+            foreach (Control c in chips.Controls) c.ForeColor = Theme.Fg;
+
+            // ---- varningar: syns alltid
+            notesLabel.Text = string.Join("\n", r.Notes.Select(x => "⚠  " + x));
+            notesLabel.ForeColor = Theme.Warn;
+            notesLabel.Visible = r.Notes.Count > 0;
+
+            // ---- Detaljer, kolumn 1: så gjordes synken
+            var d = new StringBuilder("Metod: " + r.Method + "\n");
             if (r.Segments.Count > 1)
             {
-                sb.Append("Avsnitt: ");
-                var parts = r.Segments.Take(8).Select(s => Srt.FormatTime(s.FromMs).Substring(0, 8) + " " + FmtOffset(s.OffsetMs));
-                sb.Append(string.Join("   ·   ", parts));
-                if (r.Segments.Count > 8) sb.Append("   … (" + r.Segments.Count + " st)");
-                sb.Append("\n");
+                d.Append("Varje avsnitt har flyttats för sig:\n");
+                var parts = r.Segments.Take(8).Select(s => Srt.FormatTime(s.FromMs).Substring(0, 8) + "   " + FmtOffset(s.OffsetMs)).ToList();
+                // två i bredd: första halvan till vänster, andra till höger
+                int half = (parts.Count + 1) / 2;
+                for (int i = 0; i < half; i++) d.Append(parts[i] + (i + half < parts.Count ? "          " + parts[i + half] : "") + "\n");
+                if (r.Segments.Count > 8) d.Append("… (" + r.Segments.Count + " st)\n");
             }
-            else
-            {
-                sb.Append("Förskjutning: " + FmtOffset(r.OffsetMs));
-                if (Math.Abs(r.DriftMsPerHour) >= 1) sb.Append("     Drift: " + Fmt(r.DriftMsPerHour, "0") + " ms/timme");
-                sb.Append("\n");
-            }
-            if (r.FpsText.Length > 0) sb.Append(r.FpsText + "\n");
-            if (hiInfo != null) sb.Append(hiInfo + "\n");
-            if (plainCheck.Checked && plainCount > 0) sb.Append("Kursiv och annan formatering borttagen på " + plainCount + (plainCount == 1 ? " rad" : " rader") + ". Kryssa ur rutan i Inställningar för att få tillbaka den.\n");
-            int fixedRows = r.Output.Count(c => c.Raw != null);
-            if (fixedRows > 0) sb.Append((fixedRows == 1 ? "1 rad rättades" : fixedRows + " rader rättades") + " vid inläsningen (märkta ✎ i listan). Håll muspekaren över en sådan rad för att se vad som stod i filen, eller välj Bara rättade rader i Visa.\n");
-            foreach (var n in r.Notes) sb.Append("⚠  " + n + "\n");
-            if (!good) sb.Append("Under 95 % av raderna har referenstext samtidigt – granska de röda raderna (F3 hoppar till nästa).\n");
-            if (proposals.Count > 0)
-                sb.Append(proposals.Count + " förslag om att slå ihop eller dela rader så att de följer referensens radindelning och tider (blå i listan). " +
-                    "Under varje förslag står hur raden blir (→ blir). Högerklicka för att godkänna eller avvisa.\n");
-            if (refOnlyTotal > 0) sb.Append(refOnlyTotal + " grå rader finns bara i referensen och sparas inte" + (viewCombo.SelectedIndex == ViewAll ? "" : viewCombo.SelectedIndex == ViewProposals ? " (de flesta dolda just nu, se Visa ovanför listan)" : " (dolda just nu, se Visa ovanför listan)") + ".\n");
-            sb.Append("Redigera i listan: dubbelklicka för att ändra text och tid, Insert lägger till, Delete tar bort, Ctrl+Z ångrar.");
-            resultLabel.Text = sb.ToString().TrimEnd();
-            resultLabel.ForeColor = Theme.Fg;
-            resultLabel.MaximumSize = new Size(Math.Max(200, root.ClientSize.Width - 40), 0);
+            else d.Append("Förskjutning: " + FmtOffset(r.OffsetMs) + (drift ? "     Drift: " + Fmt(r.DriftMsPerHour, "0") + " ms/timme" : "") + "\n");
+            if (r.FpsText.Length > 0) d.Append(r.FpsText + "\n");
+            if (more != null) d.Append(more + "\n");
+            if (hiInfo != null) d.Append(hiInfo + "\n");
+            if (plainCheck.Checked && plainCount > 0) d.Append("Kursiv och annan formatering borttagen på " + plainCount + (plainCount == 1 ? " rad" : " rader") + ". Kryssa ur rutan i Inställningar för att få tillbaka den.\n");
+            detailBody[0].Text = d.ToString().TrimEnd();
+
+            // ---- kolumn 2: färgerna och märkena som finns i listan just nu
+            d = new StringBuilder();
+            if (red > 0 || !good) d.Append("Röd – " + (speech ? "ligger inte på tal i ljudet" : "ingen referenstext samtidigt") + ". " +
+                (good ? "F3 hoppar till nästa." : "Under 95 % av raderna " + (speech ? "ligger på tal" : "har referenstext samtidigt") + ", så granska de röda raderna. F3 hoppar till nästa.") + "\n");
+            if (proposals.Count > 0) d.Append("Blå – förslag om att slå ihop eller dela rader så att de följer referensens radindelning och tider. Under förslaget står hur raden blir (→ blir). Högerklicka för att godkänna eller avvisa.\n");
+            if (refOnlyTotal > 0) d.Append("Grå – finns bara i referensen och sparas inte" + (viewCombo.SelectedIndex == ViewAll ? "" : viewCombo.SelectedIndex == ViewProposals ? " (de flesta dolda just nu, se Visa ovanför listan)" : " (dolda just nu, se Visa ovanför listan)") + ".\n");
+            if (fixedRows > 0) d.Append("✎ – rättades vid inläsningen. Håll muspekaren över raden för att se vad som stod i filen, eller välj Bara rättade rader i Visa.\n");
+            if (weak && !sparse) d.Append("⚠ – svagt ställe: få rader " + (refIsText ? "börjar samtidigt som referensen" : "ligger på tal i ljudet") + ".\n");
+            if (d.Length == 0) d.Append("Inga rader är märkta: " + (speech ? "alla ligger på tal i ljudet." : "alla har referenstext samtidigt."));
+            detailBody[1].Text = d.ToString().TrimEnd();
+            for (int i = 0; i < 3; i++) { detailHead[i].ForeColor = Theme.Fg; detailBody[i].ForeColor = Theme.Fg; }
+            detailsSep.BackColor = HC ? SystemColors.WindowText : Theme.BtnBorder;
+
             resBox.Visible = true;
+            LayoutResult();
         }
 
         void RefreshPreview()

@@ -58,8 +58,8 @@ namespace TextSync
             var a = trackCombo.SelectedItem as AudioRefOption;
             bool whisper = (a != null && a.Mode != AudioMode.Speech) || trackCombo.SelectedItem is TextCheckOption || trackCombo.SelectedItem is OrigSrtOption;
             if (whisper && gpuDevices == null) FillGpus();
-            gpuCombo.Visible = whisper;
-            audioRow.Visible = audioCombo.Items.Count > 1 && (a != null || whisper);
+            gpuLabel.Visible = gpuCombo.Visible = whisper;
+            audioLabel.Visible = audioCombo.Visible = audioCombo.Items.Count > 1 && (a != null || whisper);
         }
 
         // NVIDIA-kort (CUDA) + processorn. Intel/AMD-grafik kan inte användas av Whisper-versionen och visas inte.

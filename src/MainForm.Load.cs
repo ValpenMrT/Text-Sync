@@ -38,10 +38,10 @@ namespace TextSync
         {
             if (busy) return;
             path = (path ?? "").Trim().Trim('"');
-            refBox.Text = path; refLoadedPath = path; playMovie = null;
+            ShowFile(refName, path); refLoadedPath = path; playMovie = null;
             mkvPath = null; refSrtCues = null;
             trackCombo.Items.Clear(); trackCombo.Visible = trackLabel.Visible = false;
-            audioFilling = true; audioCombo.Items.Clear(); audioFilling = false; audioRow.Visible = false; refAudioIndex = 0;
+            audioFilling = true; audioCombo.Items.Clear(); audioFilling = false; audioLabel.Visible = audioCombo.Visible = false; refAudioIndex = 0;
             origLink.Visible = false; origLink.Text = "Lägg till undertext på filmens originalspråk (SRT)…"; refInfoDefault = "";
             ClearResult();
             if (path.Length == 0) { refInfo.Text = ""; return; }
@@ -168,7 +168,7 @@ namespace TextSync
             if (busy) return;
             path = (path ?? "").Trim().Trim('"');
             if (!SamePath(path, tgtLoadedPath) && encCombo.SelectedIndex != 0) { encReset = true; encCombo.SelectedIndex = 0; encReset = false; } // ny fil → automatisk igen
-            tgtBox.Text = path; tgtLoadedPath = path; playMovie = null;
+            ShowFile(tgtName, path); tgtLoadedPath = path; playMovie = null;
             tgtCues = null; ClearResult();
             if (path.Length == 0) { tgtInfo.Text = ""; return; }
             try
