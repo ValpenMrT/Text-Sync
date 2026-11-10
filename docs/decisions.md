@@ -2,12 +2,18 @@
 
 Nyast först.
 
+## 2026-11-11 – 2.4.4: Tio omgångar räcker för återställning av Hel säsong
+- **Område:** filer
+- **Fråga:** *De tio senaste omgångarna går att återställa, och äldre tas bort automatiskt. En omgång är en hel säsong (en mapp) med alla sina avsnitt. Räcker tio?* **Svar (ägaren):** "Ja det räcker."
+- **Beslut:** ingen ändring i programmet. Gränsen står kvar på tio omgångar (`SeasonUndo.Prune(9)` före en ny omgång i `SeasonDialog.cs`), och omgångar utan något kvar att återställa räknas inte.
+- **Nivå:** LIVE
+
 ## 2026-11-11 – 2.4.3: Hel säsong – ägarens svar: välja om osäkra sparas, välja ljudmetod, MKV-kopior
 - **Område:** GUI / filer
 - **Frågor och svar** (frågorna stod i README efter 2.4.2):
   - *Osäkra avsnitt sparas inte. Ska de sparas ändå?* **Svar:** "Låt mig välja."
   - *Film utan textspår synkas mot ljud A, och A+B bara om Whisper redan finns och ett NVIDIA-kort är valt. Rätt?* **Svar:** "Ja men informera användaren och ge alternativ att ladda ner det som behövs."
-  - *Räcker det att de tio senaste säsongssynkarna går att återställa?* **Svar:** en motfråga, "Menar du hela säsonger eller episoder?" Hela säsonger. Frågan står kvar i README.
+  - *Räcker det att de tio senaste säsongssynkarna går att återställa?* **Svar:** en motfråga, "Menar du hela säsonger eller episoder?" Hela säsonger. Besvarad i posten ovanför (2.4.4).
   - *Står knappen Hel säsong… på rätt plats?* **Svar:** ja.
   - *Behövs Lägg in i MKV… för en hel säsong?* **Svar:** "Ja det behövs. Både SRT och mkv."
 - **Beslut:**

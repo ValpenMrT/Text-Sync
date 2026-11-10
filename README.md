@@ -52,8 +52,7 @@ Kopiera den senaste `TextSync-<version>.exe` från `Build\` till ett USB-minne. 
 Programmet är inte signerat (se [docs/decisions.md](docs/decisions.md)). Versionen står i filnamnet och i fönstrets rubrik, och sätts bara i `Program.Version` i [src/Program.cs](src/Program.cs) (plus de två `Assembly…Version`-raderna, som bygget kontrollerar).
 
 ### Obesvarade frågor (tas upp vid nästa körning)
-Om Hel säsong:
-1. **De tio senaste omgångarna går att återställa.** En omgång är en hel säsong (en mapp) med alla sina avsnitt, inte ett avsnitt. Räcker tio, och ska äldre tas bort automatiskt som nu? (Ägaren frågade 2026-11-11 vad som menades. Svaret väntar.)
+Inga just nu.
 
 ### Dokumentation
 
