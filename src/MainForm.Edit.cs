@@ -63,7 +63,8 @@ namespace TextSync
             var idx = SelectedCues();
             if (idx.Count == 0)
             {
-                SetStatus("Grå rader kommer från referensen och sparas inte – de kan inte tas bort.", false);
+                bool prop = rowProp != null && list.SelectedIndices.Cast<int>().Any(r => r < rowProp.Length && rowProp[r] >= 0);
+                SetStatus(prop ? "Raden visar hur förslaget blir. Högerklicka för att avvisa förslaget." : "Grå rader kommer från referensen och sparas inte – de kan inte tas bort.", false);
                 return;
             }
             if (idx.Count == result.Output.Count)
@@ -82,6 +83,11 @@ namespace TextSync
             if (busy || result == null || list.SelectedIndices.Count != 1) return;
             int row = list.SelectedIndices[0];
             if (rowCue == null || row >= rowCue.Length) return;
+            if (rowProp != null && row < rowProp.Length && rowProp[row] >= 0)
+            {
+                SetStatus("Raden visar hur förslaget blir. Högerklicka för att godkänna eller avvisa det.", false);
+                return;
+            }
             if (rowCue[row] < 0) { AddRow(rowRef[row]); return; }   // grå referensrad: lägg till en egen rad på samma tid
             int i = rowCue[row];
             var shown = synced[i];
@@ -125,6 +131,10 @@ namespace TextSync
             if (cueProp == null) return r;
             foreach (int ci in SelectedCues())
                 if (ci < cueProp.Length && cueProp[ci] >= 0 && !r.Contains(proposals[cueProp[ci]])) r.Add(proposals[cueProp[ci]]);
+            // raderna "→ blir" hör också till sitt förslag
+            if (rowProp != null)
+                foreach (int row in list.SelectedIndices)
+                    if (row < rowProp.Length && rowProp[row] >= 0 && rowProp[row] < proposals.Count && !r.Contains(proposals[rowProp[row]])) r.Add(proposals[rowProp[row]]);
             return r;
         }
 
@@ -213,6 +223,36 @@ namespace TextSync
             // raden är dold av valet i Visa: visa alla rader först
             if (cueRow != null && i < cueRow.Length && cueRow[i] < 0) viewCombo.SelectedIndex = ViewAll;
             SelectRow(i);
+        }
+
+        // Sök i texten (synkad text och referens) bland raderna som listan visar.
+        // dir: 1 = nästa träff, -1 = föregående, 0 = första träffen från den markerade raden (medan man skriver)
+        void Find(int dir)
+        {
+            string q = searchBox.Text.Trim();
+            searchInfo.ForeColor = Muted;
+            if (q.Length == 0) { searchInfo.Text = ""; return; }
+            if (synced == null || list.Items.Count == 0) { searchInfo.Text = synced == null ? "Synka först, så går det att söka i texten." : "Inga rader att söka i."; return; }
+            var hits = new List<int>();
+            for (int i = 0; i < list.Items.Count; i++)
+            {
+                var si = list.Items[i].SubItems;
+                if (si[6].Text.IndexOf(q, StringComparison.CurrentCultureIgnoreCase) >= 0 || si[8].Text.IndexOf(q, StringComparison.CurrentCultureIgnoreCase) >= 0) hits.Add(i);
+            }
+            if (hits.Count == 0)
+            {
+                searchInfo.ForeColor = ErrColor;
+                searchInfo.Text = viewCombo.SelectedIndex == ViewAll ? "Inga träffar." : "Inga träffar bland raderna som visas. Välj Alla rader i Visa.";
+                return;
+            }
+            int cur = list.SelectedIndices.Count > 0 ? list.SelectedIndices[0] : -1;
+            int k = -1;
+            if (dir < 0) { for (int j = hits.Count - 1; j >= 0; j--) if (hits[j] < cur) { k = j; break; } if (k < 0) k = hits.Count - 1; }
+            else { for (int j = 0; j < hits.Count; j++) if (dir == 0 ? hits[j] >= cur : hits[j] > cur) { k = j; break; } if (k < 0) k = 0; }
+            list.SelectedIndices.Clear();
+            var it = list.Items[hits[k]];
+            it.Selected = true; it.Focused = true; list.EnsureVisible(hits[k]);   // fokus stannar i sökrutan
+            searchInfo.Text = "Träff " + (k + 1) + " av " + hits.Count + ". Enter = nästa.";
         }
 
         // Under 95 % matchade rader: fråga innan sparning

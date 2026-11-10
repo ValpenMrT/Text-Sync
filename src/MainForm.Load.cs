@@ -208,7 +208,8 @@ namespace TextSync
         {
             result = null; synced = null; refCuesUsed = null; unsaved = false;
             if (list != null) list.Items.Clear();
-            rowCue = null; cueRow = null; rowRef = null; refOnlyTotal = 0;
+            rowCue = null; cueRow = null; rowRef = null; rowProp = null; refOnlyTotal = 0;
+            if (searchInfo != null) searchInfo.Text = "";
             proposals = new List<AlignProposal>(); cueProp = null; rejected.Clear();
             if (viewInfo != null) viewInfo.Text = "";
             if (acceptAllLink != null) acceptAllLink.Visible = false;

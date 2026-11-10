@@ -28,18 +28,24 @@ namespace TextSync
                 .Select(c => new Cue(Math.Max(0, c.Start - startMs), Math.Min(endMs, c.End) - startMs, c.Text)).ToList();
         }
 
-        // Steg 1: ffmpeg klipper ut sekunderna runt raden till en liten tillfällig film (960 px bred) med texten inbränd.
+        // Steg 1: ffmpeg klipper ut sekunderna runt raden till en liten tillfällig film (bredden anpassas efter skärmen) med texten inbränd.
         // -ss före -i ger exakt start och tider från 0. Då slutar uppspelningen exakt där den ska, även i en mycket stor film,
         // och det fungerar för format där filmens tider inte börjar på 0 (t.ex. .ts).
         // srtName och clipName är filnamn utan mapp (ffmpeg startas i mappen där de ligger), så att sökvägen inte
         // behöver skrivas om för ffmpegs filter. srtName = null: ingen text ovanpå.
-        public static string BuildClipArgs(string movie, string srtName, string clipName, double startMs, double durMs, int audioIndex)
+        public static string BuildClipArgs(string movie, string srtName, string clipName, double startMs, double durMs, int audioIndex, int width)
         {
             var inv = CultureInfo.InvariantCulture;
-            string vf = "scale=960:-2" + (srtName != null ? ",subtitles=" + srtName : "");
+            string vf = "scale=" + width + ":-2" + (srtName != null ? ",subtitles=" + srtName : "");
             return "-nostdin -hide_banner -loglevel error -y -ss " + (startMs / 1000).ToString("0.000", inv) + " -t " + (durMs / 1000).ToString("0.000", inv) +
                 " -i " + Q(movie) + " -map 0:v:0 -map 0:a:" + Math.Max(0, audioIndex) + "? -sn -dn -vf " + Q(vf) +
                 " -c:v libx264 -preset ultrafast -crf 22 -pix_fmt yuv420p -c:a aac -ac 2 -b:a 160k " + clipName;
+        }
+
+        // Uppspelningsfönstrets bredd: tre fjärdedelar av skärmens bredd, minst 960 och högst 1920 bildpunkter (jämnt tal)
+        public static int PlayWidth(int screenWidth)
+        {
+            return Math.Max(960, Math.Min(1920, screenWidth * 3 / 4)) / 2 * 2;
         }
 
         // Steg 2: ffplay spelar klippet i ett eget fönster och stänger sig själv när det är slut
@@ -190,6 +196,9 @@ namespace TextSync
             lastPlayRow = row; lastPlayTick = now;
             int ci = rowCue[row];
             Cue c = ci >= 0 && ci < synced.Count ? synced[ci] : rowRef[row];
+            // raden "→ blir" under ett förslag: spela stället som förslaget gäller
+            if (c == null && rowProp != null && row < rowProp.Length && rowProp[row] >= 0 && rowProp[row] < proposals.Count && proposals[rowProp[row]].First < synced.Count)
+                c = synced[proposals[rowProp[row]].First];
             if (c == null) return;
             string srtPath = null, clipPath = null;
             try
@@ -223,7 +232,7 @@ namespace TextSync
                 if (cues.Count > 0) { srtName = id + ".srt"; srtPath = Path.Combine(tmpDir, srtName); Srt.Save(srtPath, cues); }
                 string span = Srt.FormatTime(start).Substring(0, 8) + "–" + Srt.FormatTime(end).Substring(0, 8);
                 SetStatus("▶ Förbereder " + span + "…", true);
-                string clipArgs = BuildClipArgs(movie, srtName, clipName, start, end - start, refAudioIndex);
+                string clipArgs = BuildClipArgs(movie, srtName, clipName, start, end - start, refAudioIndex, PlayWidth(Screen.FromControl(this).WorkingArea.Width));
                 Log.Info("Uppspelning: ffmpeg " + clipArgs);
                 var sw = Stopwatch.StartNew();
                 var r = await Task.Run(() => RunPlayTool(ffmpeg, clipArgs, tmpDir, gen));

@@ -25,7 +25,7 @@ Ja. Kryssa i **Föreslå radindelning som referensen** ovanför listan. Rutan ä
 - **Dela:** en svensk rad som täcker två engelska rader delas i två, till exempel "- Vart då? / - Hem." blir "Vart då?" och "Hem.".
 - **Slå ihop:** två svenska rader som tillsammans motsvarar en engelsk rad blir en.
 
-De nya raderna får den engelska radens tider. Håll muspekaren över en blå rad för att se förslaget. Högerklicka (eller tryck **Skift+F10**) för att **godkänna** eller **avvisa** det, eller klicka **Godkänn alla förslag** ovanför listan. Förslag som du inte godkänner påverkar inte filen du sparar. **Ctrl+Z** ångrar, även om du godkände alla på en gång.
+De nya raderna får den engelska radens tider. Direkt under varje förslag står hur raden blir om du godkänner det: en eller två kursiva rader märkta **→ blir**, med de nya tiderna och texten. De raderna är bara en förhandsvisning och sparas inte. Högerklicka (eller tryck **Skift+F10**) för att **godkänna** eller **avvisa** det, eller klicka **Godkänn alla förslag** ovanför listan. Förslag som du inte godkänner påverkar inte filen du sparar. **Ctrl+Z** ångrar, även om du godkände alla på en gång.
 
 Programmet föreslår bara det som går att göra säkert:
 - En rad delas bara vid en radbrytning eller efter . ? !. Mitt i en mening delas den bara om den engelska raden också slutar mitt i en mening.
@@ -43,8 +43,11 @@ Efter synken står ett besked ovanför listan:
 - **⚠ Kontrollera de markerade ställena:** på några ställen passar texten sämre. Raderna där är märkta ⚠ i listan. Klicka **Nästa ställe** och **Föregående ställe** för att hoppa mellan dem, eller tryck F4 och Skift+F4.
 - **✖ Osäkert:** texten verkar inte passa. Den kan höra till ett annat avsnitt eller en annan version av filmen.
 
+**Kan jag söka i texten?**
+Ja. Skriv i rutan **Sök** ovanför listan, eller tryck **Ctrl+F**. Programmet letar i både den synkade texten och referensen och markerar första träffen. **Enter** hoppar till nästa träff och **Skift+Enter** till föregående. Det går också att klicka **Föregående** och **Nästa**. **Esc** tömmer rutan. Sökningen gäller raderna som listan visar, så välj Alla rader i Visa om du saknar en träff.
+
 **Kan jag se och höra om texten stämmer med filmen?**
-Ja. Klicka på **▶** längst till vänster på en rad i listan (eller markera raden och tryck **P**). Efter några sekunders förberedelse spelas filmen i ett eget fönster från 5 sekunder före raden till 5 sekunder efter, med den synkade texten ovanpå. Du ser texten som den är just nu, även det du inte har sparat. **Esc** stänger fönstret.
+Ja. Klicka på **▶** längst till vänster på en rad i listan (eller markera raden och tryck **P**). Efter några sekunders förberedelse spelas filmen i ett eget fönster (tre fjärdedelar av skärmens bredd) från 5 sekunder före raden till 5 sekunder efter, med den synkade texten ovanpå. Du ser texten som den är just nu, även det du inte har sparat. **Esc** stänger fönstret.
 - Första gången frågar programmet om det får hämta gratisverktyget ffmpeg (cirka 110 MB), om det inte redan finns.
 - Är referensen en SRT-fil letar programmet efter filmen i samma mapp. Hittar det ingen får du välja filmen.
 - Blockerar Smart App Control verktyget går uppspelningen inte att använda på den datorn.

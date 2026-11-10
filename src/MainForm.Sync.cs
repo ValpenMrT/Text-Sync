@@ -246,7 +246,7 @@ namespace TextSync
             if (!good) sb.Append("Under 95 % av raderna har referenstext samtidigt – granska de röda raderna (F3 hoppar till nästa).\n");
             if (proposals.Count > 0)
                 sb.Append(proposals.Count + " förslag om att slå ihop eller dela rader så att de följer referensens radindelning och tider (blå i listan). " +
-                    "Högerklicka för att godkänna eller avvisa.\n");
+                    "Under varje förslag står hur raden blir (→ blir). Högerklicka för att godkänna eller avvisa.\n");
             if (refOnlyTotal > 0) sb.Append(refOnlyTotal + " grå rader finns bara i referensen och sparas inte" + (viewCombo.SelectedIndex == ViewAll ? "" : viewCombo.SelectedIndex == ViewProposals ? " (de flesta dolda just nu, se Visa ovanför listan)" : " (dolda just nu, se Visa ovanför listan)") + ".\n");
             sb.Append("Redigera i listan: dubbelklicka för att ändra text och tid, Insert lägger till, Delete tar bort, Ctrl+Z ångrar.");
             resultLabel.Text = sb.ToString().TrimEnd();
@@ -323,7 +323,11 @@ namespace TextSync
 
             int view = viewCombo.SelectedIndex;
             int total = synced.Count + extraRef.Count;
-            rowCue = new int[total]; rowRef = new Cue[total]; cueRow = new int[synced.Count];
+            // under varje förslag visas en eller två rader "→ blir" med texten och tiderna som raden får om förslaget godkänns
+            int cap = total + proposals.Sum(p => p.NewCues.Count), previewRows = 0;
+            rowCue = new int[cap]; rowRef = new Cue[cap]; rowProp = new int[cap]; cueRow = new int[synced.Count];
+            for (int i = 0; i < cap; i++) rowProp[i] = -1;
+            if (propFont == null || propFont.Size != list.Font.Size) propFont = new Font(list.Font, FontStyle.Italic);
             for (int i = 0; i < cueRow.Length; i++) cueRow[i] = -1;   // -1 = raden är dold av valet i Visa
             var items = new List<ListViewItem>(total);
             int si = 0, ei = 0;
@@ -368,11 +372,28 @@ namespace TextSync
                     }
                     rowCue[row] = i; rowRef[row] = bc; cueRow[i] = row;
                     items.Add(it);
+                    int pk = cueProp[i];
+                    if (pk >= 0 && i == proposals[pk].First + proposals[pk].Count - 1)
+                    {
+                        var p = proposals[pk];
+                        for (int q = 0; q < p.NewCues.Count; q++)
+                        {
+                            var nc = p.NewCues[q]; var pr = q < p.Refs.Length ? p.Refs[q] : null;
+                            var pit = new ListViewItem(new[] { HC ? "▶" : "Spela stället", "→ blir", "", Srt.FormatTime(nc.Start), Srt.FormatTime(nc.End), "",
+                                nc.Text.Replace("\n", " / "), pr != null ? Srt.FormatTime(pr.Start) : "", pr != null ? pr.Text.Replace("\n", " / ") : "" });
+                            pit.ForeColor = PropRow; pit.Font = propFont;
+                            if (!HC) pit.BackColor = Theme.PropBg;
+                            pit.ToolTipText = "Så här blir raden om du godkänner förslaget ovanför. Högerklicka för att godkänna eller avvisa.";
+                            int prow = items.Count;
+                            rowCue[prow] = -1; rowRef[prow] = null; rowProp[prow] = pk;
+                            items.Add(pit); previewRows++;
+                        }
+                    }
                 }
             }
-            Array.Resize(ref rowCue, items.Count); Array.Resize(ref rowRef, items.Count);
+            Array.Resize(ref rowCue, items.Count); Array.Resize(ref rowRef, items.Count); Array.Resize(ref rowProp, items.Count);
             if (view == ViewAll) viewInfo.Text = "";
-            else if (items.Count > 0) viewInfo.Text = "Visar " + items.Count + " av " + total + " rader.";
+            else if (items.Count > 0) viewInfo.Text = "Visar " + (items.Count - previewRows) + " av " + total + " rader.";
             // tom lista: säg varför, så att det inte ser ut som att synken misslyckades
             else if (view == ViewOnlyRed) viewInfo.Text = "Inga röda rader. Välj Alla rader i Visa för att se listan.";
             else if (view == ViewProposals && !proposeCheck.Checked) viewInfo.Text = "Förslag är avstängda. Kryssa i rutan bredvid, eller välj Alla rader.";

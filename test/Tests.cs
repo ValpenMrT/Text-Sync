@@ -510,12 +510,12 @@ namespace TextSync
 
             // ---- spela upp filmen runt en rad
             {
-                string pa = MainForm.BuildClipArgs(@"C:\Film\Min film.mkv", "TextSync_play_abc.srt", "TextSync_play_abc.mkv", 61500, 13250, 0);
+                string pa = MainForm.BuildClipArgs(@"C:\Film\Min film.mkv", "TextSync_play_abc.srt", "TextSync_play_abc.mkv", 61500, 13250, 0, 1440);
                 Console.WriteLine("Uppspelning: ffmpeg " + pa);
                 Check("Uppspelning: klippet får start och längd i sekunder med punkt före filmen, texten inbränd och första ljudspåret",
-                    pa.Contains(" -ss 61.500 -t 13.250 -i \"C:\\Film\\Min film.mkv\" ") && pa.Contains("-vf \"scale=960:-2,subtitles=TextSync_play_abc.srt\"") &&
+                    pa.Contains(" -ss 61.500 -t 13.250 -i \"C:\\Film\\Min film.mkv\" ") && pa.Contains("-vf \"scale=1440:-2,subtitles=TextSync_play_abc.srt\"") &&
                     pa.Contains(" -map 0:v:0 -map 0:a:0? ") && pa.EndsWith(" TextSync_play_abc.mkv"));
-                string pb = MainForm.BuildClipArgs(@"C:\Film\a.mkv", null, "k.mkv", 0, 12000, 2);
+                string pb = MainForm.BuildClipArgs(@"C:\Film\a.mkv", null, "k.mkv", 0, 12000, 2, 960);
                 Check("Uppspelning: valt ljudspår används, och utan rader i fönstret används inget textfilter",
                     pb.Contains(" -map 0:a:2? ") && pb.Contains("-vf \"scale=960:-2\"") && !pb.Contains("subtitles"));
                 string pp = MainForm.BuildPlayArgs("TextSync_play_abc.mkv", "Text Sync – 00:01:06 (Esc stänger)");
@@ -527,6 +527,8 @@ namespace TextSync
                 var cut = MainForm.PlayCues(pc, 2000, 10000);
                 Check("Uppspelning: rader som sticker ut ur klippet kapas vid klippets början och slut",
                     cut.Count == 2 && cut[0].Start == 0 && cut[0].End == 1000 && cut[1].Start == 7000 && cut[1].End == 8000);
+                Check("Uppspelning: fönstret blir tre fjärdedelar av skärmens bredd, minst 960 och högst 1920",
+                    MainForm.PlayWidth(1920) == 1440 && MainForm.PlayWidth(3840) == 1920 && MainForm.PlayWidth(1366) == 1024 && MainForm.PlayWidth(1024) == 960 && MainForm.PlayWidth(1601) % 2 == 0);
                 var vids = new[] { @"C:\F\Serie.S04E01.1080p.mkv", @"C:\F\Serie.S04E02.1080p.mkv", @"C:\F\Annan film.mp4" };
                 Check("Uppspelning: filmen med samma avsnittsnummer som texten väljs",
                     MainForm.PickMovie(vids, @"C:\F\Serie.S04E02.en.srt", @"C:\F\serie 4x02 sv.srt") == vids[1]);

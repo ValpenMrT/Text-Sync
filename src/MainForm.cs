@@ -46,6 +46,9 @@ namespace TextSync
         // förslag på att slå ihop eller dela rader så att de följer referensens radindelning (blå rader)
         List<AlignProposal> proposals = new List<AlignProposal>();
         int[] cueProp;                 // index i synced -> index i proposals, -1 = inget förslag
+        int[] rowProp;                 // listrad -> index i proposals för raden "→ blir" som visar hur förslaget blir, annars -1
+        Font propFont;                 // kursiv stil för de raderna
+        TextBox searchBox; Label searchInfo; LinkLabel searchPrev, searchNext;
         readonly HashSet<string> rejected = new HashSet<string>();   // avvisade förslag (AlignProposal.Key)
         bool refIsText;                // referensen är riktig text (inte ljud), så att raderna kan matchas
         LinkLabel undoLink;
@@ -147,6 +150,7 @@ namespace TextSync
                 if (e.Control && e.KeyCode == Keys.Z && !(ActiveControl is TextBoxBase) && !(ActiveControl is NumericUpDown) && undo.Count > 0)
                 { UndoChange(); e.Handled = true; }
                 else if (e.KeyCode == Keys.F3 && synced != null) { NextUnmatched(); e.Handled = true; }
+                else if (e.Control && e.KeyCode == Keys.F) { searchBox.Focus(); searchBox.SelectAll(); e.Handled = true; e.SuppressKeyPress = true; }
                 else if (e.KeyCode == Keys.F4 && !e.Alt && synced != null) { JumpWeak(e.Shift ? -1 : 1); e.Handled = true; }
                 else if (e.KeyCode == Keys.Escape && StopPlay()) { if (statusLabel.Text.StartsWith("▶")) SetStatus("", true); e.Handled = true; }   // Esc stoppar uppspelningen även härifrån
             };
@@ -337,7 +341,7 @@ namespace TextSync
                 bool sel = e.Item.Selected;
                 // första kolumnen får hela radens yta: begränsa till kolumnens bredd
                 var b = e.ColumnIndex == 0 ? new Rectangle(e.Bounds.X, e.Bounds.Y, e.Header.Width, e.Bounds.Height) : e.Bounds;
-                Color cellBg = winSel ? (list.Focused ? SystemColors.Highlight : SystemColors.Control) : !own ? list.BackColor : sel ? Theme.SelBg : Theme.HotBg;
+                Color cellBg = winSel ? (list.Focused ? SystemColors.Highlight : SystemColors.Control) : !own ? e.Item.BackColor : sel ? Theme.SelBg : Theme.HotBg;
                 using (var bg = new SolidBrush(cellBg)) e.Graphics.FillRectangle(bg, b);
                 // fokusramen (t.ex. efter Ctrl+pil) ritade Windows förut
                 if (e.Item.Focused && list.Focused && !sel)
@@ -365,7 +369,7 @@ namespace TextSync
                 // radens egen färg (röd, blå, grå) behålls när muspekaren är över
                 // samma marginaler som Windows: 6 px i första kolumnen, 2 px vänster och 3 px höger i övriga
                 var tr = e.ColumnIndex == 0 ? new Rectangle(b.X + 6, b.Y, b.Width - 8, b.Height) : new Rectangle(b.X + 2, b.Y, b.Width - 5, b.Height);
-                TextRenderer.DrawText(e.Graphics, e.SubItem.Text, list.Font, tr, sel ? Color.White : e.Item.ForeColor, flags);
+                TextRenderer.DrawText(e.Graphics, e.SubItem.Text, e.Item.Font, tr, sel ? Color.White : e.Item.ForeColor, flags);
             };
             float k = 1f;
             using (var gr = CreateGraphics()) k = gr.DpiX / 96f;
@@ -431,7 +435,7 @@ namespace TextSync
             {
                 if (synced == null || busy) { e.Cancel = true; return; }
                 int n = SelectedCues().Count;
-                bool refOnly = list.SelectedIndices.Count == 1 && rowCue != null && rowCue[list.SelectedIndices[0]] < 0;
+                bool refOnly = list.SelectedIndices.Count == 1 && rowCue != null && rowCue[list.SelectedIndices[0]] < 0 && !(rowProp != null && rowProp[list.SelectedIndices[0]] >= 0);
                 miEdit.Text = refOnly ? "Lägg till rad här…" : "Ändra rad…";
                 miEdit.Enabled = (n == 1 && list.SelectedIndices.Count == 1) || refOnly;
                 miPlay.Enabled = list.SelectedIndices.Count == 1;
@@ -478,6 +482,26 @@ namespace TextSync
             acceptAllLink = new LinkLabel { AutoSize = true, Margin = new Padding(0, 7, 0, 0), Visible = false, LinkColor = Accent };
             acceptAllLink.LinkClicked += (s, e) => AcceptProposals(proposals);
             vbar.Controls.Add(acceptAllLink);
+            // sök i texten (Ctrl+F): Enter = nästa träff, Skift+Enter = föregående, Esc = töm
+            // en egen rad i raden, så att etikett, ruta och träffar håller ihop när fönstret är smalt
+            var srow = new FlowLayoutPanel { AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, WrapContents = false, Margin = new Padding(0) };
+            srow.Controls.Add(new Label { Text = "Sö&k:", AutoSize = true, Margin = new Padding(0, 7, 6, 0) });
+            searchBox = new TextBox { Width = 200, Margin = new Padding(0, 3, 8, 0), AccessibleName = "Sök i texten" };
+            searchBox.TextChanged += (s, e) => Find(0);
+            searchBox.KeyDown += (s, e) =>
+            {
+                if (e.KeyCode == Keys.Return) { Find(e.Shift ? -1 : 1); e.Handled = true; e.SuppressKeyPress = true; }
+                else if (e.KeyCode == Keys.Escape && searchBox.TextLength > 0) { searchBox.Clear(); list.Focus(); e.Handled = true; e.SuppressKeyPress = true; }
+            };
+            srow.Controls.Add(searchBox);
+            searchPrev = new LinkLabel { Text = "Föregående", AutoSize = true, Margin = new Padding(0, 7, 8, 0), LinkColor = Accent };
+            searchNext = new LinkLabel { Text = "Nästa", AutoSize = true, Margin = new Padding(0, 7, 8, 0), LinkColor = Accent };
+            searchPrev.LinkClicked += (s, e) => Find(-1);
+            searchNext.LinkClicked += (s, e) => Find(1);
+            srow.Controls.Add(searchPrev); srow.Controls.Add(searchNext);
+            searchInfo = new Label { AutoSize = true, ForeColor = Muted, Margin = new Padding(0, 7, 0, 0) };
+            srow.Controls.Add(searchInfo);
+            vbar.Controls.Add(srow);
             split.Panel1.Controls.Add(vbar);
             timeline = new TimelinePanel { Dock = DockStyle.Fill };
             split.Panel2.Controls.Add(timeline);
@@ -812,7 +836,8 @@ namespace TextSync
                 "Rutan \"Ta bort text för hörselskadade\" tar bort [MUSIK], (skrattar) och talarnamn som JOHN: ur texten. Resultatet säger hur många rader som togs bort.\n\n" +
                 "Tips: dra in båda filerna samtidigt. Rödmarkerade rader saknar engelsk text samtidigt – ofta helt i sin ordning (t.ex. utrop).\n" +
                 "Kryssa i \"Föreslå radindelning som referensen\" så föreslår programmet att dela eller slå ihop rader som de engelska (blå, \"Dela?\"/\"Ihop?\") – högerklicka för att godkänna. " +
-                "Visa ovanför listan döljer grå rader eller visar bara röda eller blå. Utseende längst upp väljer ljust eller mörkt.\n\n" +
+                "Under varje förslag står hur raden blir om du godkänner det (→ blir). " +
+                "Visa ovanför listan döljer grå rader eller visar bara röda eller blå. Sök (Ctrl+F) letar i texten, Enter hoppar till nästa träff. Utseende längst upp väljer ljust eller mörkt.\n\n" +
                 "Verktygen för synk mot ljudet (0,6–1,4 GB) ligger i mappen tools i " + Log.Dir + ". Mappen kan tas bort när Text Sync är stängt, och verktygen hämtas igen vid behov.\n\n" +
                 "Text Sync " + Program.Version + " · MIT-licens\n" +
                 "Loggfil (för felsökning): " + Log.FilePath + "\n\n" +

@@ -2,6 +2,20 @@
 
 Nyast först.
 
+## 2026-11-10 – 2.3: större uppspelning, förslagen visas i listan, sök i texten
+- **Område:** GUI
+- **Önskemål (ägaren, efter att ha provat 2.2):** play-knappen fungerar, men uppspelningsfönstret ska vara större. Det ska synas tydligare hur det blir med "Föreslå radindelning som referensen". Man ska kunna söka i texten.
+- **Beslut:**
+  - **Uppspelningen** är tre fjärdedelar av skärmens bredd, minst 960 och högst 1920 bildpunkter (förut alltid 960). På en skärm som är 1920 bred blir det 1440.
+  - **Förslagen visas i listan.** Under varje förslag står en eller två kursiva rader märkta **→ blir**, med ljusblå bakgrund, som visar tiderna och texten raden får om förslaget godkänns, och referensraden den då motsvarar. Förut syntes det bara i verktygstipset. Raderna är en förhandsvisning: de sparas inte, räknas inte i "Visar X av Y rader" och kan inte ändras. Högerklick på dem godkänner eller avvisar förslaget, och ▶ spelar stället.
+  - **Sök** ovanför listan (Ctrl+F): letar i den synkade texten och i referensen, utan skillnad på stora och små bokstäver, bland raderna som listan visar. Första träffen markeras medan man skriver. Enter = nästa, Skift+Enter = föregående, Esc tömmer. Länkarna Föregående och Nästa gör samma sak. Bredvid står "Träff 2 av 23".
+  - **Version 2.3**, eftersom 2.2 var öppen hos ägaren när den nya byggdes.
+- **Claudes tolkning:** "visa tydligare hur det ser ut" tolkades som att resultatet av varje förslag ska synas direkt i listan. Sökningen flyttar markeringen till träffen. Den döljer inga rader.
+- **Test:** 88 av 88 kontroller (1 ny, för fönstrets bredd). Provat i programmet mot Blacklist: 155 förslag gav raderna "→ blir" (skärmbild i mörkt läge), godkänn från en sådan rad gav 367 → 368 rader, sökning på "kirk" gav 23 träffar med hopp framåt och bakåt, och "xyzzy" gav "Inga träffar.".
+- **Ej provat:** den större uppspelningen (ägaren provar), och hur lång tid klippet tar att förbereda i den storleken.
+- **Product-check:** Claude granskade själv (tre mindre GUI-ändringar). Rättat under arbetet: sökrutan hamnade på en egen rad skild från etiketten, och pilen "↳" såg ut som en fyra i kursiv stil. Kan vänta: F3 hoppar till nästa röda rad och inte till nästa sökträff, och sökningen letar inte i rader som är dolda av valet i Visa (den säger det när inget hittas).
+- **Nivå:** LIVE
+
 ## 2026-11-10 – Ta bort text för hörselskadade, som en inställning
 - **Område:** GUI / text
 - **Önskemål (ägaren):** en kryssruta som tar bort text för hörselskadade. Inte ikryssad från början, och valet sparas (`removehi` i settings.txt).

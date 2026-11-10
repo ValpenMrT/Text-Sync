@@ -21,6 +21,7 @@ namespace TextSync
         public static Color Grid, TlRef, TlOrig, TlSynced, TlHighlight;
         // när muspekaren är över: listrad, knappar (vanlig/blå) och nedtryckt knapp
         public static Color HotBg, BtnHover, BtnDown, AccentHover, AccentDown;
+        public static Color PropBg;   // bakgrund på raden som visar hur ett förslag blir
         public static readonly Color SelBg = Color.FromArgb(0, 95, 170);   // markerad rad i listan i mörkt läge (vit text)
 
         static Theme() { Set(false); }
@@ -40,7 +41,7 @@ namespace TextSync
                 BtnBg = SystemColors.Control; BtnBorder = SystemColors.ControlDark; BtnDisabled = SystemColors.ControlDark;
                 RedRow = SystemColors.GrayText; RefOnly = SystemColors.GrayText; Prop = SystemColors.HotTrack;
                 Grid = SystemColors.GrayText; TlRef = SystemColors.Highlight; TlOrig = SystemColors.GrayText; TlSynced = SystemColors.HotTrack; TlHighlight = SystemColors.WindowText;
-                HotBg = SystemColors.Window; BtnHover = SystemColors.Control; BtnDown = SystemColors.Control; AccentHover = SystemColors.Highlight; AccentDown = SystemColors.Highlight;
+                PropBg = SystemColors.Window; HotBg = SystemColors.Window; BtnHover = SystemColors.Control; BtnDown = SystemColors.Control; AccentHover = SystemColors.Highlight; AccentDown = SystemColors.Highlight;
             }
             else if (Dark)
             {
@@ -50,7 +51,7 @@ namespace TextSync
                 BtnBg = C(55, 55, 55); BtnBorder = C(85, 85, 85); BtnDisabled = C(70, 70, 70);
                 RedRow = C(255, 130, 130); RefOnly = C(135, 135, 135); Prop = C(105, 170, 255);
                 Grid = C(58, 58, 58); TlRef = C(76, 160, 255); TlOrig = C(120, 120, 120); TlSynced = C(70, 190, 110); TlHighlight = C(240, 240, 240);
-                HotBg = C(52, 52, 52); BtnHover = C(72, 72, 72); BtnDown = C(90, 90, 90); AccentHover = C(25, 140, 230); AccentDown = C(0, 95, 170);
+                PropBg = C(30, 42, 58); HotBg = C(52, 52, 52); BtnHover = C(72, 72, 72); BtnDown = C(90, 90, 90); AccentHover = C(25, 140, 230); AccentDown = C(0, 95, 170);
             }
             else
             {
@@ -60,7 +61,7 @@ namespace TextSync
                 BtnBg = C(255, 255, 255); BtnBorder = C(200, 200, 200); BtnDisabled = C(200, 200, 200);
                 RedRow = C(170, 60, 60); RefOnly = C(110, 110, 110); Prop = C(0, 90, 180);
                 Grid = C(235, 235, 235); TlRef = C(0, 103, 192); TlOrig = C(160, 160, 160); TlSynced = C(16, 140, 60); TlHighlight = C(0, 0, 0);
-                HotBg = C(229, 241, 251); BtnHover = C(229, 241, 251); BtnDown = C(204, 228, 247); AccentHover = C(0, 120, 215); AccentDown = C(0, 84, 153);
+                PropBg = C(236, 244, 253); HotBg = C(229, 241, 251); BtnHover = C(229, 241, 251); BtnDown = C(204, 228, 247); AccentHover = C(0, 120, 215); AccentDown = C(0, 84, 153);
             }
             var now = new[] { Bg, Card, Fg, Muted, Err, Ok, Title, Warn };
             var map = new Dictionary<int, Color>();

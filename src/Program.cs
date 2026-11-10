@@ -8,14 +8,14 @@ using System.Windows.Forms;
 [assembly: System.Reflection.AssemblyProduct("Text Sync")]
 [assembly: System.Reflection.AssemblyDescription("Synka undertexter mot en referensundertext")]
 [assembly: System.Reflection.AssemblyCopyright("MIT-licens")]
-[assembly: System.Reflection.AssemblyVersion("2.2.0.0")]
-[assembly: System.Reflection.AssemblyFileVersion("2.2.0.0")]
+[assembly: System.Reflection.AssemblyVersion("2.3.0.0")]
+[assembly: System.Reflection.AssemblyFileVersion("2.3.0.0")]
 
 namespace TextSync
 {
     static class Program
     {
-        public const string Version = "2.2";
+        public const string Version = "2.3";
 
         [DllImport("user32.dll")] static extern bool SetProcessDPIAware();
 
