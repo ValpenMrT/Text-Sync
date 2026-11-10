@@ -30,6 +30,19 @@ namespace TextSync
         static readonly Regex Br = new Regex(@"<br[ \t]{0,2}/?>", RegexOptions.IgnoreCase);
         // Koder från ASS-formatet: {\an8} (text överst), {\i1}, {\pos(10,20)}
         static readonly Regex AssTag = new Regex(@"\{\\[^{}]*\}");
+        // Kursiv, fetstil, understruken och genomstruken i ASS: {\i1}…{\i0}, {\b1}, {\u1}, {\s1}. Görs om till <i>, <b>, <u>, <s>,
+        // som fler spelare förstår. Inte \bord2, \shad1 eller \b700: efter siffran måste nästa kod eller } komma.
+        static readonly Regex AssStyle = new Regex(@"\\([ibus])([01])(?=[\\}])");
+        // Taggar från webbsidor och TTML som ingen spelare tolkar i en SRT. Bara små bokstäver, och attribut måste se ut som namn=värde,
+        // så att vanlig text inom vinkelparenteser ("Kör in på <P>") står kvar.
+        const string Attrs = @"(?:\s{1,3}[\w:\-]{1,30}\s{0,2}=\s{0,2}(?:""[^""<>]*""|'[^'<>]*'|[^\s<>""']+))";
+        static readonly Regex HtmlBlockOpen = new Regex(@"<(?:p|div)" + Attrs + @"*\s{0,2}>");      // <p>, <div class="x">: tas bort
+        static readonly Regex HtmlBlockClose = new Regex(@"</(?:p|div)\s{0,2}>");                     // </p>, </div>: ny rad
+        static readonly Regex HtmlInline = new Regex(@"<(?:span|sup|sub|small)" + Attrs + @"*\s{0,2}>|</(?:span|sup|sub|small)\s{0,2}>");
+        static readonly Regex HtmlLinkOpen = new Regex(@"<a" + Attrs + @"+\s{0,2}>");                // <a href="…">: taggen tas bort, texten står kvar
+        static readonly Regex HtmlLinkClose = new Regex(@"</a\s{0,2}>");
+        // Koder från MicroDVD-formatet: {y:i} (kursiv), {c:$0000ff} (färg), {f:Arial}, {s:20}, {P:1}. Tas bort av rutan för formatering.
+        static readonly Regex MicroDvd = new Regex(@"\{[ycfsYCFSPo]:[^{}]{0,40}\}");
         static readonly Regex EmptyPair = new Regex(@"<(i|b|u|s|font)(?:\s[^<>]*)?>(\s*)</\1>");
         static readonly Regex Spaces = new Regex(@"[ \t]{2,}");
         const int MaxReopen = 4;   // så många öppna taggar stängs och öppnas igen för att rätta ordningen (skydd mot orimlig indata)
@@ -92,6 +105,34 @@ namespace TextSync
             if (s.Contains("</c>")) s = VttClass.Replace(s, "");
             if (s.Contains("</v>")) s = VttVoice.Replace(s, "");
             return VttOther.Replace(s, "");
+        }
+
+        // {\i1}Hej{\i0} → <i>Hej</i>,  {\an8\b1}Hej → {\an8}<b>Hej   (det som inte stängs stängs sedan av RepairTags)
+        static string AssToTags(string s)
+        {
+            if (s.IndexOf("{\\", StringComparison.Ordinal) < 0) return s;
+            return AssTag.Replace(s, m =>
+            {
+                var tags = new StringBuilder();
+                string rest = AssStyle.Replace(m.Value, x =>
+                {
+                    tags.Append(x.Groups[2].Value == "1" ? "<" : "</").Append(x.Groups[1].Value).Append('>');
+                    return "";
+                });
+                if (tags.Length == 0) return m.Value;
+                return (rest == "{}" ? "" : rest) + tags;
+            });
+        }
+
+        // <p>Rad ett</p><p>Rad två</p> → två rader,  <span style="…">Hej</span> → Hej,  <a href="…">sajt.se</a> → sajt.se
+        static string RemoveHtml(string s)
+        {
+            if (s.IndexOf('<') < 0) return s;
+            s = HtmlBlockClose.Replace(HtmlBlockOpen.Replace(s, ""), "\n");
+            s = HtmlInline.Replace(s, "");
+            string noLink = HtmlLinkOpen.Replace(s, "");
+            if (noLink != s) s = HtmlLinkClose.Replace(noLink, "");   // </a> tas bara bort när det fanns en länk
+            return s;
         }
 
         class Open { public string Name, Text; }
@@ -182,9 +223,11 @@ namespace TextSync
             string s = DecodeEntities(src);
             entities = s != src;
             string r = s;
-            if (s.IndexOf('<') >= 0)
+            if (s.IndexOf('<') >= 0 || s.IndexOf('\\') >= 0)
             {
-                r = RepairTags(RemoveVtt(Br.Replace(s, "\n")));
+                // \N är radbrytning i ASS-formatet. Ingen spelare tolkar den i en SRT.
+                r = AssToTags(Br.Replace(s, "\n").Replace("\\N", "\n"));
+                if (r.IndexOf('<') >= 0) r = RepairTags(RemoveVtt(RemoveHtml(r)));
                 tags = r != s;
             }
             return entities || tags ? Tidy(r) : src;
@@ -201,7 +244,7 @@ namespace TextSync
                 string name, attrs; bool close;
                 return IsTag(m, out name, out close, out attrs) ? "" : m.Value;
             });
-            r = AssTag.Replace(RemoveVtt(r), "");
+            r = MicroDvd.Replace(AssTag.Replace(RemoveVtt(r), ""), "");
             return r == text ? text : Tidy(r);
         }
 

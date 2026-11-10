@@ -621,6 +621,20 @@ namespace TextSync
                 Check("Taggar: <br> blir en radbrytning, och <strike>/<del> blir <s>",
                     F("Rad ett<br>rad två") == "Rad ett\nrad två" && F("Rad ett<BR />rad två") == "Rad ett\nrad två" && F("Rad ett <br/> rad två") == "Rad ett\nrad två" &&
                     F("<i>Rad ett<br>rad två</i>") == "<i>Rad ett\nrad två</i>" && F("<strike>Fel</strike> <del>fel</del>") == "<s>Fel</s> <s>fel</s>" && F("<bra>") == "<bra>");
+                Check("Koder från ASS: \\N blir en radbrytning, och {\\i1} {\\b1} {\\u1} {\\s1} blir <i> <b> <u> <s>",
+                    F("Rad ett\\NRad två") == "Rad ett\nRad två" && F("{\\i1}Hej{\\i0}") == "<i>Hej</i>" && F("{\\b1}Fet{\\b0} och {\\i1}kursiv") == "<b>Fet</b> och <i>kursiv</i>" &&
+                    F("{\\an8\\i1}Överst") == "{\\an8}<i>Överst</i>" && F("{\\u1}Under{\\u0} {\\s1}struken{\\s0}") == "<u>Under</u> <s>struken</s>" &&
+                    F("{\\an8}Orörd") == "{\\an8}Orörd" && F("{\\bord2\\shad1\\b700}Orörd") == "{\\bord2\\shad1\\b700}Orörd" && F("C:\\nytt och 1\\2") == "C:\\nytt och 1\\2");
+                Check("Taggar från webbsidor: <p> och <div> blir rader, <span> <sup> <sub> <small> och länkar tas bort och texten står kvar",
+                    F("<p>Rad ett</p><p>Rad två</p>") == "Rad ett\nRad två" && F("<div class=\"x\">Hej</div>") == "Hej" && F("<span style=\"color:red\">Hej</span> du") == "Hej du" &&
+                    F("m<sup>2</sup> H<sub>2</sub>O <small>liten</small>") == "m2 H2O liten" && F("Text från <a href=\"http://exempel.se\">exempel.se</a>") == "Text från exempel.se" &&
+                    F("<span style='font-style:italic'><i>Hej</i></span>") == "<i>Hej</i>");
+                bool htmlOk = true;
+                foreach (string t in new[] { "Kör in på <P>", "<a>", "</a>", "<p och q>", "<span av tid>", "<A href>", "<small talk>", "<sub zero>", "<div by zero>", "{y:i}Hej" })
+                    if (F(t) != t) { htmlOk = false; Console.WriteLine("    ändrades: " + t + "  →  " + F(t)); }
+                Check("Taggar från webbsidor: vanlig text inom vinkelparenteser står kvar", htmlOk);
+                Check("Ta bort formatering: koder från MicroDVD och ASS tas bort",
+                    S0("{y:i}Hej") == "Hej" && S0("{c:$0000ff}{y:b}Blå och fet") == "Blå och fet" && S0("{\\pos(10,20)}Hej") == "Hej" && S0("{klammer: text som är längre än fyrtio tecken står kvar}") == "{klammer: text som är längre än fyrtio tecken står kvar}" && S0("{x:i}Hej") == "{x:i}Hej");
                 int fe, ft, fs, fg;
                 var fl0 = Markup.FixAll(new List<Cue> { new Cue(0, 1000, "<i> </i>"), new Cue(2000, 3000, "Hej &amp; hå"), new Cue(4000, 5000, "&nbsp;"), new Cue(6000, 7000, "<br>"), new Cue(8000, 9000, "Orörd"), new Cue(10000, 11000, "") }, out fe, out ft, out fg);
                 Check("Tecken och taggar: rader där ingen text blir kvar tas bort, och en rättad rad minns vad som stod i filen",
@@ -642,6 +656,7 @@ namespace TextSync
                 Check("Tecken och taggar: en SRT-fil som läses, rättas och skrivs får riktiga tecken och hela taggar", fsrt.Contains("<i>Tom & Jerry</i>\r\n"));
                 var sw3 = System.Diagnostics.Stopwatch.StartNew();
                 F(string.Concat(Enumerable.Repeat("<i>", 3000)) + "x"); F(string.Concat(Enumerable.Repeat("</b>", 3000))); F(new string('<', 20000) + "i"); F(string.Concat(Enumerable.Repeat("&amp;", 5000))); S(string.Concat(Enumerable.Repeat("{\\", 5000)));
+                F("<p" + new string(' ', 20000) + "x"); F(string.Concat(Enumerable.Repeat("<a b=", 5000))); F(string.Concat(Enumerable.Repeat("{\\i1", 5000))); F(string.Concat(Enumerable.Repeat("<span a=\"", 5000)));
                 F("<" + new string(' ', 20000) + "x"); F(string.Concat(Enumerable.Repeat("<" + new string('\t', 5000) + "x", 20)));
                 int big = F(string.Concat(Enumerable.Repeat("<font color=\"red\">", 2000)) + string.Concat(Enumerable.Repeat("</i>", 2000))).Length;
                 Check("Tecken och taggar: orimligt djupa taggar blåser inte upp texten", big < 200000);

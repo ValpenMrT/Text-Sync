@@ -46,7 +46,7 @@
 ## Kvar från product-check 2026-11-10 (kodade tecken och taggar, kan vänta)
 - **Inte provat mot en riktig SRT-fil** med kodade tecken från en undertextsajt, eller på en TV som visar taggar som text.
 - **Avvisade förslag kommer tillbaka** när rutan "Ta bort kursiv och annan formatering" kryssas i eller ur, eftersom förslagets nyckel (`AlignProposal.Key`) innehåller radens text.
-- **Andra taggar och koder rörs inte**, inte heller av rutan: `<p>`, `<span>`, `<a>`, `<sup>` från webbsidor, `\N` (radbrytning i ASS), `{y:i}` (MicroDVD) och `{\i1}` (kursiv i ASS). Ägaren har fått listan 2026-11-10 och säger till om någon ska hanteras.
+- **Inte provat mot riktiga filer** med koder från ASS (`\N`, `{\i1}`), MicroDVD (`{y:i}`) eller webbsidor (`<p>`, `<span>`, `<a>`).
 - **Text för hörselskadade** (`src/Sdh.cs`) räknar fortfarande allt mellan `<` och `>` som en tagg.
 
 ## Kvar från product-check 2026-11-10 (text för hörselskadade, kan vänta)

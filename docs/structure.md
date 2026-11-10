@@ -24,7 +24,8 @@ src/
   TextCheck.cs     Kontroll av textspår mot Whisper ord för ord (ankare, utjämning, rättning); separat SRT på originalspråket synkas först grovt mot ljudet
   Engine.cs        SRT läs/skriv och synkmotorn
   Sdh.cs           Tar bort text för hörselskadade: [MUSIK], (skrattar), ♪ och talarnamn i versaler
-  Markup.cs        Kodade tecken (&amp; → &) och taggar (<i>, <b>, <u>, <s>, <font>): avkodas och lagas alltid vid inläsningen, tas bort som ett val
+  Markup.cs        Kodade tecken (&amp; → &) och taggar (<i>, <b>, <u>, <s>, <font>): avkodas och lagas alltid vid inläsningen, tas bort som ett val.
+                   Också koder från webbsidor (<br>, <p>, <span>), ASS (\N, {\i1}) och MicroDVD ({y:i})
   Quality.cs       Besked om hur säker synken är (Bra / Kontrollera / Osäkert, svaga ställen) och avsnittsnummer i filnamn (varning för fel avsnitt)
   ConfirmDialog.cs Varningsruta med egna knapptexter ("Synka ändå" / "Avbryt")
   Mkv.cs           Minimal Matroska-läsare: spårlista och textundertexter (SRT/ASS/WebVTT, även zlib-komprimerade)

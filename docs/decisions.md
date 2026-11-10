@@ -2,6 +2,20 @@
 
 Nyast först.
 
+## 2026-11-10 – Koder från ASS, MicroDVD och webbsidor
+- **Område:** text
+- **Önskemål (ägaren):** "implementera alla dina förslag", efter listan över taggar och koder som programmet inte rörde (se "Kända gränser" i posten nedan, som den här posten ersätter).
+- **Beslut:** alltid vid inläsningen, på samma sätt som övrig lagning (raden märks ✎ och räknas som "trasig formatering"):
+  - **`\N`** (radbrytning i ASS) blir en riktig radbrytning.
+  - **`{\i1}…{\i0}`, `{\b1}`, `{\u1}`, `{\s1}`** (ASS) görs om till `<i>`, `<b>`, `<u>`, `<s>`. Andra koder i samma klammer står kvar (`{\an8\i1}` → `{\an8}<i>`). Det som inte stängs stängs sist i raden.
+  - **`<p>` och `<div>`** tas bort, och där de slutar blir det en ny rad. **`<span>`, `<sup>`, `<sub>`, `<small>`** och **länkar (`<a href=…>`)** tas bort, och texten står kvar.
+  - Taggarna från webbsidor räknas bara med små bokstäver, och attribut måste se ut som `namn=värde`. "Kör in på \<P\>", "\<small talk\>" och ett ensamt `<a>` är vanlig text.
+- **Med rutan "Ta bort kursiv och annan formatering":** koder från MicroDVD tas också bort (`{y:i}`, `{c:$0000ff}`, `{f:…}`, `{s:…}`, `{P:…}`, högst 40 tecken). Utan rutan står de kvar.
+- **Kända gränser:** `\h` (hårt blanksteg i ASS) rörs inte. `<span style="font-style:italic">` blir vanlig text och inte kursiv. Reklamtexten i en länk står kvar (bara taggen tas bort).
+- **Test:** 114 av 114 kontroller (4 nya). Inte provat i programmet mot en riktig fil med sådana koder.
+- **Product-check:** Claude granskade själv (tillägg till lagningen i posten nedan, samma regler om vanlig text inom vinkelparenteser och om mönster som inte får bli långsamma). Inget blockerande.
+- **Nivå:** LIVE
+
 ## 2026-11-10 – 2.4: rader utan text tas bort, rättade rader märks, \<br\> blir radbrytning
 - **Område:** text / GUI
 - **Önskemål (ägaren, svar på det som stod kvar efter posten nedan):** ta bort rader som bara bestod av formatering. Markera vilka rader som har rättats. `<br>` brukar betyda ny rad. Version 2.4.
