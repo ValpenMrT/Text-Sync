@@ -2,6 +2,35 @@
 
 Nyast först.
 
+## 2026-11-11 – 2.4.8: Betydelsejämförelsen parar en rad med två eller tre referensrader, och rättar korta fel
+- **Område:** Synk
+- **Önskemål (ägaren):** "Bygg det", som svar på förslaget i 2.4.7 om att låta en svensk rad paras med två engelska rader i följd.
+- **Beslut:**
+  - **Grupper av referensrader:** en rad får paras med en, två eller tre referensrader i följd (`Meaning.MaxGroup = 3`). Varje grupp får en egen vektor för radernas text tillsammans. Avvikelsen mäts mot gruppens första rad. Rader bildar bara en grupp om pausen mellan dem är under 2 s.
+  - **Lägre kostnad för byte av nivå:** 1,5 i stället för 2,0 (`Meaning.JumpCost`). En utflykt och tillbaka behöver då minst fyra säkra par i stället för fem.
+  - **Ingen kostnad inom 0,1 s från nivån** (`Free`), eftersom översättningar sällan börjar exakt samtidigt som originalet.
+  - **Likheten räknas i standardavvikelser** för varje slags grupp för sig, så att rad mot rad och rad mot grupp går att jämföra.
+- **Mätt mot Blacklist S04E01** med `test/MeaningDiag.cs` (facit = den vanliga synken, delar flyttade med flit):
+
+  | Fel som lades in | 2.4.7 | 2.4.8 |
+  |---|---|---|
+  | +3,0 s från 30:00 till slutet (95 rader) | 95 | 95 |
+  | +0,7 s i tre minuter (29 rader) | 29 | 29 |
+  | −0,3 s i två minuter (17 rader) | 15, och 1 annan rad ändrad | 17 |
+  | +1,0 s i en minut (6 rader) | 0 | 6 |
+  | +8,0 s i 40 s (5 rader) | 0 | 5 |
+  | −1,5 s i 25 s (2 rader) | 0 | 0 |
+
+  Siffrorna är antal rader tillbaka inom 0,3 s. Inga andra rader ändrades i 2.4.8, och den vanliga synken (ingenting förstört) ändras inte.
+  - **Bruset:** säkra par inom 0,4 s från sin nivå gick från 180 av 320 till 256 av 341. Med grupper om bara två blev det 250 av 341.
+  - **Kostnaden för byte av nivå:** 2,0 missade felen på 5–6 rader. 1,0 rättade dem men flyttade också fyra rader som låg rätt (upp till 0,5 s). 1,5 valdes.
+  - **Tid:** 19 s första gången på processorn (16 s med grupper om två), under 0,1 s med cache.
+- **Kvar:** fel på färre än tre rader rättas inte, eftersom ett avsnitt behöver tre säkra par. Det är med flit: enstaka par avviker ofta av sig själva.
+- **Test:** 224 av 224 kontroller (2 nya: en rad som motsvarar två referensrader paras med båda och ett fel på 7 rader rättas, och bara rader som följer tätt bildar en grupp).
+- **Ej provat:** andra filmer och språk, texter där översättningen har fler rader än originalet (då skulle två översatta rader behöva paras med en referensrad, vilket inte är byggt), och allt i fönstret som stod som ej provat i 2.4.7.
+- **Product-check:** Claude granskade själv (justering av en funktion som är av från början, mätt före och efter mot samma film, ingen ändring i gränssnittet).
+- **Nivå:** LIVE
+
 ## 2026-11-11 – 2.4.7: Betydelsejämförelsen provad med riktiga verktyg och mätt mot Blacklist S04E01
 - **Område:** Synk / test
 - **Önskemål (ägaren):** "Kan du testa åt mig."
@@ -28,7 +57,7 @@ Nyast först.
 - **Ägarens svar på frågorna:** inställningen ska förbättra själva synken (inte bara kontrollera den), den stora modellen ska användas, rutan ska vara av från början, och funktionen byggs in direkt utan ett mätprogram först. Nya nedladdningar går bra.
 - **Beslut:**
   - **Kryssrutan "Jämför också vad raderna betyder"** i Inställningar under Synk, av från början (`meaning` i `settings.txt`). Den gäller huvudfönstret och Hel säsong, och bara när referensen är en text (textspår, SRT eller originaltext), inte ljud.
-  - **Efter den vanliga synken** får varje rad en vektor från språkmodellen bge-m3 (över 100 språk). Raderna paras ihop med referensraderna efter betydelse utan att byta ordning. Varje säkert par säger hur långt raden ligger från sin referensrad. Där minst tre par i följd är överens om en avvikelse på minst 0,15 s flyttas raderna dit. En utflykt och tillbaka kräver minst fem par. Övriga rader lämnas precis som synkmotorn lade dem.
+  - **Efter den vanliga synken** får varje rad en vektor från språkmodellen bge-m3 (över 100 språk). Raderna paras ihop med referensraderna efter betydelse utan att byta ordning. Varje säkert par säger hur långt raden ligger från sin referensrad. Där minst tre par i följd är överens om en avvikelse på minst 0,15 s flyttas raderna dit. En utflykt och tillbaka kräver minst fem par (fyra från 2.4.8). Övriga rader lämnas precis som synkmotorn lade dem.
   - **Enstaka par som avviker räknas inte.** Det skyddar mot rader som svenskan har slagit ihop och som därför paras med fel halva.
   - **Korta rader** (under 8 bokstäver) jämförs inte. De följer med raderna runt omkring.
   - **Gränserna för vad som är ett par** sätts efter spridningen i just de två texterna (2,5 och 4 standardavvikelser), eftersom modellens skala inte är mätt.

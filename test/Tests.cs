@@ -1140,6 +1140,28 @@ namespace TextSync
                 var withHoles = Meaning.Refine(mref, off, mrefV.ToArray(), holes, out rep);
                 Check("Betydelse: rader som inte jämförs flyttas med raderna runt omkring", Enumerable.Range(100, 20).All(i => Math.Abs(withHoles[i].Start - truth[i]) < 300) && withHoles[50].Start == off[50].Start && rep.Moved == 20);
 
+                // f) översättningen slår ihop två referensrader till en: med grupper mäts avvikelsen mot den första raden,
+                //    och då hittas också ett kort fel (7 rader) som annars drunknar i bruset
+                {
+                    var gref = new List<Cue>(); var grefV = new List<float[]>();
+                    for (int i = 0; i < 300; i++) { gref.Add(new Cue(10000 + i * 2500, 12000 + i * 2500, "Reference line number " + i)); grefV.Add(rndVec(256)); }
+                    var pairV = new float[300][];
+                    for (int i = 0; i + 1 < 300; i++) { pairV[i] = new float[256]; for (int k = 0; k < 256; k++) pairV[i][k] = grefV[i][k] + grefV[i + 1][k]; Meaning.Normalize(pairV[i]); }
+                    var gt = new List<Cue>(); var gtV = new List<float[]>(); var gTruth = new List<double>();
+                    for (int i = 0; i + 1 < 300; i += 2)
+                    {
+                        double s = gref[i].Start + (mr.NextDouble() * 200 - 100);
+                        gTruth.Add(s); gt.Add(new Cue(s, s + 4200, "Två rader i en, nummer " + i)); gtV.Add(near(pairV[i], 0.35));
+                    }
+                    for (int i = 60; i < 67; i++) { gt[i].Start += 1000; gt[i].End += 1000; }
+                    var gOut = Meaning.Refine(gref, gt, grefV.ToArray(), gtV.ToArray(), out rep, new[] { pairV });
+                    Console.WriteLine("Betydelse, två rader i en: " + rep.LogText());
+                    Check("Betydelse: en rad som motsvarar två referensrader paras med båda, och ett kort fel på 7 rader rättas",
+                        rep.Grouped > 120 && rep.Moved == 7 && Enumerable.Range(0, gt.Count).All(i => Math.Abs(gOut[i].Start - gTruth[i]) < 300));
+                    var gtexts = Meaning.GroupTexts(new List<Cue> { new Cue(0, 1000, "Hej."), new Cue(1500, 2500, "<i>Var är du?</i>"), new Cue(9000, 9500, "Här.") }, 2);
+                    Check("Betydelse: bara referensrader som följer tätt på varandra bildar en grupp", gtexts[0] == "Hej. Var är du?" && gtexts[1] == "" && gtexts[2] == "");
+                }
+
                 // frågan till och svaret från llama-server
                 string reqJson = LlamaServer.BuildRequest(new List<string> { "Var är \"han\"?", "Hallå å\\ä 😀" });
                 var parsed = Json.Parse(reqJson) as Dictionary<string, object>;

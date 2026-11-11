@@ -39,17 +39,17 @@
     - Gränserna sätts mot testerna och testfilmen, så att varningen inte visas för vanliga filmer med förtexter eller eftertexter som saknar text.
 
 ## Kvar efter betydelsejämförelsen 2.4.6 (2026-11-11)
-Mätt mot Blacklist S04E01 i 2.4.7 (se beslutsloggen): verktygen fungerar, den vanliga synken ändras inte, fel som varar i minuter rättas, korta fel rättas inte.
+Mätt mot Blacklist S04E01 i 2.4.7 och 2.4.8 (se beslutsloggen): verktygen fungerar, den vanliga synken ändras inte, och fel på minst fem rader i följd rättas.
 
 Det som inte är gjort:
-- **Korta fel (under ungefär en minut) rättas inte.** En svensk rad täcker ofta två engelska och paras ibland med den andra, så 140 av 320 säkra par avviker mer än 0,4 s. Förslag: låt en svensk rad paras med två engelska rader i följd (vektor för de två raderna tillsammans), och mät mot den första. Mät om med `MeaningDiag`.
-- **Bara en film mätt.** Kör `MeaningDiag` på fler filmer när ägaren har dem.
+- **Bara en film mätt.** Gränserna (`JumpCost`, `MaxGroup`, 2,5 och 4 standardavvikelser) passar Blacklist S04E01. Kör `MeaningDiag` på fler filmer när ägaren har dem, innan gränserna litas på.
+- **Översättning med fler rader än originalet:** två översatta rader mot en referensrad paras inte som grupp. Den ena raden paras, den andra följer med.
+- **Fel på en eller två rader rättas inte.**
 - **Ägaren provar i fönstret:** frågerutan och nedladdningen (verktygen ligger redan på den här datorn, så frågan kommer inte här), rutan **Betydelse:** i resultatet, och Avbryt under jämförelsen.
 - **Bara processorn.** Det tar cirka 20 s per avsnitt första gången, så paketet för NVIDIA (cirka 700 MB till) behövs inte nu.
 - **Tiden står inte i Inställningar.** Skriv "ungefär en halv minut per avsnitt första gången" när fler filmer är mätta.
 - **Frågan om nedladdning nämner inte Smart App Control.** llama-server är inte signerat, så 440 MB kan hämtas och sedan blockeras. Felet förklaras då i resultatet. Förslag: kryssa ur rutan automatiskt efter första blockeringen, som `gpuwhisperfailed` gör för Whisper.
 - **Raderna före första och efter sista säkra paret** får samma flytt som kanten, även om de ligger långt bort i tid.
-- **Gränsen mellan två nivåer kan hamna en rad fel** (en rad flyttades 0,3 s i onödan i mätningen).
 - **Frågor till ägaren från granskningen:** (1) Ska jämförelsen gälla Hel säsong redan nu, där resultatet sparas utan att någon ser det, eller bara huvudfönstret tills den är provad? Nu gäller den båda. (2) Räcker 10 s som längsta flytt? Synkmotorns finjustering har 6 s.
 - **Flyttade rader märks inte i listan.** Kolumnen Flyttad visar hoppet, men inget märke säger att det var betydelsejämförelsen.
 - **Beskedet** (Bra / Kontrollera / Osäkert) använder inte parningen. Få par är ett tecken på fel avsnitt och kunde ge Osäkert.

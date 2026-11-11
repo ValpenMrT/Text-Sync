@@ -48,6 +48,13 @@ namespace TextSync
             Console.OutputEncoding = System.Text.Encoding.UTF8;
             if (args.Length < 2) { Console.WriteLine("Användning: MeaningDiag <film.mkv> <undertext.srt>"); return 2; }
             if (!Tools.MeaningReady()) { Console.WriteLine("Verktygen saknas: kryssa i \"Jämför också vad raderna betyder\" i Inställningar och synka en gång, så hämtas de."); return 2; }
+            // tredje argumentet: hur många referensrader i följd en rad får paras med (1 = bara rad mot rad), för att jämföra
+            int mg;
+            if (args.Length > 2 && int.TryParse(args[2], out mg)) Meaning.MaxGroup = mg;
+            // fjärde argumentet: vad ett byte av nivå kostar (Meaning.JumpCost), för att prova gränsen
+            double jc;
+            if (args.Length > 3 && double.TryParse(args[3], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out jc)) Meaning.JumpCost = jc;
+            Console.WriteLine("En rad får paras med upp till " + Meaning.MaxGroup + " referensrader i följd, byte av nivå kostar " + Meaning.JumpCost.ToString(System.Globalization.CultureInfo.InvariantCulture));
             List<Cue> refc;
             using (var f = new MkvFile(args[0]))
             {

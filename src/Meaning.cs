@@ -22,6 +22,7 @@ namespace TextSync
     {
         public int Lines;        // rader i texten som är långa nog att jämföra
         public int Paired;       // rader som parades ihop med en referensrad efter betydelse
+        public int Grouped;      // varav med två eller tre referensrader i följd
         public int Anchors;      // par som är säkra nog att styra tiderna
         public int Moved;        // rader som flyttades
         public int Places;       // antal ställen (rader i följd med samma flytt)
@@ -62,7 +63,7 @@ namespace TextSync
             var inv = CultureInfo.InvariantCulture;
             if (Canceled) return "avbruten";
             if (Error != null) return "fel: " + Error;
-            return (Worse ? "togs tillbaka (sämre poäng), " : "") + "rader " + Lines + ", par " + Paired + ", säkra par " + Anchors + ", flyttade " + Moved + " på " + Places + " ställen, största " + MaxMs.ToString("0", inv) +
+            return (Worse ? "togs tillbaka (sämre poäng), " : "") + "rader " + Lines + ", par " + Paired + " (" + Grouped + " mot flera rader), säkra par " + Anchors + ", flyttade " + Moved + " på " + Places + " ställen, största " + MaxMs.ToString("0", inv) +
                 " ms, sigma " + Sigma.ToString("0.000", inv) + ", gränser " + MatchMin.ToString("0.000", inv) + "/" + AnchorMin.ToString("0.000", inv) +
                 (TooFew ? ", för få säkra par" : "") + (Levels.Length > 0 ? ", nivåer " + Levels : "");
         }
@@ -70,10 +71,12 @@ namespace TextSync
 
     public static class Meaning
     {
-        // Gränserna är satta mot påhittade data i testerna och mätta mot en film, Blacklist S04E01 (beslutsloggen 2026-11-11, 2.4.7):
-        // den vanliga synken ändras inte och fel som varar i minuter rättas, men korta fel (under ungefär en minut) rättas inte.
+        // Gränserna är satta mot påhittade data i testerna och mätta mot en film, Blacklist S04E01 (beslutsloggen 2026-11-11, 2.4.8):
+        // den vanliga synken ändras inte, och fel på minst fem rader i följd rättas. Mät om med test/MeaningDiag.cs när något ändras:
+        // JumpCost 2,0 missade fel på 5–6 rader, och 1,0 flyttade fyra rader som låg rätt.
         const double Tol = 400;        // ms: ett par stöder en nivå om det ligger så nära den
-        const double JumpCost = 2.0;   // byte av nivå kostar som två par som inte stämmer: ett nytt avsnitt behöver minst tre par
+        const double Free = 100;       // ms: så nära nivån kostar ingenting
+        public static double JumpCost = 1.5;   // byte av nivå kostar som ett och ett halvt par som inte stämmer: en utflykt och tillbaka behöver minst fyra par
         const double Deadband = 150;   // ms: mindre flyttar görs inte, synkmotorn är redan så exakt
         const double LevelStep = 50;   // ms
         const int MinLetters = 8;      // kortare rader ("Ja.", "Okej.") säger för lite om betydelsen
@@ -81,6 +84,8 @@ namespace TextSync
         const double MatchSigmas = 2.5, AnchorSigmas = 4;
         const double MaxShift = 10000; // ms: par som ligger längre från varandra styr inte tiderna (en scen som upprepas, eller fel avsnitt)
         const double WorseMargin = 0.01; // så mycket får överlappspoängen sjunka innan flytten tas tillbaka
+        const double GroupGap = 2000;  // ms: längsta paus mellan referensrader som kan höra till samma översatta rad
+        public static int MaxGroup = 3; // en rad får paras med upp till så många referensrader i följd (1 = bara rad mot rad)
 
         // Texten som jämförs: utan taggar, radbrytningar och replikstreck
         public static string Clean(string text)
@@ -123,13 +128,19 @@ namespace TextSync
                 var rt = refc.Select(c => Clean(c.Text)).ToList();
                 var tt = r.Output.Select(c => Clean(c.Text)).ToList();
                 float[][] rv, tv;
+                int steps = 1 + MaxGroup;   // texten, referensen rad för rad, och referensen i grupper om två, tre, …
+                var groups = new float[Math.Max(0, MaxGroup - 1)][][];
                 using (var srv = new LlamaServer(exe, model))
                 {
-                    rv = Embedder.Get(rt, model, srv, p => progress(p / 2, "Jämför vad raderna betyder… " + p / 2 + " %"), s => progress(0, s), ct);
-                    tv = Embedder.Get(tt, model, srv, p => progress(50 + p / 2, "Jämför vad raderna betyder… " + (50 + p / 2) + " %"), s => progress(50, s), ct);
+                    Func<int, Action<int>> part = k => p => { int pct = (k * 100 + p) / steps; progress(pct, "Jämför vad raderna betyder… " + pct + " %"); };
+                    Func<int, Action<string>> stat = k => s => progress(k * 100 / steps, s);
+                    rv = Embedder.Get(rt, model, srv, part(0), stat(0), ct);
+                    tv = Embedder.Get(tt, model, srv, part(1), stat(1), ct);
+                    for (int g = 0; g < groups.Length; g++)
+                        groups[g] = Embedder.Get(GroupTexts(refc, g + 2), model, srv, part(2 + g), stat(2 + g), ct);
                 }
                 ct.ThrowIfCancellationRequested();
-                var outp = Refine(refc, r.Output, rv, tv, out rep);
+                var outp = Refine(refc, r.Output, rv, tv, out rep, groups);
                 if (rep.Moved > 0)
                 {
                     // gränserna är inte mätta mot riktiga filmer: passar texten referensen sämre efter flytten tas den tillbaka
@@ -153,6 +164,13 @@ namespace TextSync
 
         class Anchor { public int Line, Ref; public double Delta; public int State; }
 
+        // Vad det kostar att ett par ligger d ms från nivån: ingenting inom Free (översättningar börjar sällan exakt samtidigt),
+        // sedan stigande till 1 vid Tol. Längre bort kostar lika mycket, så att ett enstaka par som avviker inte styr.
+        static double Emit(double d)
+        {
+            return Math.Min(1, Math.Max(0, Math.Abs(d) - Free) / (Tol - Free));
+        }
+
         // Avståndet från t till närmaste värde i den sorterade listan
         static double NearestDist(double[] sorted, double t)
         {
@@ -160,6 +178,61 @@ namespace TextSync
             if (k >= 0) return 0;
             k = ~k;
             return Math.Min(k < sorted.Length ? sorted[k] - t : double.MaxValue, k > 0 ? t - sorted[k - 1] : double.MaxValue);
+        }
+
+        // Likheten mellan varje textrad (ti) och varje referensrad eller grupp (vecs, i ordningen ra), minus radens och kolumnens
+        // medellikhet, uttryckt i standardavvikelser. Kolumner utan vektor får minus oändligheten. null = för få kolumner.
+        static float[][] Scores(float[][] tgtVec, int[] ti, float[][] vecs, int[] ra, out double sigma)
+        {
+            sigma = 0;
+            int n = ti.Length, m = ra.Length;
+            int[] cols = Enumerable.Range(0, m).Where(b => vecs[ra[b]] != null).ToArray();
+            if (cols.Length < 5) return null;
+            var sim = new float[n][];
+            Parallel.For(0, n, a =>
+            {
+                var row = new float[m]; var v = tgtVec[ti[a]];
+                for (int b = 0; b < m; b++) row[b] = float.NegativeInfinity;
+                foreach (int b in cols) row[b] = Dot(v, vecs[ra[b]]);
+                sim[a] = row;
+            });
+            var rowMean = new double[n]; var colMean = new double[m];
+            for (int a = 0; a < n; a++) foreach (int b in cols) { rowMean[a] += sim[a][b]; colMean[b] += sim[a][b]; }
+            for (int a = 0; a < n; a++) rowMean[a] /= cols.Length;
+            foreach (int b in cols) colMean[b] /= n;
+            double sum = 0, sum2 = 0, cnt = (double)n * cols.Length;
+            for (int a = 0; a < n; a++)
+                foreach (int b in cols)
+                {
+                    float s = (float)(sim[a][b] - 0.5 * (rowMean[a] + colMean[b]));
+                    sim[a][b] = s; sum += s; sum2 += (double)s * s;
+                }
+            double mean = sum / cnt;
+            sigma = Math.Max(0.02, Math.Sqrt(Math.Max(0, sum2 / cnt - mean * mean)));
+            for (int a = 0; a < n; a++) foreach (int b in cols) sim[a][b] = (float)((sim[a][b] - mean) / sigma);
+            return sim;
+        }
+
+        // Texten för referensrad j tillsammans med de size-1 följande raderna i tidsordning ("" = ingen grupp).
+        // Raderna måste följa tätt på varandra (under GroupGap), annars slår en översättning inte ihop dem.
+        public static List<string> GroupTexts(List<Cue> refc, int size)
+        {
+            var res = refc.Select(c => "").ToList();
+            int[] ra = Enumerable.Range(0, refc.Count).OrderBy(j => refc[j].Start).ToArray();
+            for (int p = 0; p + size <= ra.Length; p++)
+            {
+                bool ok = true;
+                var parts = new List<string>();
+                for (int q = p; q < p + size && ok; q++)
+                {
+                    if (q > p && refc[ra[q]].Start - refc[ra[q - 1]].End > GroupGap) ok = false;
+                    string t = Clean(refc[ra[q]].Text);
+                    if (t.Length == 0) ok = false;
+                    parts.Add(t);
+                }
+                if (ok) res[ra[p]] = Clean(string.Join(" ", parts));
+            }
+            return res;
         }
 
         // Parar ihop raderna efter betydelse och rättar tiderna. refVec[j] hör till refc[j], tgtVec[i] till synced[i];
@@ -171,66 +244,64 @@ namespace TextSync
         // 3) Varje säkert par säger hur långt raden ligger från sin referensrad. En Viterbi över paren delar in texten
         //    i avsnitt med var sin nivå. Enstaka par som avviker (t.ex. en rad som svenskan har slagit ihop) räknas inte.
         // 4) Avsnitt där nivån är minst Deadband flyttas dit. Övriga rader lämnas precis som synkmotorn lade dem.
-        public static List<Cue> Refine(List<Cue> refc, List<Cue> synced, float[][] refVec, float[][] tgtVec, out MeaningReport rep)
+        //
+        // refGroups[k][j] = vektor för referensrad j tillsammans med de k+1 följande raderna (se GroupTexts), null = ingen sådan grupp.
+        // En översättning slår ofta ihop två eller tre rader i originalet. Då paras raden med hela gruppen, och avvikelsen
+        // mäts mot gruppens första rad. Utan grupperna paras raden ibland med den andra raden, vilket ser ut som ett fel på en till tre sekunder.
+        public static List<Cue> Refine(List<Cue> refc, List<Cue> synced, float[][] refVec, float[][] tgtVec, out MeaningReport rep, float[][][] refGroups = null)
         {
             rep = new MeaningReport();
             var outp = synced.Select(c => c.Clone()).ToList();
             int[] ti = Enumerable.Range(0, synced.Count).Where(i => tgtVec[i] != null && synced[i].End > 0).OrderBy(i => synced[i].Start).ToArray();
-            int[] rj = Enumerable.Range(0, refc.Count).Where(j => refVec[j] != null).OrderBy(j => refc[j].Start).ToArray();
-            int n = ti.Length, m = rj.Length;
+            int[] ra = Enumerable.Range(0, refc.Count).OrderBy(j => refc[j].Start).ToArray();   // alla referensrader i tidsordning
+            int n = ti.Length, m = ra.Length;
             rep.Lines = n;
-            if (n < 5 || m < 5) { rep.TooFew = true; return outp; }
+            if (n < 5 || refVec.Count(v => v != null) < 5) { rep.TooFew = true; return outp; }
 
-            // 1) likhet
-            var sim = new float[n][];
-            Parallel.For(0, n, a =>
+            // 1) likhet, som antal standardavvikelser över det vanliga för de här två texterna. z[0] = enstaka rader, z[1] = två rader i följd, …
+            int G = 1 + (refGroups == null ? 0 : refGroups.Length);
+            var z = new float[G][][];
+            for (int g = 0; g < G; g++)
             {
-                var row = new float[m]; var v = tgtVec[ti[a]];
-                for (int b = 0; b < m; b++) row[b] = Dot(v, refVec[rj[b]]);
-                sim[a] = row;
-            });
-            var rowMean = new double[n]; var colMean = new double[m];
-            for (int a = 0; a < n; a++) for (int b = 0; b < m; b++) { rowMean[a] += sim[a][b]; colMean[b] += sim[a][b]; }
-            for (int a = 0; a < n; a++) rowMean[a] /= m;
-            for (int b = 0; b < m; b++) colMean[b] /= n;
-            double sum = 0, sum2 = 0;
-            for (int a = 0; a < n; a++)
-                for (int b = 0; b < m; b++)
-                {
-                    float s = (float)(sim[a][b] - 0.5 * (rowMean[a] + colMean[b]));
-                    sim[a][b] = s; sum += s; sum2 += (double)s * s;
-                }
-            double mean = sum / ((double)n * m);
-            double sigma = Math.Max(0.02, Math.Sqrt(Math.Max(0, sum2 / ((double)n * m) - mean * mean)));
-            float matchMin = (float)(mean + MatchSigmas * sigma), anchorMin = (float)(mean + AnchorSigmas * sigma);
-            rep.Sigma = sigma; rep.MatchMin = matchMin; rep.AnchorMin = anchorMin;
+                double sg;
+                z[g] = Scores(tgtVec, ti, g == 0 ? refVec : refGroups[g - 1], ra, out sg);
+                if (g == 0) { rep.Sigma = sg; rep.MatchMin = MatchSigmas * sg; rep.AnchorMin = AnchorSigmas * sg; }
+            }
+            if (z[0] == null) { rep.TooFew = true; return outp; }
 
-            // 2) bästa parningen i ordning: 1 = hoppa över textraden, 2 = hoppa över referensraden, 3 = par
+            // 2) bästa parningen i ordning: 1 = hoppa över textraden, 2 = hoppa över referensraden, 3 = par med en rad, 4 = med två rader, 5 = med tre
             var D = new float[n + 1][]; var back = new byte[n + 1][];
             for (int a = 0; a <= n; a++) { D[a] = new float[m + 1]; back[a] = new byte[m + 1]; }
             for (int a = 1; a <= n; a++)
             {
-                var row = sim[a - 1];
                 for (int b = 1; b <= m; b++)
                 {
                     float best = D[a - 1][b]; byte bk = 1;
                     if (D[a][b - 1] > best) { best = D[a][b - 1]; bk = 2; }
-                    float g = row[b - 1] - matchMin;
-                    if (g > 0 && D[a - 1][b - 1] + g > best) { best = D[a - 1][b - 1] + g; bk = 3; }
+                    for (int g = 0; g < G && g < b; g++)
+                    {
+                        if (z[g] == null) continue;
+                        float gain = z[g][a - 1][b - 1 - g] - (float)MatchSigmas;
+                        if (gain > 0 && D[a - 1][b - 1 - g] + gain > best) { best = D[a - 1][b - 1 - g] + gain; bk = (byte)(3 + g); }
+                    }
                     D[a][b] = best; back[a][b] = bk;
                 }
             }
             var anchors = new List<Anchor>();
             for (int a = n, b = m; a > 0 && b > 0; )
             {
-                if (back[a][b] == 3)
+                int bk = back[a][b];
+                if (bk >= 3)
                 {
+                    int g = bk - 3, col = b - 1 - g;   // gruppens första rad
                     rep.Paired++;
-                    if (sim[a - 1][b - 1] >= anchorMin && Math.Abs(refc[rj[b - 1]].Start - synced[ti[a - 1]].Start) <= MaxShift)
-                        anchors.Add(new Anchor { Line = ti[a - 1], Ref = rj[b - 1], Delta = refc[rj[b - 1]].Start - synced[ti[a - 1]].Start });
-                    a--; b--;
+                    if (g > 0) rep.Grouped++;
+                    double delta = refc[ra[col]].Start - synced[ti[a - 1]].Start;
+                    if (z[g][a - 1][col] >= AnchorSigmas && Math.Abs(delta) <= MaxShift)
+                        anchors.Add(new Anchor { Line = ti[a - 1], Ref = ra[col], Delta = delta });
+                    a--; b -= g + 1;
                 }
-                else if (back[a][b] == 1) a--;
+                else if (bk == 1) a--;
                 else b--;
             }
             anchors.Reverse();
@@ -241,7 +312,7 @@ namespace TextSync
             double[] lv = anchors.Select(x => Math.Round(x.Delta / LevelStep) * LevelStep).Distinct().OrderBy(x => x).ToArray();
             int K = lv.Length, A = anchors.Count;
             var cost = new double[K]; var from = new int[A][];
-            for (int s = 0; s < K; s++) cost[s] = Math.Min(1, Math.Abs(anchors[0].Delta - lv[s]) / Tol);
+            for (int s = 0; s < K; s++) cost[s] = Emit(anchors[0].Delta - lv[s]);
             for (int k = 1; k < A; k++)
             {
                 int arg = 0;
@@ -251,7 +322,7 @@ namespace TextSync
                 for (int s = 0; s < K; s++)
                 {
                     if (cost[s] <= jump) { nc[s] = cost[s]; from[k][s] = s; } else { nc[s] = jump; from[k][s] = arg; }
-                    nc[s] += Math.Min(1, Math.Abs(anchors[k].Delta - lv[s]) / Tol);
+                    nc[s] += Emit(anchors[k].Delta - lv[s]);
                 }
                 cost = nc;
             }
