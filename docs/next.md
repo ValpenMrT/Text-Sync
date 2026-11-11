@@ -38,6 +38,26 @@
     - I kön för en hel säsong (punkt 5) blir varningen ett "osäkert"-besked för avsnittet i stället för en ruta som stoppar kön.
     - Gränserna sätts mot testerna och testfilmen, så att varningen inte visas för vanliga filmer med förtexter eller eftertexter som saknar text.
 
+## Kvar efter betydelsejämförelsen 2.4.6 (2026-11-11)
+Ägaren provar först, eftersom verktygen inte får köras i Claudes miljö:
+1. Kryssa i **Jämför också vad raderna betyder** i Inställningar och synka Blacklist S04E01 mot det engelska spåret. Svara ja på nedladdningen.
+2. Titta på rutan **Betydelse:** i resultatet och på raderna runt 03:30 och 07:18, där synken tidigare hade korta klipp.
+3. Skicka `log.txt`. Raden "Betydelsejämförelse:" visar antal par, gränserna, nivåerna och tiden. Med den går gränserna att justera.
+
+Det som inte är gjort:
+- **Inte mätt mot facit.** Ett mätprogram i `test/` (som `OrigSrtDiag`) som förstör det engelska spåret med flit och jämför med och utan jämförelsen.
+- **Bara processorn.** Paketet för NVIDIA (cirka 700 MB till) väntar tills tiden på processorn är känd. Tar det flera minuter per avsnitt är det värt att lägga till.
+- **Ingen varning om att det tar tid** första gången, som den för Whisper på processorn. Skriv in en uppskattning i Inställningar när tiden är mätt.
+- **Frågan om nedladdning nämner inte Smart App Control.** llama-server är inte signerat, så 440 MB kan hämtas och sedan blockeras. Felet förklaras då i resultatet. Förslag: kryssa ur rutan automatiskt efter första blockeringen, som `gpuwhisperfailed` gör för Whisper.
+- **Raderna före första och efter sista säkra paret** får samma flytt som kanten, även om de ligger långt bort i tid. Titta på det i första riktiga loggen.
+- **Frågor till ägaren från granskningen:** (1) Ska jämförelsen gälla Hel säsong redan nu, där resultatet sparas utan att någon ser det, eller bara huvudfönstret tills den är provad? Nu gäller den båda. (2) Räcker 10 s som längsta flytt? Synkmotorns finjustering har 6 s.
+- **Flyttade rader märks inte i listan.** Kolumnen Flyttad visar hoppet, men inget märke säger att det var betydelsejämförelsen.
+- **Beskedet** (Bra / Kontrollera / Osäkert) använder inte parningen. Få par är ett tecken på fel avsnitt och kunde ge Osäkert.
+- **Förslagen om att dela och slå ihop rader** jämför fortfarande bara tider och längd. Parningen efter betydelse kunde göra dem säkrare.
+- **Mot ljud:** Whispers text kunde paras med den svenska på samma sätt (Ljud B och A+B).
+- **Cachen rensas aldrig.** Varje text tar några MB i `%LOCALAPPDATA%\TextSync\cache`.
+- **Övriga idéer från samma samtal:** mäta på fler filmer, rätta den fasta avvikelsen på cirka 0,24 s mot ljud, Silero-taldetektering i Ljud A, flera referenser som röstar, scenklipp med ffmpeg, exakt ordtid mot ljudet (wav2vec2).
+
 ## Beslutat 2026-11-10, inte byggt än
 - **Rekommendera Ljud A utan NVIDIA-grafikkort:** en kort förklaring bredvid valet när datorn saknar NVIDIA-kort.
 - **Markera rättningar från Whisper-kontrollen i listan**, så att man kan granska dem.

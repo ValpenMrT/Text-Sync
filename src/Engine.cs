@@ -287,6 +287,7 @@ namespace TextSync
         public double ScoreBefore, ScoreAfter;
         public string Method = "";
         public List<string> Notes = new List<string>();
+        public MeaningReport Meaning;  // betydelsejämförelsen (null = inte gjord)
     }
 
     public static class SyncEngine

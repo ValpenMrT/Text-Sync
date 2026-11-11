@@ -621,6 +621,7 @@ namespace TextSync
             {
                 Options.Ref = (SeasonRefMode)refCombo.SelectedIndex;
                 var films = todo.Where(r => r.Item.RefIsVideo).Select(r => r.Item.RefPath).ToList();
+                bool anyText = todo.Any(r => !r.Item.RefIsVideo);   // något avsnitt synkas mot en text (SRT eller filmens textspår)
                 if (films.Count > 0)
                 {
                     // grafikkortet avgör om Whisper används, och verktygen för ljudet hämtas en gång före kön
@@ -637,6 +638,7 @@ namespace TextSync
                             {
                                 var c = SeasonSync.ChooseRef(f, mode, wok);
                                 if (c.Audio) { needAudio = true; nAudio++; if (c.Mode != AudioMode.Speech) needWhisper = true; }
+                                else anyText = true;
                             }
                             catch { }   // en film som inte går att läsa får sitt felbesked i kön
                         }
@@ -666,6 +668,9 @@ namespace TextSync
                         "Fortsätt", "Avbryt")) { endNote = "Avbrutet."; return; }
                     if (needAudio && !await main.EnsureTools(needWhisper, token, this, Progress)) { endNote = "Avbrutet – verktygen för synk mot ljudet hämtades inte."; return; }
                 }
+                // Betydelsejämförelsen (Inställningar): verktygen hämtas en gång före kön. Utan dem synkas avsnitten som vanligt.
+                // Frågan kommer bara om något avsnitt har en text som referens (mot ljud används jämförelsen inte).
+                if (Options.Meaning && anyText && !await main.EnsureMeaningTools(token, this, Progress)) Options.Meaning = false;
                 // MKV-kopior: MKVToolNix måste finnas, och kopiorna är lika stora som filmerna
                 Options.SaveUnsure = unsureCheck.Checked;
                 Options.MakeMkv = mkvCheck.Checked && films.Count > 0;

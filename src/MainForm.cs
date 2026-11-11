@@ -61,7 +61,7 @@ namespace TextSync
         QualityResult quality; List<int> weakStops = new List<int>(); bool[] cueWeak;
         Label verdictLabel; LinkLabel prevWeakLink, nextWeakLink; TableLayoutPanel resBox;
         // resultatrutan: beskedet på en rad, siffrorna på nästa (chip*), varningar (notesLabel) och resten under Detaljer
-        Label summaryLabel, notesLabel, chipPct, chipRed, chipProp, chipGrey, chipFixed, chipSeg, chipHi;
+        Label summaryLabel, notesLabel, chipPct, chipRed, chipProp, chipGrey, chipFixed, chipSeg, chipHi, chipMeaning;
         FlowLayoutPanel chips; TableLayoutPanel detailsPanel; Panel detailsSep; Button detailsBtn;
         Label[] detailHead, detailBody;
         static readonly int[] DetailPct = { 36, 40, 24 };   // kolumnernas bredd under Detaljer
@@ -82,11 +82,12 @@ namespace TextSync
         ComboBox trackCombo, modeCombo, encCombo;
         Label refInfo, tgtInfo, statusLabel, trackLabel;
         LinkLabel openLink, helpLink;
-        CheckBox fpsCheck, hiCheck, plainCheck;
+        CheckBox fpsCheck, hiCheck, plainCheck, meaningCheck;
         int plainCount;                // rader där formatering (kursiv m.m.) tas bort av rutan "Ta bort kursiv och annan formatering"
         string hiInfo;                 // vad som togs bort som text för hörselskadade (visas i resultatet)
         int hiUndoDepth;               // ångra-nivån där den synkade texten rensades i efterhand (0 = inte gjort)
         bool hiQuiet;                  // rutan ändras av programmet, inte av användaren
+        bool meaningQuiet;             // samma sak för rutan "Jämför också vad raderna betyder"
         Button syncBtn, saveBtn, muxBtn, refBtn, tgtBtn;
         Button busyBtn;                // knappen som startade arbetet och är Avbryt så länge (null = Synka)
         ProgressBar progress;
@@ -290,6 +291,15 @@ namespace TextSync
                 else SetStatus("Formateringen är tillbaka.", false);
                 Log.Info("Ta bort formatering: " + (plainCheck.Checked ? "på, " + plainCount + " rader" : "av"));
             };
+            // betydelsejämförelsen (llama.cpp, Meaning.cs): inte ikryssad från början, gäller från nästa synk
+            meaningCheck = new CheckBox { Text = "Jämför också vad raderna betyder", AutoSize = true, Checked = Tools.GetSetting("meaning", "0") == "1" };
+            meaningCheck.CheckedChanged += (s, e) =>
+            {
+                Tools.SetSetting("meaning", meaningCheck.Checked ? "1" : "0");
+                UpdateOptInfo();
+                Log.Info("Jämför vad raderna betyder: " + (meaningCheck.Checked ? "på" : "av"));
+                if (!busy && result != null && !meaningQuiet) SetStatus("Inställningen gäller från nästa synk. Klicka Synka för att synka om texten.", false);
+            };
 
             // hur SRT-filen sparas (dialogen Inställningar): 0 = UTF-8 med BOM, 1 = UTF-8 utan BOM, 2 = mycket gamla spelare
             int sf;
@@ -350,7 +360,7 @@ namespace TextSync
             vrow.Controls.Add(verdictLabel, 0, 0); vrow.Controls.Add(summaryLabel, 1, 0); vrow.Controls.Add(prevWeakLink, 2, 0); vrow.Controls.Add(nextWeakLink, 3, 0); vrow.Controls.Add(detailsBtn, 4, 0);
 
             chipPct = MakeChip(null, 80); chipRed = MakeChip(() => RedRow, 15); chipProp = MakeChip(() => PropRow, 15); chipGrey = MakeChip(() => RefOnlyRow, 15);
-            chipFixed = MakeChip(null, 0); chipSeg = MakeChip(null, 0); chipHi = MakeChip(null, 0);
+            chipFixed = MakeChip(null, 0); chipSeg = MakeChip(null, 0); chipHi = MakeChip(null, 0); chipMeaning = MakeChip(null, 0);
             // stapeln framför procenttalet: röd under gränsen (95 %), annars grön
             chipPct.Paint += (s, e) =>
             {
@@ -362,7 +372,7 @@ namespace TextSync
             tips.SetToolTip(chipGrey, "Grå rader finns bara i referensen och sparas inte.");
             tips.SetToolTip(chipFixed, "Rader märkta ✎ rättades vid inläsningen. Håll muspekaren över raden för att se vad som stod i filen.");
             chips = new FlowLayoutPanel { AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, Dock = DockStyle.Top, WrapContents = true, Margin = new Padding(10, 6, 10, 6) };
-            chips.Controls.AddRange(new Control[] { chipPct, chipRed, chipProp, chipGrey, chipFixed, chipSeg, chipHi });
+            chips.Controls.AddRange(new Control[] { chipPct, chipRed, chipProp, chipGrey, chipFixed, chipSeg, chipHi, chipMeaning });
             FitFlowHeight(chips);
             notesLabel = new Label { Anchor = AnchorStyles.Left | AnchorStyles.Right, UseMnemonic = false, ForeColor = Theme.Warn, Margin = new Padding(10, 0, 10, 6), Visible = false };
             FitLabelHeight(notesLabel);
@@ -681,7 +691,7 @@ namespace TextSync
         void OpenSettings()
         {
             if (busy) return;
-            using (var d = new SettingsDialog(themeIndex, !HC, fpsCheck.Checked, hiCheck.Checked, plainCheck.Checked, Srt.SaveFormat))
+            using (var d = new SettingsDialog(themeIndex, !HC, fpsCheck.Checked, hiCheck.Checked, plainCheck.Checked, Srt.SaveFormat, meaningCheck.Checked))
             {
                 if (d.ShowDialog(this) != DialogResult.OK) return;
                 if (d.SrtFormat != Srt.SaveFormat)
@@ -702,6 +712,7 @@ namespace TextSync
                 fpsCheck.Checked = d.DetectFps;
                 hiCheck.Checked = d.RemoveHi;
                 plainCheck.Checked = d.StripFormatting;
+                meaningCheck.Checked = d.CompareMeaning;
             }
         }
 
@@ -713,6 +724,7 @@ namespace TextSync
             if (hiCheck.Checked) parts.Add("text för hörselskadade tas bort");
             if (plainCheck.Checked) parts.Add("kursiv och annan formatering tas bort");
             if (!fpsCheck.Checked) parts.Add("bildfrekvensfel upptäcks inte");
+            if (meaningCheck != null && meaningCheck.Checked) parts.Add("radernas betydelse jämförs");
             if (Srt.SaveFormat == Srt.FormatUtf8) parts.Add("SRT sparas som UTF-8 utan BOM");
             if (Srt.SaveFormat == Srt.FormatLegacy) parts.Add("SRT sparas för mycket gamla spelare");
             optInfo.Text = parts.Count == 0 ? "" : "Inställningar: " + string.Join("  ·  ", parts);
@@ -1078,7 +1090,7 @@ namespace TextSync
             // ett nytt fönster om utseendet har bytts sedan det byggdes (listan töms då, men det som är sparat går fortfarande att återställa)
             if (seasonDlg != null && (seasonDlg.IsDisposed || seasonDlg.BuiltDark != Theme.Dark)) { seasonDlg.Dispose(); seasonDlg = null; }
             if (seasonDlg == null) seasonDlg = new SeasonDialog(this);
-            seasonDlg.Prepare(new SeasonOptions { Lang = lang, Mode = (SyncMode)modeCombo.SelectedIndex, DetectFramerate = fpsCheck.Checked, RemoveHi = hiCheck.Checked, StripFormatting = plainCheck.Checked }, paths);
+            seasonDlg.Prepare(new SeasonOptions { Lang = lang, Mode = (SyncMode)modeCombo.SelectedIndex, DetectFramerate = fpsCheck.Checked, RemoveHi = hiCheck.Checked, StripFormatting = plainCheck.Checked, Meaning = meaningCheck.Checked }, paths);
             Log.Info("Öppnar Hel säsong" + (paths != null ? ": " + string.Join("; ", paths) : ""));
             var res = seasonDlg.ShowDialog(this);
             // "Öppna i huvudfönstret": läs in avsnittet och synka, så att raderna går att granska
@@ -1226,7 +1238,7 @@ namespace TextSync
                 "Har filmen ingen engelsk text men du har en engelsk SRT som inte går i takt: klicka \"Lägg till undertext på filmens originalspråk\" " +
                 "(eller dra in filmen och båda SRT-filerna). Den engelska synkas då mot filmens ljud och kontrolleras med Whisper, och sedan synkas den svenska mot den.\n\n" +
                 "Inställningar (knappen längst upp till höger): \"Ta bort text för hörselskadade\" tar bort [MUSIK], (skrattar) och talarnamn som JOHN: ur texten. Resultatet säger hur många rader som togs bort. " +
-                "Där väljer du också ljust eller mörkt utseende.\n\n" +
+                "Där väljer du också ljust eller mörkt utseende. \"Jämför också vad raderna betyder\" parar ihop raderna med referenstexten efter betydelse och flyttar rader som ligger fel. Det är nytt, så kontrollera resultatet.\n\n" +
                 "Kodade tecken som &amp; i texten görs alltid om till riktiga tecken (&), och trasig formatering som <i> utan avslut lagas. Sådana rader är märkta ✎ i listan: håll muspekaren över raden för att se vad som stod i filen. " +
                 "Visar din TV <i> som text? Kryssa i \"Ta bort kursiv och annan formatering\" i Inställningar. Kryssar du ur rutan kommer formateringen tillbaka.\n\n" +
                 "Hel säsong (knappen Hel säsong… uppe till höger, eller dra in en mapp): alla avsnitt synkas i kö och varje undertext sparas bredvid sitt avsnitt. " +
@@ -1235,7 +1247,7 @@ namespace TextSync
                 "Kryssa i \"Föreslå radindelning som referensen\" så föreslår programmet att dela eller slå ihop rader som de engelska (blå, \"Dela?\"/\"Ihop?\") – högerklicka för att godkänna. " +
                 "Under varje förslag står hur raden blir om du godkänner det (→ blir). " +
                 "Visa ovanför listan döljer grå rader eller visar bara röda eller blå. Sök (Ctrl+F) letar i texten, Enter hoppar till nästa träff.\n\n" +
-                "Verktygen för synk mot ljudet (0,6–1,4 GB) ligger i mappen tools i " + Log.Dir + ". Mappen kan tas bort när Text Sync är stängt, och verktygen hämtas igen vid behov.\n\n" +
+                "Verktygen för synk mot ljudet (0,6–1,4 GB) och för betydelsejämförelsen (0,5 GB) ligger i mappen tools i " + Log.Dir + ". Mappen kan tas bort när Text Sync är stängt, och verktygen hämtas igen vid behov.\n\n" +
                 "Text Sync " + Program.Version + " · MIT-licens\n" +
                 "Loggfil (för felsökning): " + Log.FilePath + "\n\n" +
                 "Vill du öppna mappen med loggfilen?",

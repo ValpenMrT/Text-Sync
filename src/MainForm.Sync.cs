@@ -141,6 +141,25 @@ namespace TextSync
                 }
                 Action<int, string> prog = (p, s) => { token.ThrowIfCancellationRequested(); Progress(p, s); };
                 var r = await Task.Run(() => SyncEngine.Sync(refc, tgt, opt, prog));
+                // Betydelsejämförelsen (Inställningar): bara mot riktig text, inte mot ljud eller Whispers egen text.
+                // Verktygen hämtas vid behov. Går något fel står det i resultatet, och synken är kvar som den var.
+                // Avbryt under nedladdningen eller jämförelsen hoppar över jämförelsen: synken är redan klar och visas.
+                if (meaningCheck.Checked && aopt == null)
+                {
+                    try
+                    {
+                        if (await EnsureMeaningTools(token))
+                        {
+                            var refM = refc;
+                            await Task.Run(() => Meaning.Apply(refM, r, prog, token));
+                        }
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        r.Meaning = new MeaningReport { Canceled = true };
+                        Log.Info("Betydelsejämförelsen avbröts, synken visas som den var");
+                    }
+                }
                 if (truncated) r.Notes.Insert(0, "MKV-filen verkar vara ofullständig – bara en del av referensen kunde läsas.");
                 if (audioInfo != null) r.FpsText = (r.FpsText.Length > 0 ? r.FpsText + " · " : "") + "Referens: " + audioInfo;
                 saveTextBtn.Text = origSynced != null ? "Spara synkad originaltext…" : "Spara igenkänd text…";
@@ -155,7 +174,7 @@ namespace TextSync
                 extraNum.Value = 0;
                 timeline.Highlight = null;
                 RefreshPreview();   // räknar beskedet och visar resultatet
-                if (quality != null) Log.Info("Synkens kvalitet: " + quality.LogText());
+                if (quality != null) Log.Info("Synkens kvalitet: " + quality.LogText() + (r.Meaning != null && r.Meaning.Moved > 0 ? " (efter betydelsejämförelsen)" : ""));
                 Log.Info("Synk: ref=" + (mkvPath ?? refLoadedPath) + (mkvPath != null ? " " + trackCombo.SelectedItem : "") +
                     ", mål=" + tgtLoadedPath + ", metod=" + opt.Mode + " → " + r.Method + ", matchning " + Fmt(r.ScoreBefore * 100, "0") + "→" + Fmt(r.ScoreAfter * 100, "0") + " %");
             }
@@ -271,6 +290,9 @@ namespace TextSync
             chipHi.Visible = hiDone || plainDone;
             chipHi.Text = hiDone && plainDone ? "Text för hörselskadade och formatering borttagen" : hiDone ? "Text för hörselskadade borttagen" : "Formatering borttagen på " + plainCount + (plainCount == 1 ? " rad" : " rader");
             tips.SetToolTip(chipHi, (hiDone ? hiInfo + " " : "") + (plainDone ? "Kursiv och annan formatering borttagen på " + plainCount + (plainCount == 1 ? " rad" : " rader") + ". Kryssa ur rutan i Inställningar för att få tillbaka den." : ""));
+            // betydelsejämförelsen: vad den gjorde syns utan klick, hela meningen står i tipsrutan och under Detaljer
+            chipMeaning.Visible = r.Meaning != null;
+            if (r.Meaning != null) { chipMeaning.Text = r.Meaning.Chip(); tips.SetToolTip(chipMeaning, r.Meaning.Summary()); }
             foreach (Control c in chips.Controls) c.ForeColor = Theme.Fg;
 
             // ---- varningar: syns alltid
@@ -291,6 +313,7 @@ namespace TextSync
             }
             else d.Append("Förskjutning: " + FmtOffset(r.OffsetMs) + (drift ? "     Drift: " + Fmt(r.DriftMsPerHour, "0") + " ms/timme" : "") + "\n");
             if (r.FpsText.Length > 0) d.Append(r.FpsText + "\n");
+            if (r.Meaning != null) d.Append(r.Meaning.Summary() + "\n");
             if (more != null) d.Append(more + "\n");
             if (hiInfo != null) d.Append(hiInfo + "\n");
             if (plainCheck.Checked && plainCount > 0) d.Append("Kursiv och annan formatering borttagen på " + plainCount + (plainCount == 1 ? " rad" : " rader") + ". Kryssa ur rutan i Inställningar för att få tillbaka den.\n");

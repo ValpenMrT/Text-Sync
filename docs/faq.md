@@ -162,8 +162,18 @@ Då visas listan **Ljudspår** under filnamnet i ruta 1 när du synkar mot ljude
 **Varför syns inte mitt grafikkort i listan Grafikkort?**
 Whisper kan bara använda NVIDIA-grafikkort från ungefär 2014 och senare, med en drivrutin från december 2022 eller senare (version 527). Uppdatera drivrutinen från NVIDIA:s webbplats. Annars körs Whisper på processorn, vilket tar längre tid. Står det att grafikkortet inte fungerade under synken, börjar Whisper om på processorn automatiskt.
 
-**Hur tar jag bort verktygen för ljudsynk?**
-De ligger i mappen `tools` i `%LOCALAPPDATA%\TextSync` och tar cirka 0,6–1,4 GB. Stäng Text Sync, skriv `%LOCALAPPDATA%\TextSync` i adressfältet i Utforskaren och tryck Enter. Ta sedan bort mappen `tools`. Mappen `cache`, med sparade analyser av ljudet, kan också tas bort. Verktygen laddas ner igen nästa gång du synkar mot ljudet.
+**Kan programmet jämföra vad raderna betyder, inte bara när de visas?**
+Ja, som ett val. Klicka **Inställningar** och kryssa i **Jämför också vad raderna betyder**. Efter den vanliga synken paras då varje rad ihop med den rad i referenstexten som betyder samma sak, till exempel "Var är han?" med "Where is he?". Visar flera rader i följd att texten ligger fel flyttas de dit. Rader som redan ligger rätt rörs inte.
+- Det fungerar bara när referensen är en text (filmens textspår eller en SRT), inte mot filmens ljud.
+- Första gången frågar programmet om det får hämta två gratisverktyg, cirka 440 MB: llama.cpp och språkmodellen bge-m3. Svarar du nej synkas texten som vanligt, och rutan kryssas ur.
+- Det tar längre tid första gången en text synkas. Nästa gång går det direkt.
+- Vad jämförelsen gjorde står i resultatet, i rutan som börjar med **Betydelse:**, och utförligare under **Detaljer**.
+- Korta rader som "Ja." och "Okej." jämförs inte, eftersom de säger för lite.
+- Funktionen är ny och inte utprovad på riktiga filmer ännu. Kontrollera resultatet, och kryssa ur rutan om det blir sämre.
+- Blockerar Smart App Control verktyget görs synken som vanligt, och resultatet säger att jämförelsen inte kunde göras.
+
+**Hur tar jag bort verktygen för ljudsynk och betydelsejämförelsen?**
+De ligger i mappen `tools` i `%LOCALAPPDATA%\TextSync` och tar cirka 0,6–1,4 GB för ljudsynken och 0,5 GB för betydelsejämförelsen. Stäng Text Sync, skriv `%LOCALAPPDATA%\TextSync` i adressfältet i Utforskaren och tryck Enter. Ta sedan bort mappen `tools`. Mappen `cache`, med sparade analyser av ljudet och texterna, kan också tas bort. Verktygen laddas ner igen nästa gång de behövs, efter att programmet har frågat.
 
 **Fungerar ljudsynk på korta klipp?**
 Bäst på hela filmer och avsnitt. På korta klipp, som 10 minuter, kan synken hamna fel, eftersom det pratas nästan hela tiden. Kontrollera resultatet i listan.

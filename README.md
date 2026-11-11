@@ -29,7 +29,7 @@ Originalfilen ändras aldrig utan att en kopia sparas.
 ### Vad programmet gör
 Referensen kan vara ett textspår i en MKV-fil, en separat SRT eller filmens ljud. Ljudet analyseras med taldetektering, Whisper eller båda kombinerat. Ett textspår, eller en separat SRT på filmens originalspråk, kan också **kontrolleras ord för ord med Whisper** innan den svenska texten synkas mot det. Whisper körs på NVIDIA-grafikkort om det finns, annars på processorn.
 
-Programmet jämför *när* det pratas och *när* repliker börjar, inte vad som sägs. Därför fungerar olika språk. Det hanterar förskjutning, fel bildfrekvens (25 ↔ 23,976 fps m.fl.), drift och klipp/reklampauser.
+Programmet jämför *när* det pratas och *när* repliker börjar, inte vad som sägs. Därför fungerar olika språk. Som ett val i Inställningar kan det också jämföra vad raderna betyder, med en flerspråkig språkmodell (se [docs/decisions.md](docs/decisions.md), 2.4.6). Det hanterar förskjutning, fel bildfrekvens (25 ↔ 23,976 fps m.fl.), drift och klipp/reklampauser.
 
 ### Bygga
 ```
@@ -38,6 +38,7 @@ powershell -ExecutionPolicy Bypass -File build.ps1
 Det skapar `Build\TextSync-<version>.exe`, till exempel `Build\TextSync-2.4.exe`. Versionen läses ur `Program.Version` i [src/Program.cs](src/Program.cs), och bygget avbryts om `AssemblyVersion` och `AssemblyFileVersion` inte stämmer med den. Äldre versioner ligger kvar i `Build\`. Kräver bara Windows, med .NET Framework 4.8 som redan finns i Windows 10/11.
 
 - **Lägg in i MKV…** kräver [MKVToolNix](https://mkvtoolnix.download/). Det behövs bara för den knappen.
+- Inställningen **Jämför också vad raderna betyder** behöver llama.cpp och språkmodellen bge-m3, cirka 0,5 GB. Programmet frågar och laddar ner dem första gången, till samma mapp som verktygen nedan.
 - Ljudsynk och Whisper behöver ffmpeg, whisper.cpp och en språkmodell. Programmet frågar och laddar ner dem första gången, och kontrollerar varje fil mot en SHA-256-summa. De hamnar i `%LOCALAPPDATA%\TextSync\tools`, cirka 1,4 GB med NVIDIA-grafikkort och 0,6 GB med processorn (det som hämtas följer valet i listan Grafikkort). Loggen och cachen ligger också i `%LOCALAPPDATA%\TextSync`, liksom mappen `undo` med det som behövs för att återställa en säsongssynk.
 
 ### Testa
@@ -52,7 +53,8 @@ Kopiera den senaste `TextSync-<version>.exe` från `Build\` till ett USB-minne. 
 Programmet är inte signerat (se [docs/decisions.md](docs/decisions.md)). Versionen står i filnamnet och i fönstrets rubrik, och sätts bara i `Program.Version` i [src/Program.cs](src/Program.cs) (plus de två `Assembly…Version`-raderna, som bygget kontrollerar).
 
 ### Obesvarade frågor (tas upp vid nästa körning)
-Inga just nu.
+1. **Betydelsejämförelsen i Hel säsong:** inställningen "Jämför också vad raderna betyder" gäller nu också Hel säsong, där resultatet sparas utan att någon ser det. Ska den bara gälla huvudfönstret tills den är provad på riktiga filmer?
+2. **Längsta flytt:** betydelsejämförelsen flyttar en rad högst 10 s. Räcker det, eller ska gränsen vara 6 s som i synkmotorns finjustering?
 
 ### Dokumentation
 

@@ -2,6 +2,32 @@
 
 Nyast först.
 
+## 2026-11-11 – 2.4.6: Jämför vad raderna betyder (llama.cpp och bge-m3), som en inställning
+- **Område:** Synk / verktyg / GUI
+- **Önskemål (ägaren):** fler sätt att få så exakt synk som möjligt när svensk text synkas mot engelsk text, och "kan du lägga in llama.cpp som en inställning".
+- **Ägarens svar på frågorna:** inställningen ska förbättra själva synken (inte bara kontrollera den), den stora modellen ska användas, rutan ska vara av från början, och funktionen byggs in direkt utan ett mätprogram först. Nya nedladdningar går bra.
+- **Beslut:**
+  - **Kryssrutan "Jämför också vad raderna betyder"** i Inställningar under Synk, av från början (`meaning` i `settings.txt`). Den gäller huvudfönstret och Hel säsong, och bara när referensen är en text (textspår, SRT eller originaltext), inte ljud.
+  - **Efter den vanliga synken** får varje rad en vektor från språkmodellen bge-m3 (över 100 språk). Raderna paras ihop med referensraderna efter betydelse utan att byta ordning. Varje säkert par säger hur långt raden ligger från sin referensrad. Där minst tre par i följd är överens om en avvikelse på minst 0,15 s flyttas raderna dit. En utflykt och tillbaka kräver minst fem par. Övriga rader lämnas precis som synkmotorn lade dem.
+  - **Enstaka par som avviker räknas inte.** Det skyddar mot rader som svenskan har slagit ihop och som därför paras med fel halva.
+  - **Korta rader** (under 8 bokstäver) jämförs inte. De följer med raderna runt omkring.
+  - **Gränserna för vad som är ett par** sätts efter spridningen i just de två texterna (2,5 och 4 standardavvikelser), eftersom modellens skala inte är mätt.
+  - **Skydd mot fel flytt:** par som ligger mer än 10 s från varandra styr inte tiderna, en flyttad rad får inte överlappa raden före mer än den gjorde innan, och passar texten referensen sämre efter flytten (överlappspoängen sjunker mer än 0,01) tas hela flytten tillbaka.
+  - **Går något fel** (verktyget blockerat, modellen startar inte, oväntat svar) lämnas synken som den var, och resultatet säger att jämförelsen inte kunde göras. För få säkra par ger samma sak. Användaren får en kort mening, detaljerna står i loggen.
+  - **Avbryt under nedladdningen eller jämförelsen** hoppar över jämförelsen och visar den färdiga synken. I Hel säsong avbryter det kön som vanligt.
+  - **Hel säsong:** frågan om nedladdning kommer bara om något avsnitt har en text som referens. Misslyckas jämförelsen för ett avsnitt synkas resten av kön utan den, så att kön inte väntar på modellen för varje avsnitt.
+  - **Resultatet** visar en ruta som börjar med "Betydelse:" och hela meningen under Detaljer. I Hel säsong står meningen under listan för avsnittet.
+  - **Nedladdningen** frågar första gången vid en synk, med storleken (cirka 440 MB). Svarar man nej synkas texten som vanligt och rutan kryssas ur, så att frågan inte kommer vid varje synk.
+- **Verktyg:** llama.cpp b12291 för processorn (25 MB) och `bge-m3-Q4_K_M.gguf` från gpustack på Hugging Face (438 MB), båda MIT-licens, med fasta SHA-256-summor.
+  - **llama-server i stället för llama-embedding:** paketet för Windows innehåller inte `llama-embedding.exe` (zip-filen är genomgången). `llama-server.exe` startas dold på en ledig port på 127.0.0.1 med `--embedding --pooling cls`, och programmet frågar den över `/v1/embeddings`. Servern stängs när jämförelsen är klar, och av Windows om Text Sync avslutas oväntat (jobbobjekt).
+  - **Bara processorn i första versionen.** Paketet för NVIDIA är 317 MB plus 391 MB CUDA-filer. Det väntar tills tiden på processorn är mätt.
+  - **Cache:** vektorerna sparas i `%LOCALAPPDATA%\TextSync\cache` (`.emb`), så en ny synk av samma text går direkt.
+- **Teknik:** `src/Meaning.cs` (`Meaning.Apply` och `Refine`, `Embedder`, `LlamaServer`, `Json`), `Tools.LlamaCpu`, `Tools.ModelBgeM3`, `MainForm.EnsureMeaningTools`, `SyncResult.Meaning`, `SeasonOptions.Meaning`.
+- **Test:** 223 av 223 kontroller (15 nya), med påhittade vektorer i stället för modellen: rätt synk ändras inte, 20 rader som ligger 1 s fel flyttas rätt och inga andra rörs, enstaka felpar flyttar ingenting, en annan text ändras inte, rader utan vektor följer med, ordningen behålls, ingen ny överlappning, ingen flytt över 10 s, frågan och svaret till servern, cachen, och att synken lämnas orörd utan verktyg. Dialogen Inställningar byggd i samma process. Att en flytt som ger sämre poäng tas tillbaka, och att Avbryt behåller synken, är inte testat (koden är läst).
+- **Ej provat:** allt som kräver de riktiga verktygen, eftersom nedladdade program inte får köras i Claudes miljö. Det gäller att llama-server startar med de valda flaggorna, att modellen från gpustack fungerar med den versionen, hur lång tid det tar på processorn, om Smart App Control släpper igenom programmet, och framför allt om jämförelsen gör synken bättre på en riktig film. Nedladdningen i programmet och frågerutan är inte heller provade. Zip-filens kontrollsumma är kontrollerad mot en riktig nedladdning, modellens summa är hämtad från Hugging Face utan att filen laddades ner.
+- **Product-check (oberoende granskning):** inget blockerande. Rättat efter granskningen: Avbryt kastade bort den färdiga synken, felmeddelandet kunde innehålla 30 rader engelsk logg från llama-server, ingen kontroll att flytten gjorde synken bättre, ingen gräns för hur långt en rad fick flyttas, flyttade rader kunde överlappa raden före, Hel säsong väntade upp till tre minuter per avsnitt när modellen inte startade och frågade om nedladdning även när alla avsnitt synkas mot ljud, och rutan "för få säkra par" hette fackspråk (nu "Betydelse: inget ändrat"). Kan vänta (docs/next.md): besked om hur lång tid det tar, Smart App Control nämns inte i frågan om nedladdning, raderna före första och efter sista paret följer kantens nivå.
+- **Nivå:** LIVE, men av från början och märkt som ny i Inställningar.
+
 ## 2026-11-11 – 2.4.5: Knappen Lägg in i MKV… i fönstret Hel säsong
 - **Område:** GUI
 - **Önskemål (ägaren):** "Jag ser ingen knapp för Lägg till i MKV för en hel säsong. Kan du lägga till denna funktionen." I 2.4.3 fanns funktionen bara som en kryssruta ovanför listan, och den hittade ägaren inte.

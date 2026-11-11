@@ -18,6 +18,7 @@ namespace TextSync
         public bool SaveUnsure;  // spara även avsnitt som får beskedet Osäkert (ägarens val, från början av)
         public bool MakeMkv;     // lägg också in undertexten i en kopia av filmen: "Filmnamn (Text Sync).mkv" bredvid filmen
         public SeasonRefMode Ref = SeasonRefMode.Auto;
+        public bool Meaning;     // jämför också vad raderna betyder (Inställningar), när referensen är en text och verktygen finns
         public bool WhisperOk;   // Whisper finns på datorn och ett NVIDIA-kort är valt (då används A+B i Auto när filmen saknar text)
     }
 
@@ -136,15 +137,28 @@ namespace TextSync
             if (truncated) notes.Add("Filmen verkar vara ofullständig – bara en del av referensen kunde läsas.");
 
             int basePct = refIsText ? 40 : 80;
+            bool meaning = o.Meaning && refIsText && Tools.MeaningReady();
+            int syncEnd = meaning ? 70 : 98;
             var r = SyncEngine.Sync(refc, tgt, new SyncOptions { Mode = o.Mode, DetectFramerate = o.DetectFramerate },
-                (p, s) => { ct.ThrowIfCancellationRequested(); progress(basePct + p * (98 - basePct) / 100, s); });
+                (p, s) => { ct.ThrowIfCancellationRequested(); progress(basePct + p * (syncEnd - basePct) / 100, s); });
             ct.ThrowIfCancellationRequested();
+            // går jämförelsen inte att göra står det på raden, och synken är kvar som den var
+            if (meaning)
+            {
+                Meaning.Apply(refc, r, (p, s) => { ct.ThrowIfCancellationRequested(); progress(syncEnd + p * (98 - syncEnd) / 100, s); }, ct);
+                // fungerar inte verktyget (t.ex. blockerat) försöker kön inte igen för varje avsnitt: det kan ta flera minuter per försök
+                if (r.Meaning != null && r.Meaning.Error != null)
+                {
+                    o.Meaning = false;
+                    notes.Add("Resten av avsnitten i kön synkas utan betydelsejämförelsen.");
+                }
+            }
             var output = r.Output;
             int stripped;
             if (o.StripFormatting) output = Markup.StripAll(output, out stripped);
             var q = Quality.Assess(refc, output, r, refIsText);
             notes.AddRange(r.Notes);
-            Log.Info("Säsong " + it.Title + ": ref=" + it.RefPath + " (" + how + "), mål=" + it.TargetPath + ", " + r.Method + ", " + q.LogText());
+            Log.Info("Säsong " + it.Title + ": ref=" + it.RefPath + " (" + how + "), mål=" + it.TargetPath + ", " + r.Method + ", " + q.LogText() + (r.Meaning != null ? ", betydelse: " + r.Meaning.LogText() : ""));
 
             var res = new EpisodeOutcome();
             var detail = new List<string>();
@@ -205,6 +219,7 @@ namespace TextSync
                 }
             }
             detail.AddRange(notes);
+            if (r.Meaning != null) detail.Add(r.Meaning.Summary());
             detail.Add("Referens: " + how + ".");
             detail.Add(r.Segments.Count > 1 ? "Flyttad olika mycket i " + r.Segments.Count + " delar." : "Förskjutning " + MainForm.FmtOffset(r.OffsetMs) + ".");
             detail.Add(MainForm.Fmt(Math.Floor(q.Matched * 1000) / 10, "0.#") + " % av raderna " + (refIsText ? "har referenstext samtidigt." : "ligger på tal i ljudet."));

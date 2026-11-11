@@ -67,6 +67,35 @@ namespace TextSync
             Sha256 = "1be3a9b2063867b937e64e2ec7483364a79917e157fa98c5d94b5c1fffea987b",
             Size = 487601967, Folder = "models", FileName = "ggml-small.bin"
         };
+        // Betydelsejämförelsen (Meaning.cs). Paketet för processorn: det fungerar på alla datorer och är litet.
+        // Innehållet är kontrollerat 2026-11-11: llama-server.exe finns med, llama-embedding.exe gör det inte.
+        public static readonly ToolPackage LlamaCpu = new ToolPackage
+        {
+            Name = "llama.cpp (jämför vad raderna betyder)",
+            Url = "https://github.com/ggml-org/llama.cpp/releases/download/b12291/llama-b12291-bin-win-cpu-x64.zip",
+            Sha256 = "6b712208c51fa71108351f9dd4d31c7d6b9f1e3646199494698f0677008b71cb",
+            Size = 25057929, Folder = "llama-cpu", Zip = true
+        };
+        public static readonly ToolPackage ModelBgeM3 = new ToolPackage
+        {
+            Name = "Språkmodell bge-m3 (förstår över 100 språk)",
+            Url = "https://huggingface.co/gpustack/bge-m3-GGUF/resolve/main/bge-m3-Q4_K_M.gguf",
+            Sha256 = "6d39681b26c61279ac1f82db35a04a05009e94c415b51c858ff571489a82fc06",
+            Size = 437778496, Folder = "models", FileName = "bge-m3-Q4_K_M.gguf"
+        };
+
+        public static string FindLlamaServer() { return FindIn(Path.Combine(Root, LlamaCpu.Folder), "llama-server.exe"); }
+
+        // Det som saknas för betydelsejämförelsen
+        public static List<ToolPackage> MeaningNeeds()
+        {
+            var need = new List<ToolPackage>();
+            if (!IsInstalled(LlamaCpu)) need.Add(LlamaCpu);
+            if (!IsInstalled(ModelBgeM3)) need.Add(ModelBgeM3);
+            return need;
+        }
+
+        public static bool MeaningReady() { return MeaningNeeds().Count == 0; }
 
         // NVIDIA-drivrutinen installerar nvcuda.dll i System32
         public static bool HasNvidia()
@@ -280,6 +309,7 @@ namespace TextSync
             if (p == Ffmpeg) return FindFfmpeg() != null && FindFfprobe() != null;
             if (p == WhisperCpu) return FindWhisper(false) != null;
             if (p == WhisperGpu) return FindWhisper(true) != null;
+            if (p == LlamaCpu) return FindLlamaServer() != null;
             return FindModel(p) != null;
         }
 

@@ -9,7 +9,8 @@ namespace TextSync
     public class SettingsDialog : Form
     {
         readonly ComboBox themeCombo;
-        readonly CheckBox fpsCheck, hiCheck, plainCheck;
+        readonly CheckBox fpsCheck, hiCheck, plainCheck, meaningCheck;
+        public bool CompareMeaning { get { return meaningCheck.Checked; } }
 
         public int ThemeIndex { get { return themeCombo.SelectedIndex; } }   // 0 = som Windows, 1 = ljust, 2 = mörkt
         public bool DetectFps { get { return fpsCheck.Checked; } }
@@ -25,7 +26,7 @@ namespace TextSync
             "Mycket gamla spelare – Windows-teckentabell efter språket" };
 
         // showTheme = false i högkontrastläge, där Windows färger alltid används
-        public SettingsDialog(int themeIndex, bool showTheme, bool detectFps, bool removeHi, bool stripFormatting, int srtFormat)
+        public SettingsDialog(int themeIndex, bool showTheme, bool detectFps, bool removeHi, bool stripFormatting, int srtFormat, bool compareMeaning)
         {
             SuspendLayout();
             AutoScaleDimensions = new SizeF(96F, 96F);
@@ -59,6 +60,12 @@ namespace TextSync
             fpsCheck = new CheckBox { Text = "Upptäck &bildfrekvensfel (25 ↔ 23,976 fps m.fl.)", AutoSize = true, Checked = detectFps, Margin = new Padding(0, 2, 0, 0) };
             t.Controls.Add(fpsCheck);
             t.Controls.Add(note("Ska nästan alltid vara ikryssad. Kryssa ur om synken blir fel på en text som redan har rätt hastighet."));
+            meaningCheck = new CheckBox { Text = "&Jämför också vad raderna betyder (när referensen är en text)", AutoSize = true, Checked = compareMeaning, Margin = new Padding(0, 2, 0, 0) };
+            t.Controls.Add(meaningCheck);
+            long mb = (Tools.LlamaCpu.Size + Tools.ModelBgeM3.Size) / 1048576;
+            t.Controls.Add(note("Efter den vanliga synken paras raderna ihop efter betydelse, och rader som ligger fel flyttas. " +
+                (Tools.MeaningReady() ? "Verktygen finns redan på datorn." : "Första gången frågar programmet om det får hämta gratisverktyg (cirka " + mb + " MB).") +
+                " Det tar längre tid första gången en text synkas. Det är nytt och inte utprovat på riktiga filmer ännu, så kontrollera resultatet."));
 
             t.Controls.Add(head("Texten"));
             hiCheck = new CheckBox { Text = "Ta bort text för &hörselskadade ([MUSIK], (skrattar), talarnamn)", AutoSize = true, Checked = removeHi, Margin = new Padding(0, 2, 0, 0) };

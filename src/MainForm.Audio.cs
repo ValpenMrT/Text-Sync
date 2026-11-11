@@ -160,6 +160,63 @@ namespace TextSync
             return true;
         }
 
+        // ------------------------------------------------------------ verktyg för betydelsejämförelsen
+        // Frågar och laddar ner llama.cpp och språkmodellen om de saknas. Returnerar false om jämförelsen ska hoppas över
+        // (synken görs då som vanligt). Svarar man nej kryssas rutan i Inställningar ur, så att frågan inte kommer vid varje synk.
+        internal async Task<bool> EnsureMeaningTools(CancellationToken token, IWin32Window owner = null, Action<int, string> prog = null)
+        {
+            if (owner == null) owner = this;
+            if (prog == null) prog = Progress;
+            var need = Tools.MeaningNeeds();
+            if (need.Count == 0) return true;
+            long total = need.Sum(p => p.Size);
+            long free = Tools.FreeBytes(), want = Tools.SpaceNeeded(need);
+            if (free >= 0 && free < want)
+            {
+                Log.Info("För lite diskutrymme för betydelsejämförelsen: " + free / 1048576 + " MB ledigt, behöver " + want / 1048576 + " MB");
+                MessageBox.Show(owner,
+                    "Det finns för lite ledigt utrymme på disken " + Path.GetPathRoot(Path.GetFullPath(Tools.Root)).TrimEnd('\\') + " för verktygen som jämför vad raderna betyder.\n\n" +
+                    "De behöver cirka " + Fmt(want / 1073741824.0, "0.0") + " GB under nedladdningen, men bara " + Fmt(free / 1073741824.0, "0.0") + " GB är ledigt.\n\n" +
+                    "Texten synkas nu som vanligt, utan jämförelsen. Frigör utrymme och synka igen om du vill ha den.",
+                    Caption, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return false;
+            }
+            var a = MessageBox.Show(owner,
+                "Du har valt \"Jämför också vad raderna betyder\" i Inställningar. Det behöver några gratisverktyg som inte finns på datorn ännu:\n\n" +
+                string.Join("\n", need.Select(p => "•  " + p.Name + "  (" + Fmt(p.Size / 1048576.0, "0") + " MB)")) +
+                "\n\nTotalt cirka " + Fmt(total / 1048576.0, "0") + " MB. De laddas ner en gång till\n" + Tools.Root +
+                "\noch kontrolleras så att de inte har ändrats. Allt körs sedan på din egen dator.\n\n" +
+                "Vill du ladda ner dem nu?\n\nSvarar du Nej synkas texten som vanligt, och rutan i Inställningar kryssas ur.",
+                Caption, MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+            if (a != DialogResult.Yes)
+            {
+                Log.Info("Betydelsejämförelsen: nedladdningen avböjdes, rutan kryssas ur");
+                meaningQuiet = true; meaningCheck.Checked = false; meaningQuiet = false;
+                return false;
+            }
+            long doneBefore = 0;
+            try
+            {
+                foreach (var p in need)
+                {
+                    var pkg = p; long before = doneBefore;
+                    await Task.Run(() => Tools.Download(pkg, (d, t) => prog((int)(100 * (before + d) / Math.Max(1, total)),
+                        "Laddar ner " + pkg.Name + "… " + Fmt((before + d) / 1048576.0, "0") + " av " + Fmt(total / 1048576.0, "0") + " MB"), token));
+                    doneBefore += p.Size;
+                }
+            }
+            catch (Exception ex)
+            {
+                if (ex is OperationCanceledException || token.IsCancellationRequested) throw new OperationCanceledException();
+                // synken är redan gjord: en misslyckad nedladdning ska inte kasta bort den
+                Log.Error("Verktygen för betydelsejämförelsen kunde inte laddas ner", ex);
+                MessageBox.Show(owner, Friendly(ex) + "\n\nTexten synkas nu som vanligt, utan att raderna jämförs efter betydelse. Programmet frågar igen vid nästa synk.",
+                    Caption, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return false;
+            }
+            return true;
+        }
+
         // Originaltexten (t.ex. engelska) efter synk mot ljudet: sparas som Film.en.srt bredvid filmen
         void SaveOrig()
         {

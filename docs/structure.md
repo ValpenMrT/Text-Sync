@@ -24,8 +24,10 @@ src/
   Align.cs         Förslag om att slå ihop (2↔1) eller dela (1↔2) rader efter referensens radindelning (dynamisk programmering på tider)
   Theme.cs         Ljust/mörkt läge: paletter, färgbyte på kontrollerna, mörka Windows-delar (rullister, rubriker, titelrad)
   Audio.cs         Ljudreferens: ffmpeg → 16 kHz mono WAV (mittkanal), taldetektering (A), Whisper (B), kombination (A+B), cache
-  Tools.cs         Hittar/laddar ner ffmpeg, whisper.cpp, språkmodell och Silero (fasta URL:er + SHA-256), grafikkort, inställningar
+  Tools.cs         Hittar/laddar ner ffmpeg, whisper.cpp, språkmodell, Silero, llama.cpp och bge-m3 (fasta URL:er + SHA-256), grafikkort, inställningar
   TextCheck.cs     Kontroll av textspår mot Whisper ord för ord (ankare, utjämning, rättning); separat SRT på originalspråket synkas först grovt mot ljudet
+  Meaning.cs       Jämför vad raderna betyder (inställning): vektorer från llama-server och modellen bge-m3, parning efter betydelse,
+                   rättning av rader som ligger fel. Också cachen för vektorerna och en liten JSON-läsare
   Engine.cs        SRT läs/skriv och synkmotorn
   Sdh.cs           Tar bort text för hörselskadade: [MUSIK], (skrattar), ♪ och talarnamn i versaler
   Markup.cs        Kodade tecken (&amp; → &) och taggar (<i>, <b>, <u>, <s>, <font>): avkodas och lagas alltid vid inläsningen, tas bort som ett val.
@@ -70,3 +72,5 @@ När en funktion ändras eller läggs till som användaren märker: uppdatera fa
 4. **Styckvis synk (Viterbi):** hittar avsnitt med olika förskjutning, alltså klipp och reklampauser. Vid varje hopp prövas alla repliker ±25 s runt gränsen, och en enda brytpunkt väljs.
 5. **Finjustering per replik:** en andra Viterbi över raderna (±6 s) hittar korta klipp (15–60 s) som mätpunkterna missar. Byte kräver flera rader som är överens, och raderna får inte byta ordning.
 6. **Smart**-läget väljer styckvis synk bara när den är klart bättre än linjär.
+
+Med inställningen "Jämför också vad raderna betyder" körs `Meaning.Apply` efter motorn, se kommentaren överst i `Meaning.Refine`.

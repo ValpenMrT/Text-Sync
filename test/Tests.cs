@@ -1083,6 +1083,89 @@ namespace TextSync
                 }
             }
 
+            // ---------------- betydelsejämförelsen (Meaning.cs): påhittade vektorer i stället för språkmodellen
+            {
+                var mr = new Random(7);
+                Func<int, float[]> rndVec = dim => { var v = new float[dim]; for (int i = 0; i < dim; i++) v[i] = (float)(mr.NextDouble() * 2 - 1); Meaning.Normalize(v); return v; };
+                Func<float[], double, float[]> near = (v, noise) => { var w = new float[v.Length]; var z = rndVec(v.Length); for (int i = 0; i < v.Length; i++) w[i] = (float)(v[i] + noise * z[i]); Meaning.Normalize(w); return w; };
+                // 300 referensrader, en var fjärde sekund. Texten har samma rader med lite andra tider ("översättningen").
+                var mref = new List<Cue>(); var mrefV = new List<float[]>();
+                for (int i = 0; i < 300; i++) { mref.Add(new Cue(10000 + i * 4000, 12500 + i * 4000, "Reference line number " + i)); mrefV.Add(rndVec(256)); }
+                var truth = new List<double>(); var mtgt = new List<Cue>(); var mtgtV = new List<float[]>();
+                for (int i = 0; i < 300; i++)
+                {
+                    if (i % 11 == 5) continue;   // några rader saknas i översättningen
+                    double s = mref[i].Start + (mr.NextDouble() * 300 - 150);
+                    truth.Add(s); mtgt.Add(new Cue(s, s + 2400, "Det här är rad nummer " + i)); mtgtV.Add(near(mrefV[i], 0.35));
+                }
+                MeaningReport rep;
+                // a) synken är redan rätt: ingenting ska flyttas
+                var same = Meaning.Refine(mref, mtgt, mrefV.ToArray(), mtgtV.ToArray(), out rep);
+                Console.WriteLine("Betydelse, rätt synk: " + rep.LogText());
+                Check("Betydelse: en text som redan går i takt ändras inte", rep.Moved == 0 && !rep.TooFew && rep.Anchors > 200 && same.Zip(mtgt, (x, y) => x.Start == y.Start && x.End == y.End).All(x => x));
+                // b) synkmotorn missade ett kort klipp: rad 100–119 ligger 1 s för tidigt
+                var off = mtgt.Select(c => c.Clone()).ToList();
+                for (int i = 100; i < 120; i++) { off[i].Start -= 1000; off[i].End -= 1000; off[i].OrigStart = 123; off[i].Raw = "rå"; }
+                var fixedUp = Meaning.Refine(mref, off, mrefV.ToArray(), mtgtV.ToArray(), out rep);
+                Console.WriteLine("Betydelse, missat klipp: " + rep.LogText());
+                bool inside = true, outside = true;
+                for (int i = 0; i < off.Count; i++)
+                {
+                    if (i >= 100 && i < 120) inside &= Math.Abs(fixedUp[i].Start - truth[i]) < 300;
+                    else outside &= fixedUp[i].Start == off[i].Start;
+                }
+                Check("Betydelse: rader som ligger 1 s fel flyttas rätt, och inga andra rader rörs", inside && outside && rep.Moved == 20 && rep.Places == 1);
+                Check("Betydelse: raden behåller längd, tid före synk och ursprunglig text", fixedUp[105].End - fixedUp[105].Start == off[105].End - off[105].Start && fixedUp[105].OrigStart == 123 && fixedUp[105].Raw == "rå");
+                Check("Betydelse: raderna byter aldrig ordning", Enumerable.Range(1, fixedUp.Count - 1).All(i => fixedUp[i].Start >= fixedUp[i - 1].Start));
+                Check("Betydelse: en flyttad rad överlappar inte raden före mer än den gjorde innan",
+                    Enumerable.Range(1, fixedUp.Count - 1).All(i => fixedUp[i].Start >= fixedUp[i - 1].End - Math.Max(0, off[i - 1].End - off[i].Start) - 0.001));
+                // rader som ligger längre än 10 s från sin referensrad flyttas inte (en scen som upprepas, eller fel avsnitt)
+                var far = mtgt.Select(c => c.Clone()).ToList();
+                for (int i = 200; i < far.Count; i++) { far[i].Start += 30000; far[i].End += 30000; }
+                var farOut = Meaning.Refine(mref, far, mrefV.ToArray(), mtgtV.ToArray(), out rep);
+                Check("Betydelse: rader flyttas aldrig längre än 10 s", rep.Moved == 0 && farOut.Zip(far, (x, y) => x.Start == y.Start).All(x => x));
+                // c) enstaka rader som paras med grannraden (t.ex. en rad som svenskan har slagit ihop) flyttar ingenting
+                var mixV = mtgtV.ToArray();
+                foreach (int i in new[] { 30, 90, 150, 210 }) mixV[i] = near(mrefV[int.Parse(mtgt[i].Text.Substring(mtgt[i].Text.LastIndexOf(' ') + 1)) + 1], 0.35);
+                Meaning.Refine(mref, mtgt, mrefV.ToArray(), mixV, out rep);
+                Check("Betydelse: enstaka par som pekar på grannraden flyttar ingenting", rep.Moved == 0);
+                // d) en annan text (inga rader betyder samma sak): ingenting ändras
+                var otherV = mtgt.Select(c => rndVec(256)).ToArray();
+                var unrelated = Meaning.Refine(mref, off, mrefV.ToArray(), otherV, out rep);
+                Console.WriteLine("Betydelse, annan text: " + rep.LogText());
+                Check("Betydelse: en text som inte hör till referensen ändras inte", rep.Moved == 0 && unrelated.Zip(off, (x, y) => x.Start == y.Start).All(x => x));
+                // e) korta rader jämförs inte, och rader utan vektor följer med sitt avsnitt
+                Check("Betydelse: korta rader jämförs inte, taggar och replikstreck tas bort", !Meaning.Usable(Meaning.Clean("- Ja.\n- Okej.")) && Meaning.Clean("<i>- Var är\nhan?</i>") == "Var är han?" && Meaning.Usable("Var är han någonstans?"));
+                var holes = mtgtV.ToArray(); for (int i = 0; i < holes.Length; i += 3) holes[i] = null;
+                var withHoles = Meaning.Refine(mref, off, mrefV.ToArray(), holes, out rep);
+                Check("Betydelse: rader som inte jämförs flyttas med raderna runt omkring", Enumerable.Range(100, 20).All(i => Math.Abs(withHoles[i].Start - truth[i]) < 300) && withHoles[50].Start == off[50].Start && rep.Moved == 20);
+
+                // frågan till och svaret från llama-server
+                string reqJson = LlamaServer.BuildRequest(new List<string> { "Var är \"han\"?", "Hallå å\\ä 😀" });
+                var parsed = Json.Parse(reqJson) as Dictionary<string, object>;
+                var inp = parsed != null ? parsed["input"] as List<object> : null;
+                Check("llama-server: frågan är giltig JSON i ren ASCII och texten kommer fram oförändrad",
+                    inp != null && inp.Count == 2 && (string)inp[0] == "Var är \"han\"?" && (string)inp[1] == "Hallå å\\ä 😀" && reqJson.All(ch => ch < 127));
+                var vecs = LlamaServer.ParseResponse("{\"object\":\"list\",\"data\":[{\"index\":1,\"object\":\"embedding\",\"embedding\":[0.5,-1e-1]},{\"embedding\":[1,2.5],\"index\":0}],\"model\":\"x\"}", 2);
+                Check("llama-server: vektorerna läggs efter index, inte efter ordningen i svaret", vecs[0][0] == 1f && vecs[0][1] == 2.5f && vecs[1][0] == 0.5f && Math.Abs(vecs[1][1] + 0.1f) < 1e-6);
+                bool threw = false;
+                try { LlamaServer.ParseResponse("{\"data\":[{\"index\":0,\"embedding\":[1]}]}", 2); } catch (InvalidDataException) { threw = true; }
+                Check("llama-server: ett svar med för få vektorer avvisas", threw);
+                // cachen
+                string embFile = Path.Combine(dir, "test.emb");
+                Embedder.WriteCache(embFile, mrefV.Take(5).ToList());
+                var readBack = Embedder.ReadCache(embFile, 5);
+                Check("Betydelse: vektorerna sparas och läses tillbaka, och en fil med fel antal rader används inte",
+                    readBack != null && readBack.Length == 5 && readBack[4].SequenceEqual(mrefV[4]) && Embedder.ReadCache(embFile, 6) == null);
+                // utan verktyg: synken lämnas som den var, och rapporten säger varför
+                if (!Tools.MeaningReady())
+                {
+                    var sr = new SyncResult { Output = off.Select(c => c.Clone()).ToList() };
+                    var er = Meaning.Apply(mref, sr, (a, b) => { }, System.Threading.CancellationToken.None);
+                    Check("Betydelse: utan verktyg lämnas synken som den var och felet står i rapporten", er.Error != null && sr.Meaning == er && sr.Output.Zip(off, (x, y) => x.Start == y.Start).All(x => x) && er.Summary().Contains("som vanligt"));
+                }
+            }
+
             Console.WriteLine();
             if (muxSkipped) Console.WriteLine("OBS: testet av \"Lägg in i MKV\" hoppades över, eftersom mkvmerge (MKVToolNix) inte är installerat.");
             if (failed == 0) Console.WriteLine("RESULTAT: alla {0} kontroller gick igenom.", checks);
