@@ -65,7 +65,7 @@ namespace TextSync
             long mb = (Tools.LlamaCpu.Size + Tools.ModelBgeM3.Size) / 1048576;
             t.Controls.Add(note("Efter den vanliga synken paras raderna ihop efter betydelse, och rader som ligger fel flyttas. " +
                 (Tools.MeaningReady() ? "Verktygen finns redan på datorn." : "Första gången frågar programmet om det får hämta gratisverktyg (cirka " + mb + " MB).") +
-                " Det tar längre tid första gången en text synkas. Det är nytt och inte utprovat på riktiga filmer ännu, så kontrollera resultatet."));
+                " Det tar längre tid första gången en text synkas. Det är nytt och bara utprovat på en film, så kontrollera resultatet."));
 
             t.Controls.Add(head("Texten"));
             hiCheck = new CheckBox { Text = "Ta bort text för &hörselskadade ([MUSIK], (skrattar), talarnamn)", AutoSize = true, Checked = removeHi, Margin = new Padding(0, 2, 0, 0) };

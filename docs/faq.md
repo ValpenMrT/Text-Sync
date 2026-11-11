@@ -169,7 +169,9 @@ Ja, som ett val. Klicka **Inställningar** och kryssa i **Jämför också vad ra
 - Det tar längre tid första gången en text synkas. Nästa gång går det direkt.
 - Vad jämförelsen gjorde står i resultatet, i rutan som börjar med **Betydelse:**, och utförligare under **Detaljer**.
 - Korta rader som "Ja." och "Okej." jämförs inte, eftersom de säger för lite.
-- Funktionen är ny och inte utprovad på riktiga filmer ännu. Kontrollera resultatet, och kryssa ur rutan om det blir sämre.
+- Det tar ungefär en halv minut per avsnitt första gången.
+- Den rättar fel som varar i minuter. Korta fel, under ungefär en minut, rättar den inte ännu.
+- Funktionen är ny och bara utprovad på en film. Kontrollera resultatet, och kryssa ur rutan om det blir sämre.
 - Blockerar Smart App Control verktyget görs synken som vanligt, och resultatet säger att jämförelsen inte kunde göras.
 
 **Hur tar jag bort verktygen för ljudsynk och betydelsejämförelsen?**

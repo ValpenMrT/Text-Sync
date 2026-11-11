@@ -2,6 +2,26 @@
 
 Nyast först.
 
+## 2026-11-11 – 2.4.7: Betydelsejämförelsen provad med riktiga verktyg och mätt mot Blacklist S04E01
+- **Område:** Synk / test
+- **Önskemål (ägaren):** "Kan du testa åt mig."
+- **Provat:** verktygen gick att köra i Claudes miljö den här gången (tidigare anteckningar säger att nedladdade program inte får köras). Allt kördes med programmets egen kod, inifrån PowerShell.
+  - **Nedladdningen:** llama.cpp på 2 s och modellen på 13 s, båda godkända mot SHA-256-summorna.
+  - **llama-server:** startar med de valda flaggorna på 2,3 s, svarar på `/v1/embeddings` med vektorer på 1024 tal, och stängs efteråt (ingen process kvar).
+  - **Modellen:** "Var är han någonstans?" mot "Where is he?" ger likheten 0,96, och "Jag sa att jag skulle bli sen." mot "I told you I would be late." ger 0,91. Meningar som inte hör ihop ger 0,40–0,57.
+  - **Tid på processorn:** 20 s för Blacklist S04E01 första gången (577 engelska och 367 svenska rader), 50 ms med cache.
+- **Mätt med `test/MeaningDiag.cs`** (svensk SRT mot engelska spåret, facit = den vanliga synken):
+  - **Den vanliga synken ändras inte:** 351 av 361 rader parades ihop, 320 säkra par, ingenting flyttat. Beskedet är oförändrat Bra (99,5 % / 83,4 % / 0,92).
+  - **Långa fel rättas:** +0,7 s i tre minuter gav 29 av 29 rader tillbaka inom 0,3 s. +3,0 s från 30:00 till slutet gav 95 av 95. Inga andra rader rördes.
+  - **Små fel rättas nästan:** −0,3 s i två minuter gav 15 av 17 rader tillbaka, och en rad utanför flyttades 0,3 s (gränsen hamnade en rad fel).
+  - **Korta fel rättas inte:** +1,0 s i en minut (6 rader), −1,5 s i 25 s (2 rader) och +8,0 s i 40 s (5 rader) lämnades orörda. Texten har bara cirka 8 rader per minut, och en utflykt och tillbaka kräver minst fem säkra par.
+- **Fynd:** bara 180 av de 320 säkra paren ligger inom 0,4 s från sin nivå. Den svenska texten har 367 rader mot 577 engelska, så en svensk rad täcker ofta två engelska och paras då ibland med den andra, vilket ger en avvikelse på en till tre sekunder. Det bruset gör att korta fel inte går att skilja ut.
+- **Slutsats:** funktionen är säker att ha påslagen på den här filmen (den ändrar ingenting som är rätt) och rättar fel som varar i minuter. De korta klippen, som var skälet till önskemålet, rättar den inte ännu. Synkmotorns finjustering per replik tar redan dem.
+- **Nästa steg (inte byggt):** låta en svensk rad paras med två engelska rader i följd, med en vektor för de två raderna tillsammans. Då mäts avvikelsen mot den första engelska raden, bruset minskar och kortare fel bör gå att hitta. Kostar cirka 10 s till per avsnitt första gången.
+- **Ej provat:** frågerutan och nedladdningen i fönstret, Avbryt under jämförelsen, Hel säsong med jämförelsen, andra filmer och andra språk, och en dator där Smart App Control blockerar llama-server.
+- **Product-check:** Claude granskade själv (ett mätprogram och dokumentation, ingen ändring i programmet).
+- **Nivå:** LIVE
+
 ## 2026-11-11 – 2.4.6: Jämför vad raderna betyder (llama.cpp och bge-m3), som en inställning
 - **Område:** Synk / verktyg / GUI
 - **Önskemål (ägaren):** fler sätt att få så exakt synk som möjligt när svensk text synkas mot engelsk text, och "kan du lägga in llama.cpp som en inställning".

@@ -70,7 +70,8 @@ namespace TextSync
 
     public static class Meaning
     {
-        // Gränserna är satta mot påhittade data i testerna. De är inte mätta mot en riktig film (se beslutsloggen 2026-11-11).
+        // Gränserna är satta mot påhittade data i testerna och mätta mot en film, Blacklist S04E01 (beslutsloggen 2026-11-11, 2.4.7):
+        // den vanliga synken ändras inte och fel som varar i minuter rättas, men korta fel (under ungefär en minut) rättas inte.
         const double Tol = 400;        // ms: ett par stöder en nivå om det ligger så nära den
         const double JumpCost = 2.0;   // byte av nivå kostar som två par som inte stämmer: ett nytt avsnitt behöver minst tre par
         const double Deadband = 150;   // ms: mindre flyttar görs inte, synkmotorn är redan så exakt

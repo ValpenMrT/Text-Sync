@@ -49,6 +49,7 @@ test/
   TextCheckDiag.cs Testar Whisper-kontrollen: orört spår och med flit förskjutet spår
   VadTune.cs       Justerar taldetekteringens gräns mot facit
   QualityDiag.cs   Mäter beskedet mot en riktig film: rätt text, texten baklänges (som ett annat avsnitt) och ett missat klipp
+  MeaningDiag.cs   Mäter betydelsejämförelsen mot en riktig film: vad den flyttar, tiden, och om text som förstörts med flit läggs tillbaka
   OrigSrtDiag.cs   Separat engelsk SRT (förstörd med flit) → ljud → svensk synk, mot facit
   bin/             Byggda testprogram (skapas av build.ps1 -Test, inte i git)
 docs/              Beslut, drift, FAQ, nästa fas (next.md)

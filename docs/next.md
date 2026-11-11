@@ -39,17 +39,17 @@
     - Gränserna sätts mot testerna och testfilmen, så att varningen inte visas för vanliga filmer med förtexter eller eftertexter som saknar text.
 
 ## Kvar efter betydelsejämförelsen 2.4.6 (2026-11-11)
-Ägaren provar först, eftersom verktygen inte får köras i Claudes miljö:
-1. Kryssa i **Jämför också vad raderna betyder** i Inställningar och synka Blacklist S04E01 mot det engelska spåret. Svara ja på nedladdningen.
-2. Titta på rutan **Betydelse:** i resultatet och på raderna runt 03:30 och 07:18, där synken tidigare hade korta klipp.
-3. Skicka `log.txt`. Raden "Betydelsejämförelse:" visar antal par, gränserna, nivåerna och tiden. Med den går gränserna att justera.
+Mätt mot Blacklist S04E01 i 2.4.7 (se beslutsloggen): verktygen fungerar, den vanliga synken ändras inte, fel som varar i minuter rättas, korta fel rättas inte.
 
 Det som inte är gjort:
-- **Inte mätt mot facit.** Ett mätprogram i `test/` (som `OrigSrtDiag`) som förstör det engelska spåret med flit och jämför med och utan jämförelsen.
-- **Bara processorn.** Paketet för NVIDIA (cirka 700 MB till) väntar tills tiden på processorn är känd. Tar det flera minuter per avsnitt är det värt att lägga till.
-- **Ingen varning om att det tar tid** första gången, som den för Whisper på processorn. Skriv in en uppskattning i Inställningar när tiden är mätt.
+- **Korta fel (under ungefär en minut) rättas inte.** En svensk rad täcker ofta två engelska och paras ibland med den andra, så 140 av 320 säkra par avviker mer än 0,4 s. Förslag: låt en svensk rad paras med två engelska rader i följd (vektor för de två raderna tillsammans), och mät mot den första. Mät om med `MeaningDiag`.
+- **Bara en film mätt.** Kör `MeaningDiag` på fler filmer när ägaren har dem.
+- **Ägaren provar i fönstret:** frågerutan och nedladdningen (verktygen ligger redan på den här datorn, så frågan kommer inte här), rutan **Betydelse:** i resultatet, och Avbryt under jämförelsen.
+- **Bara processorn.** Det tar cirka 20 s per avsnitt första gången, så paketet för NVIDIA (cirka 700 MB till) behövs inte nu.
+- **Tiden står inte i Inställningar.** Skriv "ungefär en halv minut per avsnitt första gången" när fler filmer är mätta.
 - **Frågan om nedladdning nämner inte Smart App Control.** llama-server är inte signerat, så 440 MB kan hämtas och sedan blockeras. Felet förklaras då i resultatet. Förslag: kryssa ur rutan automatiskt efter första blockeringen, som `gpuwhisperfailed` gör för Whisper.
-- **Raderna före första och efter sista säkra paret** får samma flytt som kanten, även om de ligger långt bort i tid. Titta på det i första riktiga loggen.
+- **Raderna före första och efter sista säkra paret** får samma flytt som kanten, även om de ligger långt bort i tid.
+- **Gränsen mellan två nivåer kan hamna en rad fel** (en rad flyttades 0,3 s i onödan i mätningen).
 - **Frågor till ägaren från granskningen:** (1) Ska jämförelsen gälla Hel säsong redan nu, där resultatet sparas utan att någon ser det, eller bara huvudfönstret tills den är provad? Nu gäller den båda. (2) Räcker 10 s som längsta flytt? Synkmotorns finjustering har 6 s.
 - **Flyttade rader märks inte i listan.** Kolumnen Flyttad visar hoppet, men inget märke säger att det var betydelsejämförelsen.
 - **Beskedet** (Bra / Kontrollera / Osäkert) använder inte parningen. Få par är ett tecken på fel avsnitt och kunde ge Osäkert.
