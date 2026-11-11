@@ -18,8 +18,37 @@ using System.Threading.Tasks;
 
 namespace TextSync
 {
+    // Ett par: rad Line i texten betyder samma sak som referensrad Ref och de Size-1 följande referensraderna
+    public class MeaningPair
+    {
+        public int Line, Ref, Size;
+        public double Delta;   // ms från radens start till gruppens första referensrad
+        public double Z;       // likheten i standardavvikelser
+    }
+
+    // En replik: en del av en rad. Rad Row i listan, del Part av Parts. Text = repliken utan replikstreck och radbrytningar.
+    public class MeaningUnit
+    {
+        public int Row, Part, Parts;
+        public string Text;
+    }
+
+    // Förslag om att fördela replikerna i några rader i följd som referensen gör. Raderna känns igen på tid före synk och text,
+    // så att förslaget kan visas även efter andra ändringar i listan.
+    public class MeaningMove
+    {
+        public double[] OrigStarts;   // raderna som ersätts
+        public string[] Texts;
+        public List<Cue> NewCues;     // nya rader, med referensradernas tider
+        public Cue[] Refs;            // referensraden för varje ny rad
+    }
+
     public class MeaningReport
     {
+        public List<MeaningPair> Pairs = new List<MeaningPair>();   // alla par, i tidsordning
+        public List<MeaningMove> Moves = new List<MeaningMove>();   // förslag om att flytta repliker mellan rader
+        public int UnitPairs;    // repliker som parades säkert med en replik i referensen
+        public int Snapped;      // enskilda rader som lades på referensradens starttid
         public int Lines;        // rader i texten som är långa nog att jämföra
         public int Paired;       // rader som parades ihop med en referensrad efter betydelse
         public int Grouped;      // varav med två eller tre referensrader i följd
@@ -44,11 +73,14 @@ namespace TextSync
             if (Canceled) return "Betydelsejämförelsen avbröts, så synken är gjord som vanligt.";
             if (Error != null) return "Betydelsejämförelsen kunde inte göras, så synken är gjord som vanligt. " + Error;
             string pairs = Paired + " av " + Lines + " rader parades ihop efter betydelse.";
-            if (Worse) return "Betydelsejämförelsen ändrade ingenting, eftersom texten passade referensen sämre efter flytten. " + pairs;
             if (TooFew) return "Betydelsejämförelsen ändrade ingenting, eftersom för få rader gick att para ihop säkert. " + pairs;
-            if (Moved == 0) return "Betydelsejämförelsen hittade inget att rätta. " + pairs;
-            return "Betydelsejämförelsen flyttade " + (Moved == 1 ? "1 rad" : Moved + " rader") + " på " + (Places == 1 ? "1 ställe" : Places + " ställen") +
-                " (som mest " + Sec(MaxMs) + " s). " + pairs;
+            var did = new List<string>();
+            if (Moved > 0) did.Add("flyttade " + (Moved == 1 ? "1 rad" : Moved + " rader") + " på " + (Places == 1 ? "1 ställe" : Places + " ställen") + " (som mest " + Sec(MaxMs) + " s)");
+            if (Snapped > 0) did.Add("lade " + (Snapped == 1 ? "1 enskild rad" : Snapped + " enskilda rader") + " på referensradens starttid");
+            if (Moves.Count > 0) did.Add("har " + (Moves.Count == 1 ? "1 förslag" : Moves.Count + " förslag") + " om att flytta repliker mellan rader (märkta Flytta?)");
+            string worse = Worse ? " En flytt av ett helt stycke togs tillbaka, eftersom texten passade referensen sämre efter den." : "";
+            if (did.Count == 0) return (Worse ? "Betydelsejämförelsen ändrade ingenting." : "Betydelsejämförelsen hittade inget att rätta.") + worse + " " + pairs;
+            return "Betydelsejämförelsen " + string.Join(did.Count > 2 ? ", " : " och ", did) + "." + worse + " " + pairs;
         }
 
         // Blev det bättre? Jämför hur många rader som börjar i takt med referensen före och efter flytten. null = inget flyttat.
@@ -67,8 +99,10 @@ namespace TextSync
         {
             if (Canceled) return "Betydelse: avbruten";
             if (Error != null) return "⚠ Betydelse: kunde inte jämföras";
-            if (TooFew || Worse) return "Betydelse: inget ändrat";
-            return Moved == 0 ? "Betydelse: inget att rätta" : "Betydelse: " + (Moved == 1 ? "1 rad flyttad" : Moved + " rader flyttade");
+            int n = Moved + Snapped;
+            if (n == 0 && Moves.Count > 0) return "Betydelse: " + (Moves.Count == 1 ? "1 förslag" : Moves.Count + " förslag");
+            if (TooFew || (Worse && n == 0)) return "Betydelse: inget ändrat";
+            return n == 0 ? "Betydelse: inget att rätta" : "Betydelse: " + (n == 1 ? "1 rad flyttad" : n + " rader flyttade");
         }
 
         public string LogText()
@@ -78,7 +112,8 @@ namespace TextSync
             if (Error != null) return "fel: " + Error;
             return (Worse ? "togs tillbaka (sämre poäng), " : "") + "rader " + Lines + ", par " + Paired + " (" + Grouped + " mot flera rader), säkra par " + Anchors + ", flyttade " + Moved + " på " + Places + " ställen, största " + MaxMs.ToString("0", inv) +
                 " ms, sigma " + Sigma.ToString("0.000", inv) + ", gränser " + MatchMin.ToString("0.000", inv) + "/" + AnchorMin.ToString("0.000", inv) +
-                (TooFew ? ", för få säkra par" : "") + (Levels.Length > 0 ? ", nivåer " + Levels : "");
+                (TooFew ? ", för få säkra par" : "") + (Levels.Length > 0 ? ", nivåer " + Levels : "") +
+                ", repliker med säkert par " + UnitPairs + ", enskilda rader flyttade " + Snapped + ", förslag om flytt " + Moves.Count;
         }
     }
 
@@ -97,6 +132,9 @@ namespace TextSync
         const double MatchSigmas = 2.5, AnchorSigmas = 4;
         const double MaxShift = 10000; // ms: par som ligger längre från varandra styr inte tiderna (en scen som upprepas, eller fel avsnitt)
         const double WorseMargin = 0.01; // så mycket får överlappspoängen sjunka innan flytten tas tillbaka
+        const double SnapMin = 150, SnapMax = 3000;  // ms: enskilda rader flyttas bara om de ligger så här långt från sin referensrad
+        const double MinSnapDur = 700; // ms: kortare än så får en rad inte bli
+        const int UnitLetters = 5;     // repliker får vara kortare än hela rader ("He lied."), eftersom ordningen runt omkring styr
         const double GroupGap = 2000;  // ms: längsta paus mellan referensrader som kan höra till samma översatta rad
         public static int MaxGroup = 3; // en rad får paras med upp till så många referensrader i följd (1 = bara rad mot rad)
 
@@ -109,7 +147,8 @@ namespace TextSync
             return s.Length > 300 ? s.Substring(0, 300) : s;
         }
 
-        public static bool Usable(string cleaned) { return cleaned != null && cleaned.Count(char.IsLetter) >= MinLetters; }
+        public static bool Usable(string cleaned) { return Usable(cleaned, MinLetters); }
+        public static bool Usable(string cleaned, int minLetters) { return cleaned != null && cleaned.Count(char.IsLetter) >= minLetters; }
 
         static float Dot(float[] a, float[] b)
         {
@@ -141,32 +180,53 @@ namespace TextSync
                 var rt = refc.Select(c => Clean(c.Text)).ToList();
                 var tt = r.Output.Select(c => Clean(c.Text)).ToList();
                 float[][] rv, tv;
-                int steps = 1 + MaxGroup;   // texten, referensen rad för rad, och referensen i grupper om två, tre, …
-                var groups = new float[Math.Max(0, MaxGroup - 1)][][];
+                int G = Math.Max(0, MaxGroup - 1);
+                int steps = 2 * (2 + G);   // rader: texten, referensen, grupper om två, tre, … Sedan samma sak för replikerna.
+                var groups = new float[G][][];
+                var known = new Dictionary<string, float[]>();   // samma text räknas bara en gång
+                List<Cue> outp;
                 using (var srv = new LlamaServer(exe, model))
                 {
                     Func<int, Action<int>> part = k => p => { int pct = (k * 100 + p) / steps; progress(pct, "Jämför vad raderna betyder… " + pct + " %"); };
                     Func<int, Action<string>> stat = k => s => progress(k * 100 / steps, s);
-                    rv = Embedder.Get(rt, model, srv, part(0), stat(0), ct);
-                    tv = Embedder.Get(tt, model, srv, part(1), stat(1), ct);
-                    for (int g = 0; g < groups.Length; g++)
-                        groups[g] = Embedder.Get(GroupTexts(refc, g + 2), model, srv, part(2 + g), stat(2 + g), ct);
-                }
-                ct.ThrowIfCancellationRequested();
-                var outp = Refine(refc, r.Output, rv, tv, out rep, groups);
-                if (rep.Moved > 0)
-                {
-                    // gränserna är inte mätta mot riktiga filmer: passar texten referensen sämre efter flytten tas den tillbaka
-                    double before = SyncEngine.Score(refc, r.Output), after = SyncEngine.Score(refc, outp);
-                    if (after < before - WorseMargin) { rep.Worse = true; rep.Moved = 0; rep.Places = 0; }
-                    else
+                    rv = Embedder.Get(rt, model, srv, part(0), stat(0), ct, known);
+                    tv = Embedder.Get(tt, model, srv, part(1), stat(1), ct, known);
+                    for (int g = 0; g < G; g++)
+                        groups[g] = Embedder.Get(GroupTexts(refc, g + 2), model, srv, part(2 + g), stat(2 + g), ct, known);
+                    ct.ThrowIfCancellationRequested();
+
+                    // 1) hela stycken som ligger fel
+                    outp = Refine(refc, r.Output, rv, tv, out rep, groups);
+                    if (rep.Moved > 0 && SyncEngine.Score(refc, outp) < SyncEngine.Score(refc, r.Output) - WorseMargin)
                     {
-                        // båda varianterna finns kvar i raderna (MeaningAlt), så att fönstret kan växla mellan dem
-                        rep.OnsetBefore = Quality.Assess(refc, r.Output, r, true).Onset;
-                        MarkMoved(r.Output, outp);
-                        r.Output = outp; r.ScoreAfter = after;
-                        rep.OnsetAfter = Quality.Assess(refc, outp, r, true).Onset;
+                        // passar texten referensen sämre efter flytten tas den tillbaka
+                        rep.Worse = true; rep.Moved = 0; rep.Places = 0;
+                        outp = r.Output.Select(c => c.Clone()).ToList();
                     }
+
+                    // 2) replikerna: enskilda rader läggs på referensradens tid, och repliker i fel rad blir förslag
+                    if (!rep.TooFew)
+                    {
+                        var tU = Units(outp); var rU = Units(refc);
+                        int b = 2 + G;
+                        var tuv = Embedder.Get(tU.Select(u => Clean(u.Text)).ToList(), model, srv, part(b), stat(b), ct, known, UnitLetters);
+                        var ruv = Embedder.Get(rU.Select(u => Clean(u.Text)).ToList(), model, srv, part(b + 1), stat(b + 1), ct, known, UnitLetters);
+                        var ug = new float[G][][];
+                        for (int g = 0; g < G; g++)
+                            ug[g] = Embedder.Get(UnitGroupTexts(rU, refc, g + 2), model, srv, part(b + 2 + g), stat(b + 2 + g), ct, known, UnitLetters);
+                        ct.ThrowIfCancellationRequested();
+                        var beforeSnap = outp.Select(c => c.Clone()).ToList();
+                        RefineUnits(refc, outp, tU, tuv, rU, ruv, ug, rep);
+                        if (rep.Snapped > 0 && SyncEngine.Score(refc, outp) < SyncEngine.Score(refc, beforeSnap) - WorseMargin) { outp = beforeSnap; rep.Snapped = 0; }
+                    }
+                }
+                if (rep.Moved > 0 || rep.Snapped > 0)
+                {
+                    // båda varianterna finns kvar i raderna (MeaningAlt), så att fönstret kan växla mellan dem
+                    rep.OnsetBefore = Quality.Assess(refc, r.Output, r, true).Onset;
+                    MarkMoved(r.Output, outp);
+                    r.Output = outp; r.ScoreAfter = SyncEngine.Score(refc, outp);
+                    rep.OnsetAfter = Quality.Assess(refc, outp, r, true).Onset;
                 }
                 Log.Info("Betydelsejämförelse: " + rep.LogText() + ", " + sw.ElapsedMilliseconds + " ms");
             }
@@ -188,7 +248,8 @@ namespace TextSync
         public static void MarkMoved(List<Cue> plain, List<Cue> moved)
         {
             for (int i = 0; i < moved.Count && i < plain.Count; i++)
-                if (Math.Abs(moved[i].Start - plain[i].Start) > 0.5) { moved[i].MeaningAlt = plain[i].Start; moved[i].MeaningOff = false; }
+                if (Math.Abs(moved[i].Start - plain[i].Start) > 0.5 || Math.Abs(moved[i].End - plain[i].End) > 0.5)
+                { moved[i].MeaningAlt = plain[i].Start; moved[i].MeaningAltEnd = plain[i].End; moved[i].MeaningOff = false; }
         }
 
         // Antal rader som skiljer sig mellan varianterna (0 = inget att växla mellan)
@@ -206,13 +267,256 @@ namespace TextSync
                 var n = c.Clone();
                 if (!double.IsNaN(c.MeaningAlt))
                 {
-                    double d = c.MeaningAlt - c.Start;
-                    n.Start += d; n.End += d;
-                    n.MeaningAlt = c.Start; n.MeaningOff = !c.MeaningOff;
+                    // slutet i den andra varianten finns sparat. Saknas det (NaN) följer slutet med starten.
+                    n.Start = c.MeaningAlt;
+                    n.End = double.IsNaN(c.MeaningAltEnd) ? c.End + (c.MeaningAlt - c.Start) : c.MeaningAltEnd;
+                    n.MeaningAlt = c.Start; n.MeaningAltEnd = c.End; n.MeaningOff = !c.MeaningOff;
                 }
                 res.Add(n);
             }
             return res.OrderBy(c => c.Start).ToList();
+        }
+
+        // ================================================================ repliker
+        // En rad kan innehålla två repliker ("- Var är du?" / "- Hemma."). Översättningen delar ibland replikerna på raderna
+        // på ett annat sätt än originalet. Därför paras också replikerna ihop, var för sig:
+        //  - En rad vars första replik hör till den första repliken i en referensrad läggs på den referensradens starttid (Snap).
+        //  - Där replikerna är fördelade på raderna på ett annat sätt än i referensen blir det ett förslag (MeaningMove).
+
+        // Textens repliker i tidsordning. En rad som börjar med replikstreck börjar en ny replik, andra rader hör till repliken före.
+        public static List<MeaningUnit> Units(List<Cue> cues)
+        {
+            var res = new List<MeaningUnit>();
+            foreach (int i in Enumerable.Range(0, cues.Count).OrderBy(k => cues[k].Start))
+            {
+                var parts = new List<string>();
+                foreach (string raw in (cues[i].Text ?? "").Replace("\r", "").Split('\n'))
+                {
+                    string l = Regex.Replace(raw, @"<[^>]*>|\{[^}]*\}", "").Trim();
+                    if (l.Length == 0) continue;
+                    bool dash = l[0] == '-' || l[0] == '–' || l[0] == '—';
+                    if (dash) l = l.Substring(1).TrimStart();
+                    if (l.Length == 0) continue;
+                    if (dash || parts.Count == 0) parts.Add(l); else parts[parts.Count - 1] += " " + l;
+                }
+                if (parts.Count == 0) parts.Add("");
+                for (int k = 0; k < parts.Count; k++) res.Add(new MeaningUnit { Row = i, Part = k, Parts = parts.Count, Text = parts[k] });
+            }
+            return res;
+        }
+
+        // Texten för replik p tillsammans med de size-1 följande ("" = ingen grupp). Repliker i olika rader måste följa tätt på varandra.
+        public static List<string> UnitGroupTexts(List<MeaningUnit> units, List<Cue> cues, int size)
+        {
+            var res = units.Select(u => "").ToList();
+            for (int p = 0; p + size <= units.Count; p++)
+            {
+                bool ok = true;
+                for (int q = p + 1; q < p + size && ok; q++)
+                    if (units[q].Row != units[q - 1].Row && cues[units[q].Row].Start - cues[units[q - 1].Row].End > GroupGap) ok = false;
+                if (ok && units.Skip(p).Take(size).All(u => u.Text.Length > 0)) res[p] = Clean(string.Join(" ", units.Skip(p).Take(size).Select(u => u.Text)));
+            }
+            return res;
+        }
+
+        // Bästa parningen i ordning mellan tgtVec och refVec (och grupper av referensvektorer), som i Refine steg 1–2.
+        // Paren kommer i ordning. Line och Ref är index i vektorlistorna.
+        static List<MeaningPair> PairUp(float[][] tgtVec, float[][] refVec, float[][][] refGroups)
+        {
+            var res = new List<MeaningPair>();
+            int[] ti = Enumerable.Range(0, tgtVec.Length).Where(i => tgtVec[i] != null).ToArray();
+            int[] ra = Enumerable.Range(0, refVec.Length).ToArray();
+            int n = ti.Length, m = ra.Length;
+            if (n < 5 || refVec.Count(v => v != null) < 5) return res;
+            int G = 1 + (refGroups == null ? 0 : refGroups.Length);
+            var z = new float[G][][];
+            for (int g = 0; g < G; g++) { double sg; z[g] = Scores(tgtVec, ti, g == 0 ? refVec : refGroups[g - 1], ra, out sg); }
+            if (z[0] == null) return res;
+            var D = new float[n + 1][]; var back = new byte[n + 1][];
+            for (int a = 0; a <= n; a++) { D[a] = new float[m + 1]; back[a] = new byte[m + 1]; }
+            for (int a = 1; a <= n; a++)
+                for (int b = 1; b <= m; b++)
+                {
+                    float best = D[a - 1][b]; byte bk = 1;
+                    if (D[a][b - 1] > best) { best = D[a][b - 1]; bk = 2; }
+                    for (int g = 0; g < G && g < b; g++)
+                    {
+                        if (z[g] == null) continue;
+                        float gain = z[g][a - 1][b - 1 - g] - (float)MatchSigmas;
+                        if (gain > 0 && D[a - 1][b - 1 - g] + gain > best) { best = D[a - 1][b - 1 - g] + gain; bk = (byte)(3 + g); }
+                    }
+                    D[a][b] = best; back[a][b] = bk;
+                }
+            for (int a = n, b = m; a > 0 && b > 0; )
+            {
+                int bk = back[a][b];
+                if (bk >= 3)
+                {
+                    int g = bk - 3, col = b - 1 - g;
+                    res.Add(new MeaningPair { Line = ti[a - 1], Ref = col, Size = g + 1, Z = z[g][a - 1][col] });
+                    a--; b -= g + 1;
+                }
+                else if (bk == 1) a--;
+                else b--;
+            }
+            res.Reverse();
+            return res;
+        }
+
+        // Parar replikerna och gör två saker med resultatet: lägger enskilda rader på referensradens tid (ändrar outp),
+        // och samlar förslag om att flytta repliker mellan rader (rep.Moves). tU/rU = replikerna i texten och i referensen (Units),
+        // tVec/rVec = deras vektorer (null = för kort), rGroups[k][p] = vektor för referensreplik p och de k+1 följande.
+        public static void RefineUnits(List<Cue> refc, List<Cue> outp, List<MeaningUnit> tU, float[][] tVec, List<MeaningUnit> rU, float[][] rVec, float[][][] rGroups, MeaningReport rep)
+        {
+            var pairs = PairUp(tVec, rVec, rGroups);
+            // för varje replik i texten: referensraden där dess första referensreplik står (-1 = inget säkert par), om den står först där,
+            // och referensraden där gruppens sista replik står
+            int nU = tU.Count;
+            var eRow = new int[nU]; var eFirst = new bool[nU]; var eLast = new int[nU];
+            for (int u = 0; u < nU; u++) eRow[u] = -1;
+            foreach (var p in pairs)
+            {
+                if (p.Z < AnchorSigmas) continue;
+                int row = rU[p.Ref].Row;
+                if (Math.Abs(refc[row].Start - outp[tU[p.Line].Row].Start) > MaxShift) continue;
+                eRow[p.Line] = row; eFirst[p.Line] = rU[p.Ref].Part == 0; eLast[p.Line] = rU[p.Ref + p.Size - 1].Row;
+            }
+            rep.UnitPairs = eRow.Count(x => x >= 0);
+            if (rep.UnitPairs < Math.Max(8, 0.1 * nU)) return;
+
+            // ---- förslag: block av rader där replikerna är fördelade på ett annat sätt än i referensen
+            // gräns efter replik u i texten (old) och enligt referensen (ny): old = nästa replik står i en annan rad
+            for (int u0 = 0; u0 < nU; )
+            {
+                // ett block börjar vid en radgräns och slutar vid nästa ställe där texten och referensen båda har en gräns.
+                // Utan säkert par på någon sida följs textens egna radgränser, och ett block med en sådan replik ger inget förslag.
+                int u1 = u0; bool differs = false, known = eRow[u0] >= 0;
+                while (u1 + 1 < nU)
+                {
+                    bool oldCut = tU[u1 + 1].Row != tU[u1].Row;
+                    bool bothKnown = eRow[u1] >= 0 && eRow[u1 + 1] >= 0;
+                    bool newCut = bothKnown ? eRow[u1 + 1] != eRow[u1] : oldCut;
+                    if (oldCut && newCut) break;
+                    if (oldCut != newCut) differs = true;
+                    u1++;
+                    if (eRow[u1] < 0) known = false;
+                }
+                if (differs && known)
+                {
+                    var move = MakeMove(refc, outp, tU, eRow, eLast, u0, u1);
+                    if (move != null) rep.Moves.Add(move);
+                }
+                u0 = u1 + 1;
+            }
+
+            // ---- enskilda rader: första repliken hör till första repliken i en referensrad → raden börjar när referensraden börjar
+            int[] order = Enumerable.Range(0, outp.Count).Where(i => outp[i].End > 0).OrderBy(i => outp[i].Start).ToArray();
+            var firstUnit = new Dictionary<int, int>();
+            for (int u = 0; u < nU; u++) if (tU[u].Part == 0) firstUnit[tU[u].Row] = u;
+            // Skydd (satta efter mätningen mot Blacklist S04E01, där flyttar utan dem hamnade upp till 2,5 s fel):
+            //  - parningen rad för rad (rep.Pairs) måste peka på samma referensrad som parningen av repliker,
+            //  - referensraden måste själv säga något ("No." eller "Hey!" först i en grupp duger inte som starttid),
+            //  - raden går aldrig in i raden före, och blir aldrig mycket kortare än den var.
+            var claimed = new bool[refc.Count];   // referensrader som någon replik i texten har parats med
+            foreach (var up in pairs)
+                for (int q = up.Ref; q < up.Ref + up.Size && q < rU.Count; q++) claimed[rU[q].Row] = true;
+            // referensrader som fortsätter en mening från raden före ("...your friend here was assisting him."): textens rad börjar
+            // då oftast redan med början av meningen, och ska inte flyttas till fortsättningen
+            var midSentence = new bool[refc.Count];
+            int[] rOrder = Enumerable.Range(0, refc.Count).OrderBy(k => refc[k].Start).ToArray();
+            for (int q = 0; q < rOrder.Length; q++)
+            {
+                string t = Clean(refc[rOrder[q]].Text).TrimStart('-', '–', ' ', '"', '\'');
+                bool cont = t.StartsWith("...") || t.StartsWith("…") || (t.Length > 0 && char.IsLower(t[0]));
+                if (!cont && q > 0 && refc[rOrder[q]].Start - refc[rOrder[q - 1]].End <= GroupGap) cont = LineAligner.EndsMidSentence(Clean(refc[rOrder[q - 1]].Text));
+                midSentence[rOrder[q]] = cont;
+            }
+            var rowPair = new Dictionary<int, int>();
+            foreach (var rp in rep.Pairs) if (rp.Z >= AnchorSigmas) rowPair[rp.Line] = rp.Ref;
+            int N = order.Length;
+            var oldS = order.Select(i => outp[i].Start).ToArray(); var oldE = order.Select(i => outp[i].End).ToArray();
+            for (int p = 0; p < N; p++)
+            {
+                int u, rr;
+                if (!firstUnit.TryGetValue(order[p], out u) || eRow[u] < 0 || !eFirst[u]) continue;
+                if (!rowPair.TryGetValue(order[p], out rr) || rr != eRow[u]) continue;
+                if (!Usable(Clean(refc[eRow[u]].Text), UnitLetters)) continue;
+                if (midSentence[eRow[u]]) continue;
+                // en rad som själv börjar mitt i en mening ("av sen 50-talsmodell.") hör ihop med raden före och flyttas inte
+                string own = tU[u].Text.TrimStart('"', '\'', ' ');
+                if (own.StartsWith("...") || own.StartsWith("…") || (own.Length > 0 && char.IsLower(own[0]))) continue;
+                double target = refc[eRow[u]].Start, dev = target - oldS[p];
+                if (Math.Abs(dev) < SnapMin || Math.Abs(dev) > SnapMax) continue;
+                double ns, ne = oldE[p];
+                if (dev < 0)
+                {
+                    // tidigare: bara fram till där raden före slutar. Slutet står kvar.
+                    ns = Math.Max(target, p > 0 ? oldE[p - 1] : 0);
+                    if (oldS[p] - ns < SnapMin) continue;
+                }
+                else
+                {
+                    // senare: inte om en referensrad som ingen replik har parats med börjar under tiden som raden skulle tappa.
+                    // Då täcker raden troligen den referensraden också ("Livshotande träff." före "Han kan inte ha hunnit långt.").
+                    bool covers = false;
+                    for (int k = 0; k < refc.Count && !covers; k++)
+                        covers = !claimed[k] && refc[k].Start >= oldS[p] - 300 && refc[k].Start < target - 100 && Clean(refc[k].Text).Length > 0;
+                    if (covers) continue;
+                    // slutet följer med så långt det går utan att gå in i nästa rad
+                    ns = target;
+                    double room = p + 1 < N ? Math.Max(oldE[p], oldS[p + 1]) : double.MaxValue;
+                    ne = Math.Min(oldE[p] + dev, room);
+                    if (ne - ns < Math.Max(MinSnapDur, 0.6 * (oldE[p] - oldS[p]))) continue;
+                }
+                outp[order[p]].Start = ns; outp[order[p]].End = ne;
+                rep.Snapped++;
+            }
+        }
+
+        // Ett förslag för replikerna u0..u1 (hela rader): nya rader efter referensens indelning, med referensradernas tider. null = går inte.
+        static MeaningMove MakeMove(List<Cue> refc, List<Cue> outp, List<MeaningUnit> tU, int[] eRow, int[] eLast, int u0, int u1)
+        {
+            var oldRows = new List<int>();
+            for (int u = u0; u <= u1; u++) if (oldRows.Count == 0 || oldRows[oldRows.Count - 1] != tU[u].Row) oldRows.Add(tU[u].Row);
+            var groups = new List<List<int>>();
+            for (int u = u0; u <= u1; u++)
+            {
+                if (groups.Count == 0 || eRow[u] != eRow[groups[groups.Count - 1][0]]) groups.Add(new List<int>());
+                groups[groups.Count - 1].Add(u);
+            }
+            // bara omfördelning: rena delningar och sammanslagningar har egna förslag (Dela? och Ihop?)
+            if (oldRows.Count < 2 || groups.Count < 2 || oldRows.Count > 4 || groups.Count > 4) return null;
+            var cues = new List<Cue>(); var refs = new List<Cue>();
+            for (int gi = 0; gi < groups.Count; gi++)
+            {
+                var g = groups[gi];
+                string text;
+                if (g.Count == 1) text = LineAligner.Layout(tU[g[0]].Text);
+                else if (g.Count == 2 && g.All(u => tU[u].Text.Length + 2 <= LineAligner.MaxChars)) text = "- " + tU[g[0]].Text + "\n- " + tU[g[1]].Text;
+                else text = null;
+                if (text == null) return null;
+                var first = refc[eRow[g[0]]]; var last = refc[eLast[g[g.Count - 1]]];
+                if (last.End < first.End) last = first;
+                // tiden före synk finns bara för en ny rad som börjar där en gammal rad började
+                cues.Add(new Cue(first.Start, last.End, text) { OrigStart = tU[g[0]].Part == 0 ? outp[tU[g[0]].Row].OrigStart : double.NaN });
+                refs.Add(first);
+            }
+            // tiderna: i ordning, inte in i raderna utanför blocket, och minst MinSnapDur långa
+            int[] order = Enumerable.Range(0, outp.Count).Where(i => outp[i].End > 0).OrderBy(i => outp[i].Start).ToArray();
+            int pFirst = Array.IndexOf(order, oldRows[0]), pLast = Array.IndexOf(order, oldRows[oldRows.Count - 1]);
+            if (pFirst < 0 || pLast < 0 || pLast - pFirst + 1 != oldRows.Count) return null;
+            if (pFirst > 0) cues[0].Start = Math.Max(cues[0].Start, outp[order[pFirst - 1]].End);
+            if (pLast + 1 < order.Length) cues[cues.Count - 1].End = Math.Min(cues[cues.Count - 1].End, outp[order[pLast + 1]].Start);
+            for (int k = 0; k < cues.Count; k++)
+            {
+                if (k + 1 < cues.Count && cues[k].End > cues[k + 1].Start) cues[k].End = cues[k + 1].Start;
+                if (cues[k].End - cues[k].Start < MinSnapDur) return null;
+            }
+            return new MeaningMove
+            {
+                OrigStarts = oldRows.Select(r => outp[r].OrigStart).ToArray(), Texts = oldRows.Select(r => outp[r].Text).ToArray(),
+                NewCues = cues, Refs = refs.ToArray()
+            };
         }
 
         class Anchor { public int Line, Ref; public double Delta; public int State; }
@@ -350,6 +654,7 @@ namespace TextSync
                     rep.Paired++;
                     if (g > 0) rep.Grouped++;
                     double delta = refc[ra[col]].Start - synced[ti[a - 1]].Start;
+                    rep.Pairs.Add(new MeaningPair { Line = ti[a - 1], Ref = ra[col], Size = g + 1, Delta = delta, Z = z[g][a - 1][col] });
                     if (z[g][a - 1][col] >= AnchorSigmas && Math.Abs(delta) <= MaxShift)
                         anchors.Add(new Anchor { Line = ti[a - 1], Ref = ra[col], Delta = delta });
                     a--; b -= g + 1;
@@ -358,6 +663,7 @@ namespace TextSync
                 else b--;
             }
             anchors.Reverse();
+            rep.Pairs.Reverse();
             rep.Anchors = anchors.Count;
             if (anchors.Count < Math.Max(8, 0.1 * n)) { rep.TooFew = true; return outp; }
 
@@ -465,11 +771,15 @@ namespace TextSync
         const int Batch = 16;
 
         // En vektor per rad, null för rader som är för korta att jämföra. progress: 0–100. status: text medan modellen startar.
-        public static float[][] Get(List<string> texts, string model, LlamaServer srv, Action<int> progress, Action<string> status, CancellationToken ct)
+        // known = vektorer som redan är räknade i den här körningen (samma text ger samma vektor), fylls på med de nya.
+        // minLetters = kortaste texten som jämförs (0 = som för hela rader).
+        public static float[][] Get(List<string> texts, string model, LlamaServer srv, Action<int> progress, Action<string> status, CancellationToken ct,
+            Dictionary<string, float[]> known = null, int minLetters = 0)
         {
             var res = new float[texts.Count][];
-            var idx = Enumerable.Range(0, texts.Count).Where(i => Meaning.Usable(texts[i])).ToList();
+            var idx = Enumerable.Range(0, texts.Count).Where(i => minLetters > 0 ? Meaning.Usable(texts[i], minLetters) : Meaning.Usable(texts[i])).ToList();
             if (idx.Count == 0) return res;
+            if (known == null) known = new Dictionary<string, float[]>();
             string cache = null;
             try
             {
@@ -479,21 +789,28 @@ namespace TextSync
                 using (var sha = SHA1.Create())
                     cache = Path.Combine(CacheDir, BitConverter.ToString(sha.ComputeHash(Encoding.UTF8.GetBytes(raw))).Replace("-", "").Substring(0, 20) + ".emb");
                 var got = ReadCache(cache, idx.Count);
-                if (got != null) { for (int k = 0; k < idx.Count; k++) res[idx[k]] = got[k]; progress(100); return res; }
+                if (got != null)
+                {
+                    for (int k = 0; k < idx.Count; k++) { res[idx[k]] = got[k]; known[texts[idx[k]]] = got[k]; }
+                    progress(100); return res;
+                }
             }
             catch (Exception ex) { Log.Info("Cachen för betydelsejämförelsen kunde inte läsas: " + ex.Message); }
 
-            srv.Start(status, ct);
-            var all = new List<float[]>();
-            for (int k = 0; k < idx.Count; k += Batch)
+            // bara texter som inte redan har en vektor skickas till modellen
+            var need = idx.Select(i => texts[i]).Where(t => !known.ContainsKey(t)).Distinct().ToList();
+            if (need.Count > 0) srv.Start(status, ct);
+            for (int k = 0; k < need.Count; k += Batch)
             {
                 ct.ThrowIfCancellationRequested();
-                var part = idx.Skip(k).Take(Batch).Select(i => texts[i]).ToList();
+                var part = need.Skip(k).Take(Batch).ToList();
                 var v = srv.Embed(part, ct);
-                foreach (var x in v) { Meaning.Normalize(x); all.Add(x); }
-                progress(Math.Min(100, 100 * (k + part.Count) / idx.Count));
+                for (int q = 0; q < part.Count; q++) { Meaning.Normalize(v[q]); known[part[q]] = v[q]; }
+                progress(Math.Min(100, 100 * (k + part.Count) / need.Count));
             }
+            var all = idx.Select(i => known[texts[i]]).ToList();
             for (int k = 0; k < idx.Count; k++) res[idx[k]] = all[k];
+            progress(100);
             try { if (cache != null) WriteCache(cache, all); } catch (Exception ex) { Log.Info("Cachen för betydelsejämförelsen kunde inte sparas: " + ex.Message); }
             return res;
         }

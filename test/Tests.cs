@@ -1177,6 +1177,51 @@ namespace TextSync
                     Check("Betydelse: bara referensrader som följer tätt på varandra bildar en grupp", gtexts[0] == "Hej. Var är du?" && gtexts[1] == "" && gtexts[2] == "");
                 }
 
+                // g) repliker: "- Han är polis." står sist i en rad, men referensen har den först i nästa rad → ett förslag om att flytta.
+                //    Och en enskild rad som ligger 0,6 s före sin referensrad läggs på referensradens starttid.
+                {
+                    var uref = new List<Cue>(); var utgt = new List<Cue>();
+                    var vecOf = new Dictionary<string, float[]>();
+                    Func<string, float[]> vec = t => { float[] v; if (!vecOf.TryGetValue(t, out v)) { v = rndVec(256); vecOf[t] = v; } return v; };
+                    for (int i = 0; i < 30; i++)
+                    {
+                        double s = 10000 + i * 4000;
+                        string en = "Reference sentence number " + i + ".", sv = "Svensk mening nummer " + i + ".";
+                        if (i == 10) { en = "He worked for a man who abducted a friend."; sv = "- Hans chef kidnappade en vän.\n- Han är polis."; }
+                        if (i == 11) { en = "-He's a cop.\n-Who's his rabbi?"; sv = "- Vem är hans rabbin?\n- Jag vet inte, men jag vet vem."; }
+                        if (i == 12) { en = "I don't know, but I know who might."; sv = null; }
+                        uref.Add(new Cue(s, s + 2500, en));
+                        if (sv != null) utgt.Add(new Cue(i == 20 ? s - 600 : s, s + (i == 11 ? 6500 : 2500), sv) { OrigStart = 1000 + i });
+                    }
+                    var uR = Meaning.Units(uref); var uT = Meaning.Units(utgt);
+                    Check("Betydelse: en rad med två replikstreck blir två repliker, och en rad utan streck blir en",
+                        uT.Count == utgt.Count + 2 && uR.Count == uref.Count + 1 && uT.First(x => x.Row == 10 && x.Part == 1).Text == "Han är polis." && uR.First(x => x.Row == 11).Parts == 2);
+                    // varje replik i texten får en vektor nära sin replik i referensen
+                    var pairOf = new Dictionary<string, string> {
+                        { "Hans chef kidnappade en vän.", "He worked for a man who abducted a friend." }, { "Han är polis.", "He's a cop." },
+                        { "Vem är hans rabbin?", "Who's his rabbi?" }, { "Jag vet inte, men jag vet vem.", "I don't know, but I know who might." } };
+                    for (int i = 0; i < 30; i++) pairOf["Svensk mening nummer " + i + "."] = "Reference sentence number " + i + ".";
+                    var uRv = uR.Select(x => vec(x.Text)).ToArray();
+                    var uTv = uT.Select(x => near(vec(pairOf[x.Text]), 0.35)).ToArray();
+                    var urep = new MeaningReport();
+                    for (int i = 0; i < utgt.Count; i++) urep.Pairs.Add(new MeaningPair { Line = i, Ref = i < 12 ? i : i + 1, Size = 1, Z = 10 });   // parningen rad för rad
+                    var uOut = utgt.Select(c => c.Clone()).ToList();
+                    Meaning.RefineUnits(uref, uOut, uT, uTv, uR, uRv, new float[0][][], urep);
+                    Console.WriteLine("Betydelse, repliker: " + urep.Summary());
+                    bool oneMove = urep.Moves.Count == 1 && urep.Moves[0].NewCues.Count == 3 && urep.Moves[0].Texts.Length == 2;
+                    Check("Betydelse: repliker som står i fel rad jämfört med referensen blir ett förslag med referensens indelning och tider",
+                        oneMove && urep.Moves[0].NewCues[0].Text == "Hans chef kidnappade en vän." && urep.Moves[0].NewCues[1].Text == "- Han är polis.\n- Vem är hans rabbin?" &&
+                        urep.Moves[0].NewCues[2].Text == "Jag vet inte, men jag vet vem." && urep.Moves[0].NewCues[1].Start == uref[11].Start && urep.Moves[0].NewCues[2].Start == uref[12].Start &&
+                        urep.Moves[0].OrigStarts[0] == 1010 && urep.Moves[0].NewCues[0].OrigStart == 1010 && double.IsNaN(urep.Moves[0].NewCues[1].OrigStart));
+                    int sn = utgt.FindIndex(c => c.OrigStart == 1020);
+                    Check("Betydelse: en enskild rad som ligger 0,6 s före sin referensrad läggs på referensradens starttid (slutet följer med), och inga andra rader rörs",
+                        urep.Snapped == 1 && uOut[sn].Start == uref[20].Start && uOut[sn].End == utgt[sn].End + 600 &&Enumerable.Range(0, uOut.Count).All(i => i == sn || uOut[i].Start == utgt[i].Start));
+                    // växlingen lägger tillbaka både start och slut
+                    Meaning.MarkMoved(utgt, uOut);
+                    var uBack = Meaning.Switch(uOut);
+                    Check("Betydelse: växlingen lägger tillbaka både start och slut för en enskild rad", uBack[sn].Start == utgt[sn].Start && uBack[sn].End == utgt[sn].End && Meaning.MovedCount(uOut) == 1);
+                }
+
                 // frågan till och svaret från llama-server
                 string reqJson = LlamaServer.BuildRequest(new List<string> { "Var är \"han\"?", "Hallå å\\ä 😀" });
                 var parsed = Json.Parse(reqJson) as Dictionary<string, object>;

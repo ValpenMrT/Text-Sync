@@ -335,7 +335,7 @@ namespace TextSync
             d = new StringBuilder();
             if (red > 0 || !good) d.Append("Röd – " + (speech ? "ligger inte på tal i ljudet" : "ingen referenstext samtidigt") + ". " +
                 (good ? "F3 hoppar till nästa." : "Under 95 % av raderna " + (speech ? "ligger på tal" : "har referenstext samtidigt") + ", så granska de röda raderna. F3 hoppar till nästa.") + "\n");
-            if (proposals.Count > 0) d.Append("Blå – förslag om att slå ihop eller dela rader så att de följer referensens radindelning och tider. Under förslaget står hur raden blir (→ blir). Högerklicka för att godkänna eller avvisa.\n");
+            if (proposals.Count > 0) d.Append("Blå – förslag om att slå ihop eller dela rader, eller flytta repliker mellan rader (Flytta?), så att de följer referensens radindelning och tider. Under förslaget står hur raden blir (→ blir). Högerklicka för att godkänna eller avvisa.\n");
             if (refOnlyTotal > 0) d.Append("Grå – finns bara i referensen och sparas inte" + (viewCombo.SelectedIndex == ViewAll ? "" : viewCombo.SelectedIndex == ViewProposals ? " (de flesta dolda just nu, se Visa ovanför listan)" : " (dolda just nu, se Visa ovanför listan)") + ".\n");
             if (fixedRows > 0) d.Append("✎ – rättades vid inläsningen. Håll muspekaren över raden för att se vad som stod i filen, eller välj Bara rättade rader i Visa.\n");
             if (nMoved > 0) d.Append("⇄ – raden ligger olika i den vanliga synken och med betydelsejämförelsen. Håll muspekaren över raden för att se den andra tiden.\n");
@@ -407,6 +407,33 @@ namespace TextSync
 
             // 3) förslag på att slå ihop eller dela rader så att de följer referensens radindelning
             proposals = refIsText && proposeCheck.Checked ? LineAligner.Propose(synced, refc).Where(p => !rejected.Contains(p.Key)).ToList() : new List<AlignProposal>();
+            // förslag från betydelsejämförelsen om att flytta repliker mellan rader. De visas även när rutan för radindelning inte är ikryssad,
+            // och går före förslagen som bara bygger på tider. Raderna känns igen på tid före synk och text.
+            if (refIsText && result.Meaning != null && result.Meaning.Moves.Count > 0)
+            {
+                double extraMs = (double)extraNum.Value;
+                foreach (var mv in result.Meaning.Moves)
+                {
+                    int first = -1;
+                    for (int i = 0; i + mv.Texts.Length <= synced.Count && first < 0; i++)
+                    {
+                        bool same = true;
+                        for (int k = 0; k < mv.Texts.Length && same; k++)
+                            same = synced[i + k].OrigStart == mv.OrigStarts[k] && (synced[i + k].Text == mv.Texts[k] || (plainCheck.Checked && synced[i + k].Text == Markup.Strip(mv.Texts[k])));
+                        if (same) first = i;
+                    }
+                    string key = "V|" + mv.OrigStarts[0] + "|" + string.Join("|", mv.Texts);
+                    if (first < 0 || rejected.Contains(key)) continue;
+                    int f = first, cnt = mv.Texts.Length;
+                    proposals.RemoveAll(p => p.First < f + cnt && f < p.First + p.Count);
+                    proposals.Add(new AlignProposal
+                    {
+                        IsMove = true, First = f, Count = cnt, Refs = mv.Refs, Key = key,
+                        NewCues = mv.NewCues.Select(c => new Cue(c.Start + extraMs, c.End + extraMs, c.Text) { OrigStart = c.OrigStart }).ToList()
+                    });
+                }
+                proposals = proposals.OrderBy(p => p.First).ToList();
+            }
             cueProp = new int[synced.Count];
             for (int i = 0; i < cueProp.Length; i++) cueProp[i] = -1;
             var propRefs = new HashSet<Cue>();
@@ -457,7 +484,7 @@ namespace TextSync
                     bool alt = !double.IsNaN(c.MeaningAlt);
                     if (view == ViewMoved && !alt) continue;
                     // förslagsrader märks med text också, inte bara med färg
-                    string mark = (cueWeak[i] ? "⚠ " : "") + (alt ? "⇄ " : "") + (c.Raw != null ? "✎ " : "") + (cueProp[i] < 0 ? "" : proposals[cueProp[i]].IsMerge ? "Ihop?  " : "Dela?  ");
+                    string mark = (cueWeak[i] ? "⚠ " : "") + (alt ? "⇄ " : "") + (c.Raw != null ? "✎ " : "") + (cueProp[i] < 0 ? "" : proposals[cueProp[i]].IsMove ? "Flytta?  " : proposals[cueProp[i]].IsMerge ? "Ihop?  " : "Dela?  ");
                     var it = new ListViewItem(new[] { HC ? "▶" : "Spela rad " + (i + 1), mark + (i + 1),
                         double.IsNaN(c.OrigStart) ? "— (ny rad)" : Srt.FormatTime(c.OrigStart),
                         Srt.FormatTime(c.Start), Srt.FormatTime(c.End),

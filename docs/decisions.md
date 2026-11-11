@@ -2,6 +2,34 @@
 
 Nyast först.
 
+## 2026-11-11 – 2.4.10: Betydelsejämförelsen parar repliker: enskilda rader läggs på referensradens tid, och repliker i fel rad blir förslag
+- **Område:** Synk / GUI
+- **Önskemål (ägaren):** "Kan du testa på hela avsnittet om där blir en förbättring med llama då jag inte kan se någon skillnad", och en skärmbild där "- Han är polis." står sist i en svensk rad medan "He's a cop." står först i nästa engelska rad: "Kan du lösa detta."
+- **Mätt på hela avsnittet (Blacklist S04E01) före ändringen:** betydelsejämförelsen flyttade ingenting, eftersom den bara flyttade stycken där minst fyra rader i följd ligger fel. Av 341 säkert parade rader låg 275 inom 0,5 s från sin engelska rad, och 66 låg 0,5–2,7 s ifrån.
+- **Ägarens svar:** repliker i fel rad ska lösas som förslag, och enskilda rader ska läggas på den engelska radens tid, med växling.
+- **Beslut:**
+  - **Repliker paras var för sig.** En rad som börjar med replikstreck börjar en ny replik. Replikerna i texten paras med replikerna i referensen på samma sätt som raderna (ordning, grupper om upp till tre, vektorer från bge-m3). Repliker ned till fem bokstäver jämförs.
+  - **Förslaget Flytta?** (blå rader, som Dela? och Ihop?): där replikerna är fördelade på raderna på ett annat sätt än i referensen föreslås referensens indelning, med referensradernas tider. I skärmbildens fall blir två rader tre: "Hans chef kidnappade en nära vän." (03:09,480), "- Han är polis. / - Vem är hans rabbin?" (03:13,484) och "Jag vet inte, men jag har ett namn." (03:16,779). Förslagen visas även när "Föreslå radindelning som referensen" inte är ikryssad, och går före förslag som bara bygger på tider. Rena delningar och sammanslagningar lämnas till Dela? och Ihop?.
+  - **Enskilda rader:** en rad vars första replik hör till den första repliken i en referensrad läggs på referensradens starttid, om avvikelsen är 0,15–3 s. Raderna märks ⇄ och ingår i växlingen. Vid flytt framåt följer slutet med så långt det går, vid flytt bakåt står slutet kvar.
+  - **Skydd för enskilda rader**, satta efter mätningen (utan dem hamnade rader upp till 2,5 s fel):
+    - parningen rad för rad och parningen av repliker måste peka på samma referensrad,
+    - referensraden får inte fortsätta en mening från raden före ("...your friend here was assisting him."), och textens rad får inte själv börja mitt i en mening,
+    - ingen flytt framåt om en referensrad som ingen replik har parats med börjar under tiden som raden skulle tappa ("Livshotande träff." hör till "Critical hit.", som står före "He couldn't have gone far."),
+    - raden går aldrig in i raden före, och blir aldrig kortare än 0,7 s eller 60 % av sin längd,
+    - sjunker överlappspoängen mer än 0,01 tas alla enskilda flyttar tillbaka.
+  - **Växlingen** sparar nu också radens slut i den andra varianten (`Cue.MeaningAltEnd`).
+- **Mätt på hela avsnittet efter ändringen** (`test/PairDiag.cs`): 78 rader läggs på referensradens starttid, och 1 förslag om flytt (skärmbildens). Rader som börjar inom 0,5 s från en referensrad: 83,3 % med den vanliga synken, 89,9 % med betydelsejämförelsen. Beskedet är Bra i båda. De 25 flyttarna på minst 0,5 s är genomlästa rad för rad mot den engelska texten, och ingen såg fel ut.
+- **Provat i fönstret** (samma process, utan tangenttryckningar, hela avsnittet): rutan "Betydelse: 78 rader flyttade – bättre", raderna 22 och 23 märkta Flytta? med tre rader "→ blir" under, Godkänn alla förslag (statusraden "Godkände 1 flytt av repliker", raderna 22–24 får engelskans indelning och tider), Ctrl+Z, och växling till vanlig synk. Skärmbild granskad i mörkt läge.
+- **Kända begränsningar:**
+  - Kursiv och annan formatering försvinner ur rader som ett Flytta?-förslag bygger om.
+  - "Planet är klart för start." (1,2 s före "The plane is ready.") flyttas inte, eftersom raden då skulle bli under 60 % av sin längd.
+  - Bara repliker med replikstreck delas. Två meningar i samma replik delas inte.
+  - Tiden för första körningen med replikerna är inte mätt utan cache (rad för rad tog 19 s).
+- **Test:** 233 av 233 kontroller (4 nya: repliker ur rader, förslaget med referensens indelning och tider, en enskild rad som läggs på referensradens start, växling av start och slut).
+- **Ej provat:** andra filmer, klick med musen på förslaget, Hel säsong (enskilda rader flyttas där också, men förslagen syns bara i huvudfönstret).
+- **Product-check:** Claude granskade själv efter ägarens två svar. Förslagen granskas av användaren innan de används, och de enskilda flyttarna går att växla bort. Kan vänta (docs/next.md): formatering i ombyggda rader, tid utan cache, fler filmer.
+- **Nivå:** LIVE
+
 ## 2026-11-11 – 2.4.9: Växla mellan den vanliga synken och synken med betydelsejämförelsen
 - **Område:** GUI / synk
 - **Önskemål (ägaren):** "Kan du visa vanliga synken i programmet men även om det blev en förbättring med llama. Kan du bygga in llama i applikationen."

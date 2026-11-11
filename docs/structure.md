@@ -26,8 +26,8 @@ src/
   Audio.cs         Ljudreferens: ffmpeg → 16 kHz mono WAV (mittkanal), taldetektering (A), Whisper (B), kombination (A+B), cache
   Tools.cs         Hittar/laddar ner ffmpeg, whisper.cpp, språkmodell, Silero, llama.cpp och bge-m3 (fasta URL:er + SHA-256), grafikkort, inställningar
   TextCheck.cs     Kontroll av textspår mot Whisper ord för ord (ankare, utjämning, rättning); separat SRT på originalspråket synkas först grovt mot ljudet
-  Meaning.cs       Jämför vad raderna betyder (inställning): vektorer från llama-server och modellen bge-m3, parning efter betydelse,
-                   rättning av rader som ligger fel. Också cachen för vektorerna och en liten JSON-läsare
+  Meaning.cs       Jämför vad raderna betyder (inställning): vektorer från llama-server och modellen bge-m3, parning efter betydelse (rader och repliker),
+                   rättning av rader som ligger fel, förslag om att flytta repliker mellan rader (Flytta?), växling mot den vanliga synken. Också cachen för vektorerna och en liten JSON-läsare
   Engine.cs        SRT läs/skriv och synkmotorn
   Sdh.cs           Tar bort text för hörselskadade: [MUSIK], (skrattar), ♪ och talarnamn i versaler
   Markup.cs        Kodade tecken (&amp; → &) och taggar (<i>, <b>, <u>, <s>, <font>): avkodas och lagas alltid vid inläsningen, tas bort som ett val.
@@ -50,6 +50,7 @@ test/
   VadTune.cs       Justerar taldetekteringens gräns mot facit
   QualityDiag.cs   Mäter beskedet mot en riktig film: rätt text, texten baklänges (som ett annat avsnitt) och ett missat klipp
   MeaningDiag.cs   Mäter betydelsejämförelsen mot en riktig film: vad den flyttar, tiden, och om text som förstörts med flit läggs tillbaka
+  PairDiag.cs      Visar hur betydelsejämförelsen parar raderna i en riktig film: förslag om flytt, flyttade rader, avvikelser, och raderna runt ett sökord
   OrigSrtDiag.cs   Separat engelsk SRT (förstörd med flit) → ljud → svensk synk, mot facit
   bin/             Byggda testprogram (skapas av build.ps1 -Test, inte i git)
 docs/              Beslut, drift, FAQ, nästa fas (next.md)

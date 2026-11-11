@@ -41,6 +41,14 @@
 ## Kvar efter betydelsejämförelsen 2.4.6 (2026-11-11)
 Mätt mot Blacklist S04E01 i 2.4.7 och 2.4.8 (se beslutsloggen): verktygen fungerar, den vanliga synken ändras inte, och fel på minst fem rader i följd rättas.
 
+Från 2.4.10 paras också replikerna: enskilda rader läggs på referensradens tid och repliker i fel rad blir förslag (Flytta?). Kvar där:
+- **Formatering försvinner** (kursiv m.m.) ur rader som ett Flytta?-förslag bygger om.
+- **Rader som skulle bli för korta flyttas inte** ("Planet är klart för start."). Förslag: flytta också nästa rad när den hör till nästa referensrad.
+- **Två meningar i samma replik delas inte**, bara repliker med replikstreck.
+- **Tiden utan cache är inte mätt** med replikerna. Mät och skriv in den i Inställningar.
+- **Hel säsong visar inga förslag.** De enskilda flyttarna görs, förslagen syns först när avsnittet öppnas i huvudfönstret och synkas om.
+- **Rena delningar och sammanslagningar** använder fortfarande bara tider (Dela? och Ihop?). Replikparningen kunde göra dem säkrare.
+
 Det som inte är gjort:
 - **Bara en film mätt.** Gränserna (`JumpCost`, `MaxGroup`, 2,5 och 4 standardavvikelser) passar Blacklist S04E01. Kör `MeaningDiag` på fler filmer när ägaren har dem, innan gränserna litas på.
 - **Översättning med fler rader än originalet:** två översatta rader mot en referensrad paras inte som grupp. Den ena raden paras, den andra följer med.

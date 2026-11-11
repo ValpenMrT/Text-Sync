@@ -155,8 +155,9 @@ namespace TextSync
                 foreach (var c in p.NewCues) added.Add(new Cue(c.Start - extra, c.End - extra, Markup.Fix(c.Text)) { OrigStart = c.OrigStart });
             }
             var list2 = result.Output.Where((c, i) => !replaced.Contains(i)).Concat(added).ToList();
-            int merged = ps.Count(p => p.IsMerge), splits = ps.Count - merged;
+            int moves = ps.Count(p => p.IsMove), merged = ps.Count(p => p.IsMerge && !p.IsMove), splits = ps.Count - merged - moves;
             var parts = new List<string>();
+            if (moves > 0) parts.Add(moves == 1 ? "1 flytt av repliker" : moves + " flyttar av repliker");
             if (merged > 0) parts.Add(merged == 1 ? "1 sammanslagning" : merged + " sammanslagningar");
             if (splits > 0) parts.Add(splits == 1 ? "1 delning" : splits + " delningar");
             string what = string.Join(" och ", parts);

@@ -9,6 +9,7 @@ namespace TextSync
     public class AlignProposal
     {
         public bool IsMerge;        // true = två rader blir en, false = en rad blir två
+        public bool IsMove;         // replikerna i några rader i följd fördelas som i referensen (från betydelsejämförelsen, Meaning.cs)
         public int First;           // första raden i den synkade texten som berörs
         public int Count;           // 2 vid sammanslagning, 1 vid delning
         public Cue[] Refs;          // referensraderna (1 vid sammanslagning, 2 vid delning)
@@ -17,6 +18,9 @@ namespace TextSync
 
         public string Describe()
         {
+            if (IsMove)
+                return "Förslag: flytta repliker mellan raderna, så att de står i samma rad som i referensen (" + string.Join(", ", Refs.Select(r => Srt.FormatTime(r.Start))) +
+                    ") → " + string.Join("  |  ", NewCues.Select(c => Flat(c.Text)));
             if (IsMerge)
                 return "Förslag: slå ihop med nästa rad, så att den motsvarar referensraden " + Srt.FormatTime(Refs[0].Start) + " → " + Flat(NewCues[0].Text);
             return "Förslag: dela raden i två, så att den motsvarar referensraderna " + Srt.FormatTime(Refs[0].Start) + " och " + Srt.FormatTime(Refs[1].Start) +
@@ -256,7 +260,7 @@ namespace TextSync
         static int Letters(string t) { return (t ?? "").Count(char.IsLetterOrDigit); }
 
         // "...", komma eller ingen avslutande punkt = meningen fortsätter på nästa rad
-        static bool EndsMidSentence(string t)
+        public static bool EndsMidSentence(string t)
         {
             string s = string.Join(" ", Lines(t)).TrimEnd('"', '\'', '”', '»', ' ');
             if (s.Length == 0) return false;

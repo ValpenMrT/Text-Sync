@@ -172,7 +172,9 @@ Ja, som ett val. Klicka **Inställningar** och kryssa i **Jämför också vad ra
 - Länken **Visa den vanliga synken** ovanför listan byter tillbaka till synken utan jämförelsen, och samma länk byter tillbaka igen. Det du ser är det som sparas. Ctrl+Z ångrar bytet.
 - Korta rader som "Ja." och "Okej." jämförs inte, eftersom de säger för lite.
 - Det tar ungefär en halv minut per avsnitt första gången.
-- Den rättar ställen där minst fem rader i följd ligger fel. Enstaka rader som ligger fel rättar den inte.
+- Den gör tre saker: flyttar stycken där flera rader i följd ligger fel, lägger enskilda rader på den tid då referensens rad börjar, och föreslår att repliker flyttas mellan rader när referensen har delat dem annorlunda.
+- **Flytta?** är ett sådant förslag (blå rader). Exempel: står "- Han är polis." sist i en rad, men referensen har "He's a cop." först i nästa rad, föreslår programmet samma indelning som referensen. Under förslaget står hur raderna blir (→ blir). Högerklicka för att godkänna eller avvisa, eller klicka **Godkänn alla förslag**. Kursiv i de raderna försvinner när förslaget godkänns.
+- En rad flyttas inte om den då skulle bli för kort för att hinna läsas, eller om den börjar mitt i en mening.
 - Funktionen är ny och bara utprovad på en film. Kontrollera resultatet, och kryssa ur rutan om det blir sämre.
 - Blockerar Smart App Control verktyget görs synken som vanligt, och resultatet säger att jämförelsen inte kunde göras.
 
