@@ -45,8 +45,8 @@ namespace TextSync
         int[] cueRow;                  // index i synced -> listrad
         Cue[] rowRef;                  // listrad -> referensraden som visas (eller null)
         // vilka rader listan visar: 0 = alla, 1 = dölj grå rader, 2 = bara röda rader (sparas mellan körningar)
-        const int ViewAll = 0, ViewNoGray = 1, ViewOnlyRed = 2, ViewProposals = 3, ViewFixed = 4;
-        ComboBox viewCombo; Label viewInfo; LinkLabel acceptAllLink; CheckBox proposeCheck;
+        const int ViewAll = 0, ViewNoGray = 1, ViewOnlyRed = 2, ViewProposals = 3, ViewFixed = 4, ViewMoved = 5;
+        ComboBox viewCombo; Label viewInfo; LinkLabel acceptAllLink, meaningLink; CheckBox proposeCheck;
         int refOnlyTotal;              // antal grå referensrader, även de som är dolda
         // förslag på att slå ihop eller dela rader så att de följer referensens radindelning (blå rader)
         List<AlignProposal> proposals = new List<AlignProposal>();
@@ -566,7 +566,8 @@ namespace TextSync
                 "Dölj grå rader (finns bara i referensen)",
                 "Bara röda rader (ingen referenstext samtidigt)",
                 "Bara förslag (blå rader att slå ihop eller dela)",
-                "Bara rättade rader (märkta ✎, ändrade vid inläsningen)" });
+                "Bara rättade rader (märkta ✎, ändrade vid inläsningen)",
+                "Bara rader som betydelsejämförelsen flyttar (märkta ⇄)" });
             int view; if (!int.TryParse(Tools.GetSetting("view", "0"), out view) || view < 0 || view >= viewCombo.Items.Count) view = ViewAll;
             viewCombo.SelectedIndex = view;
             viewCombo.SelectedIndexChanged += (s, e) =>
@@ -588,6 +589,10 @@ namespace TextSync
             acceptAllLink = new LinkLabel { AutoSize = true, Margin = new Padding(0, 7, 0, 0), Visible = false, LinkColor = Accent };
             acceptAllLink.LinkClicked += (s, e) => AcceptProposals(proposals);
             vbar.Controls.Add(acceptAllLink);
+            // växlar mellan den vanliga synken och synken med betydelsejämförelsen (syns bara när jämförelsen flyttade något)
+            meaningLink = new LinkLabel { AutoSize = true, Margin = new Padding(12, 7, 16, 0), Visible = false, LinkColor = Accent };
+            meaningLink.LinkClicked += (s, e) => SwitchMeaning();
+            vbar.Controls.Add(meaningLink);
             // sök i texten (Ctrl+F): Enter = nästa träff, Skift+Enter = föregående, Esc = töm
             // en egen rad i raden, så att etikett, ruta och träffar håller ihop när fönstret är smalt
             var srow = new FlowLayoutPanel { AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, WrapContents = false, Margin = new Padding(0) };
@@ -1238,7 +1243,7 @@ namespace TextSync
                 "Har filmen ingen engelsk text men du har en engelsk SRT som inte går i takt: klicka \"Lägg till undertext på filmens originalspråk\" " +
                 "(eller dra in filmen och båda SRT-filerna). Den engelska synkas då mot filmens ljud och kontrolleras med Whisper, och sedan synkas den svenska mot den.\n\n" +
                 "Inställningar (knappen längst upp till höger): \"Ta bort text för hörselskadade\" tar bort [MUSIK], (skrattar) och talarnamn som JOHN: ur texten. Resultatet säger hur många rader som togs bort. " +
-                "Där väljer du också ljust eller mörkt utseende. \"Jämför också vad raderna betyder\" parar ihop raderna med referenstexten efter betydelse och flyttar rader som ligger fel. Det är nytt, så kontrollera resultatet.\n\n" +
+                "Där väljer du också ljust eller mörkt utseende. \"Jämför också vad raderna betyder\" parar ihop raderna med referenstexten efter betydelse och flyttar rader som ligger fel. Det är nytt, så kontrollera resultatet: flyttade rader är märkta ⇄, rutan Betydelse i resultatet säger om det blev bättre, och länken ovanför listan växlar mellan den vanliga synken och synken med jämförelsen. Det du ser är det som sparas.\n\n" +
                 "Kodade tecken som &amp; i texten görs alltid om till riktiga tecken (&), och trasig formatering som <i> utan avslut lagas. Sådana rader är märkta ✎ i listan: håll muspekaren över raden för att se vad som stod i filen. " +
                 "Visar din TV <i> som text? Kryssa i \"Ta bort kursiv och annan formatering\" i Inställningar. Kryssar du ur rutan kommer formateringen tillbaka.\n\n" +
                 "Hel säsong (knappen Hel säsong… uppe till höger, eller dra in en mapp): alla avsnitt synkas i kö och varje undertext sparas bredvid sitt avsnitt. " +

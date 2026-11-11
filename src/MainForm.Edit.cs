@@ -172,6 +172,21 @@ namespace TextSync
             SetStatus(ps.Count == 1 ? "Förslaget avvisat." : ps.Count + " förslag avvisade.", false);
         }
 
+        // Byter mellan den vanliga synken och synken med betydelsejämförelsen. Det som visas är det som sparas.
+        // Bytet är en ändring som alla andra: Ctrl+Z ångrar, och rader som har ändrats för hand rörs inte.
+        void SwitchMeaning()
+        {
+            if (busy || result == null) return;
+            int n = Meaning.MovedCount(result.Output);
+            if (n == 0) return;
+            bool toPlain = !Meaning.ShowsPlain(result.Output);
+            string rows = n == 1 ? "1 rad" : n + " rader";
+            Changed(Meaning.Switch(result.Output), null,
+                toPlain ? "Nu visas den vanliga synken (" + rows + " ligger som före betydelsejämförelsen). Det du ser är det som sparas."
+                        : "Nu visas synken med betydelsejämförelsen (" + rows + " flyttade). Det du ser är det som sparas.",
+                "Växlade till " + (toPlain ? "den vanliga synken" : "synken med betydelsejämförelsen") + " (" + n + " rader)");
+        }
+
         void UndoChange()
         {
             if (busy || result == null || undo.Count == 0) return;

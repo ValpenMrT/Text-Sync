@@ -31,6 +31,8 @@ namespace TextSync
         public string Error;     // jämförelsen kunde inte göras (texten visas som den är)
         public bool Canceled;    // användaren avbröt jämförelsen: synken är kvar som den var
         public bool Worse;       // flytten gjorde synken sämre och togs tillbaka
+        // Andel rader som börjar inom 0,5 s från en referensrad, med den vanliga synken och efter flytten (NaN = inget flyttat)
+        public double OnsetBefore = double.NaN, OnsetAfter = double.NaN;
         public double Sigma, MatchMin, AnchorMin;   // till loggen, för att kunna justera gränserna mot riktiga filmer
         public string Levels = "";
 
@@ -47,6 +49,17 @@ namespace TextSync
             if (Moved == 0) return "Betydelsejämförelsen hittade inget att rätta. " + pairs;
             return "Betydelsejämförelsen flyttade " + (Moved == 1 ? "1 rad" : Moved + " rader") + " på " + (Places == 1 ? "1 ställe" : Places + " ställen") +
                 " (som mest " + Sec(MaxMs) + " s). " + pairs;
+        }
+
+        // Blev det bättre? Jämför hur många rader som börjar i takt med referensen före och efter flytten. null = inget flyttat.
+        public string Compare()
+        {
+            if (double.IsNaN(OnsetBefore) || double.IsNaN(OnsetAfter)) return null;
+            var sv = CultureInfo.GetCultureInfo("sv-SE");
+            string b = (Math.Floor(OnsetBefore * 1000) / 10).ToString("0.#", sv) + " %", a = (Math.Floor(OnsetAfter * 1000) / 10).ToString("0.#", sv) + " %";
+            string what = "Rader som börjar inom 0,5 s från en referensrad: " + b + " med den vanliga synken, " + a + " med betydelsejämförelsen.";
+            if (a == b) return "Lika bra. " + what;
+            return (OnsetAfter > OnsetBefore ? "Bättre. " : "Sämre. ") + what;
         }
 
         // Kort text till rutan bredvid siffrorna i resultatet
@@ -146,7 +159,14 @@ namespace TextSync
                     // gränserna är inte mätta mot riktiga filmer: passar texten referensen sämre efter flytten tas den tillbaka
                     double before = SyncEngine.Score(refc, r.Output), after = SyncEngine.Score(refc, outp);
                     if (after < before - WorseMargin) { rep.Worse = true; rep.Moved = 0; rep.Places = 0; }
-                    else { r.Output = outp; r.ScoreAfter = after; }
+                    else
+                    {
+                        // båda varianterna finns kvar i raderna (MeaningAlt), så att fönstret kan växla mellan dem
+                        rep.OnsetBefore = Quality.Assess(refc, r.Output, r, true).Onset;
+                        MarkMoved(r.Output, outp);
+                        r.Output = outp; r.ScoreAfter = after;
+                        rep.OnsetAfter = Quality.Assess(refc, outp, r, true).Onset;
+                    }
                 }
                 Log.Info("Betydelsejämförelse: " + rep.LogText() + ", " + sw.ElapsedMilliseconds + " ms");
             }
@@ -160,6 +180,39 @@ namespace TextSync
             }
             r.Meaning = rep;
             return rep;
+        }
+
+        // ---- växla mellan den vanliga synken och synken med betydelsejämförelsen (båda tiderna finns i varje flyttad rad)
+
+        // Märker raderna i moved som ligger på en annan tid än i plain (samma ordning i båda listorna)
+        public static void MarkMoved(List<Cue> plain, List<Cue> moved)
+        {
+            for (int i = 0; i < moved.Count && i < plain.Count; i++)
+                if (Math.Abs(moved[i].Start - plain[i].Start) > 0.5) { moved[i].MeaningAlt = plain[i].Start; moved[i].MeaningOff = false; }
+        }
+
+        // Antal rader som skiljer sig mellan varianterna (0 = inget att växla mellan)
+        public static int MovedCount(List<Cue> cues) { return cues.Count(c => !double.IsNaN(c.MeaningAlt)); }
+
+        // true = listan visar den vanliga synken, och betydelsejämförelsens tider är alternativet
+        public static bool ShowsPlain(List<Cue> cues) { return cues.Any(c => !double.IsNaN(c.MeaningAlt) && c.MeaningOff); }
+
+        // Den andra varianten: varje märkt rad byter till sin andra tid. Rader som har ändrats för hand är inte märkta och rörs inte.
+        public static List<Cue> Switch(List<Cue> cues)
+        {
+            var res = new List<Cue>(cues.Count);
+            foreach (var c in cues)
+            {
+                var n = c.Clone();
+                if (!double.IsNaN(c.MeaningAlt))
+                {
+                    double d = c.MeaningAlt - c.Start;
+                    n.Start += d; n.End += d;
+                    n.MeaningAlt = c.Start; n.MeaningOff = !c.MeaningOff;
+                }
+                res.Add(n);
+            }
+            return res.OrderBy(c => c.Start).ToList();
         }
 
         class Anchor { public int Line, Ref; public double Delta; public int State; }

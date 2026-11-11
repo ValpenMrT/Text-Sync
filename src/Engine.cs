@@ -18,8 +18,12 @@ namespace TextSync
         public string Text;
         public double OrigStart = double.NaN; // tiden i filen före synk (NaN = okänd, t.ex. en tillagd rad)
         public string Raw;                    // texten som stod i filen, om den rättades vid inläsningen (Markup.FixAll). null = inte rättad
+        // Betydelsejämförelsen flyttade raden: starttiden i den andra varianten (NaN = raden är lika i båda).
+        // MeaningOff = false: raden visas flyttad och MeaningAlt är tiden i den vanliga synken. true: tvärtom.
+        public double MeaningAlt = double.NaN;
+        public bool MeaningOff;
         public Cue(double s, double e, string t) { Start = s; End = e; Text = t ?? ""; }
-        public Cue Clone() { return new Cue(Start, End, Text) { OrigStart = OrigStart, Raw = Raw }; }
+        public Cue Clone() { return new Cue(Start, End, Text) { OrigStart = OrigStart, Raw = Raw, MeaningAlt = MeaningAlt, MeaningOff = MeaningOff }; }
     }
 
     public struct Iv
@@ -972,7 +976,7 @@ namespace TextSync
 
         public static List<Cue> ApplyExtra(List<Cue> cues, double extraMs)
         {
-            return cues.Select(c => new Cue(Math.Max(0, c.Start + extraMs), Math.Max(0, c.End + extraMs), c.Text) { OrigStart = c.OrigStart, Raw = c.Raw }).ToList();
+            return cues.Select(c => new Cue(Math.Max(0, c.Start + extraMs), Math.Max(0, c.End + extraMs), c.Text) { OrigStart = c.OrigStart, Raw = c.Raw, MeaningAlt = c.MeaningAlt + extraMs, MeaningOff = c.MeaningOff }).ToList();
         }
     }
 }

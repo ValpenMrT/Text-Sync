@@ -1119,6 +1119,21 @@ namespace TextSync
                 Check("Betydelse: raderna byter aldrig ordning", Enumerable.Range(1, fixedUp.Count - 1).All(i => fixedUp[i].Start >= fixedUp[i - 1].Start));
                 Check("Betydelse: en flyttad rad överlappar inte raden före mer än den gjorde innan",
                     Enumerable.Range(1, fixedUp.Count - 1).All(i => fixedUp[i].Start >= fixedUp[i - 1].End - Math.Max(0, off[i - 1].End - off[i].Start) - 0.001));
+                // växla mellan den vanliga synken och synken med betydelsejämförelsen
+                Meaning.MarkMoved(off, fixedUp);
+                var plainAgain = Meaning.Switch(fixedUp);
+                var withAgain = Meaning.Switch(plainAgain);
+                Check("Betydelse: de flyttade raderna märks, och listan visar först synken med betydelsejämförelsen", Meaning.MovedCount(fixedUp) == 20 && !Meaning.ShowsPlain(fixedUp));
+                Check("Betydelse: växling ger den vanliga synken tillbaka, med samma längd på raderna",
+                    Meaning.ShowsPlain(plainAgain) && Meaning.MovedCount(plainAgain) == 20 &&
+                    plainAgain.Zip(off, (x, y) => Math.Abs(x.Start - y.Start) < 0.001 && Math.Abs(x.End - y.End) < 0.001).All(x => x));
+                Check("Betydelse: växling en gång till ger synken med betydelsejämförelsen igen",
+                    !Meaning.ShowsPlain(withAgain) && withAgain.Zip(fixedUp, (x, y) => Math.Abs(x.Start - y.Start) < 0.001).All(x => x));
+                var extraShift = SyncEngine.ApplyExtra(fixedUp, 250);
+                Check("Betydelse: märket och den andra tiden följer med vid extra justering", Meaning.MovedCount(extraShift) == 20 && Math.Abs(extraShift[105].MeaningAlt - (off[105].Start + 250)) < 0.001);
+                var edited = fixedUp.Select(c => c.Clone()).ToList();
+                edited[105] = new Cue(edited[105].Start + 40, edited[105].End, "Ändrad för hand");
+                Check("Betydelse: en rad som har ändrats för hand rörs inte av växlingen", Meaning.Switch(edited).Any(c => c.Text == "Ändrad för hand" && c.Start == edited[105].Start));
                 // rader som ligger längre än 10 s från sin referensrad flyttas inte (en scen som upprepas, eller fel avsnitt)
                 var far = mtgt.Select(c => c.Clone()).ToList();
                 for (int i = 200; i < far.Count; i++) { far[i].Start += 30000; far[i].End += 30000; }

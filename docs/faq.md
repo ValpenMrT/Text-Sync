@@ -167,7 +167,9 @@ Ja, som ett val. Klicka **Inställningar** och kryssa i **Jämför också vad ra
 - Det fungerar bara när referensen är en text (filmens textspår eller en SRT), inte mot filmens ljud.
 - Första gången frågar programmet om det får hämta två gratisverktyg, cirka 440 MB: llama.cpp och språkmodellen bge-m3. Svarar du nej synkas texten som vanligt, och rutan kryssas ur.
 - Det tar längre tid första gången en text synkas. Nästa gång går det direkt.
-- Vad jämförelsen gjorde står i resultatet, i rutan som börjar med **Betydelse:**, och utförligare under **Detaljer**.
+- Vad jämförelsen gjorde står i resultatet, i rutan som börjar med **Betydelse:**, till exempel "9 rader flyttade – bättre". Under **Detaljer** står hur många rader som börjar i takt med referensen med den vanliga synken och med jämförelsen.
+- Rader som jämförelsen flyttade är märkta **⇄** i listan. Håll muspekaren över raden för att se tiden i den vanliga synken. Välj **Bara rader som betydelsejämförelsen flyttar** i **Visa** för att se bara dem.
+- Länken **Visa den vanliga synken** ovanför listan byter tillbaka till synken utan jämförelsen, och samma länk byter tillbaka igen. Det du ser är det som sparas. Ctrl+Z ångrar bytet.
 - Korta rader som "Ja." och "Okej." jämförs inte, eftersom de säger för lite.
 - Det tar ungefär en halv minut per avsnitt första gången.
 - Den rättar ställen där minst fem rader i följd ligger fel. Enstaka rader som ligger fel rättar den inte.

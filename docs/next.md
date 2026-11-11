@@ -51,7 +51,9 @@ Det som inte är gjort:
 - **Frågan om nedladdning nämner inte Smart App Control.** llama-server är inte signerat, så 440 MB kan hämtas och sedan blockeras. Felet förklaras då i resultatet. Förslag: kryssa ur rutan automatiskt efter första blockeringen, som `gpuwhisperfailed` gör för Whisper.
 - **Raderna före första och efter sista säkra paret** får samma flytt som kanten, även om de ligger långt bort i tid.
 - **Frågor till ägaren från granskningen:** (1) Ska jämförelsen gälla Hel säsong redan nu, där resultatet sparas utan att någon ser det, eller bara huvudfönstret tills den är provad? Nu gäller den båda. (2) Räcker 10 s som längsta flytt? Synkmotorns finjustering har 6 s.
-- **Flyttade rader märks inte i listan.** Kolumnen Flyttad visar hoppet, men inget märke säger att det var betydelsejämförelsen.
+- **F4 hoppar inte mellan de flyttade raderna** (märkta ⇄). Valet i Visa finns.
+- **Hel säsong har ingen växling.** Avsnittet sparas med jämförelsen. Öppna avsnittet i huvudfönstret för att jämföra.
+- **Den vanliga synken gav Bra fast 9 rader låg 7,3 s fel** (texten med −7 s i tre minuter, se beslutsloggen 2.4.9). Beskedet borde ha blivit Kontrollera. Parningen efter betydelse kunde användas för det.
 - **Beskedet** (Bra / Kontrollera / Osäkert) använder inte parningen. Få par är ett tecken på fel avsnitt och kunde ge Osäkert.
 - **Förslagen om att dela och slå ihop rader** jämför fortfarande bara tider och längd. Parningen efter betydelse kunde göra dem säkrare.
 - **Mot ljud:** Whispers text kunde paras med den svenska på samma sätt (Ljud B och A+B).

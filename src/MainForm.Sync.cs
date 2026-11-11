@@ -291,8 +291,20 @@ namespace TextSync
             chipHi.Text = hiDone && plainDone ? "Text för hörselskadade och formatering borttagen" : hiDone ? "Text för hörselskadade borttagen" : "Formatering borttagen på " + plainCount + (plainCount == 1 ? " rad" : " rader");
             tips.SetToolTip(chipHi, (hiDone ? hiInfo + " " : "") + (plainDone ? "Kursiv och annan formatering borttagen på " + plainCount + (plainCount == 1 ? " rad" : " rader") + ". Kryssa ur rutan i Inställningar för att få tillbaka den." : ""));
             // betydelsejämförelsen: vad den gjorde syns utan klick, hela meningen står i tipsrutan och under Detaljer
+            // nMoved och plainShown följer listan som visas just nu, så att rutan stämmer efter en växling eller Ctrl+Z
+            int nMoved = Meaning.MovedCount(r.Output);
+            bool plainShown = Meaning.ShowsPlain(r.Output);
+            string meaningText = null;
             chipMeaning.Visible = r.Meaning != null;
-            if (r.Meaning != null) { chipMeaning.Text = r.Meaning.Chip(); tips.SetToolTip(chipMeaning, r.Meaning.Summary()); }
+            if (r.Meaning != null)
+            {
+                string rows = nMoved == 1 ? "1 rad" : nMoved + " rader";
+                string cmp = r.Meaning.Compare();
+                chipMeaning.Text = nMoved == 0 ? r.Meaning.Chip() : plainShown ? "Betydelse: vanlig synk visas (" + rows + " kan flyttas)" : "Betydelse: " + rows + " flyttade" + (cmp != null ? " – " + cmp.Substring(0, cmp.IndexOf('.')).ToLowerInvariant() : "");
+                meaningText = r.Meaning.Summary() + (nMoved > 0 && cmp != null ? "\n" + cmp + "\n" +
+                    (plainShown ? "Nu visas den vanliga synken." : "Nu visas synken med betydelsejämförelsen.") + " Länken ovanför listan växlar mellan dem, och raderna som skiljer sig är märkta ⇄." : "");
+                tips.SetToolTip(chipMeaning, meaningText);
+            }
             foreach (Control c in chips.Controls) c.ForeColor = Theme.Fg;
 
             // ---- varningar: syns alltid
@@ -313,7 +325,7 @@ namespace TextSync
             }
             else d.Append("Förskjutning: " + FmtOffset(r.OffsetMs) + (drift ? "     Drift: " + Fmt(r.DriftMsPerHour, "0") + " ms/timme" : "") + "\n");
             if (r.FpsText.Length > 0) d.Append(r.FpsText + "\n");
-            if (r.Meaning != null) d.Append(r.Meaning.Summary() + "\n");
+            if (meaningText != null) d.Append(meaningText + "\n");
             if (more != null) d.Append(more + "\n");
             if (hiInfo != null) d.Append(hiInfo + "\n");
             if (plainCheck.Checked && plainCount > 0) d.Append("Kursiv och annan formatering borttagen på " + plainCount + (plainCount == 1 ? " rad" : " rader") + ". Kryssa ur rutan i Inställningar för att få tillbaka den.\n");
@@ -326,6 +338,7 @@ namespace TextSync
             if (proposals.Count > 0) d.Append("Blå – förslag om att slå ihop eller dela rader så att de följer referensens radindelning och tider. Under förslaget står hur raden blir (→ blir). Högerklicka för att godkänna eller avvisa.\n");
             if (refOnlyTotal > 0) d.Append("Grå – finns bara i referensen och sparas inte" + (viewCombo.SelectedIndex == ViewAll ? "" : viewCombo.SelectedIndex == ViewProposals ? " (de flesta dolda just nu, se Visa ovanför listan)" : " (dolda just nu, se Visa ovanför listan)") + ".\n");
             if (fixedRows > 0) d.Append("✎ – rättades vid inläsningen. Håll muspekaren över raden för att se vad som stod i filen, eller välj Bara rättade rader i Visa.\n");
+            if (nMoved > 0) d.Append("⇄ – raden ligger olika i den vanliga synken och med betydelsejämförelsen. Håll muspekaren över raden för att se den andra tiden.\n");
             if (weak && !sparse) d.Append("⚠ – svagt ställe: få rader " + (refIsText ? "börjar samtidigt som referensen" : "ligger på tal i ljudet") + ".\n");
             if (d.Length == 0) d.Append("Inga rader är märkta: " + (speech ? "alla ligger på tal i ljudet." : "alla har referenstext samtidigt."));
             detailBody[1].Text = d.ToString().TrimEnd();
@@ -404,6 +417,9 @@ namespace TextSync
             }
             acceptAllLink.Text = "Godkänn alla förslag (" + proposals.Count + ")";
             acceptAllLink.Visible = proposals.Count > 0;
+            int movedRows = Meaning.MovedCount(result.Output);
+            meaningLink.Visible = movedRows > 0;
+            meaningLink.Text = Meaning.ShowsPlain(result.Output) ? "Visa synken med betydelsejämförelsen" : "Visa den vanliga synken (utan betydelsejämförelsen)";
 
             int view = viewCombo.SelectedIndex;
             int total = synced.Count + extraRef.Count;
@@ -438,8 +454,10 @@ namespace TextSync
                     if (view == ViewOnlyRed && bc != null) continue;
                     if (view == ViewProposals && cueProp[i] < 0) continue;
                     if (view == ViewFixed && c.Raw == null) continue;
+                    bool alt = !double.IsNaN(c.MeaningAlt);
+                    if (view == ViewMoved && !alt) continue;
                     // förslagsrader märks med text också, inte bara med färg
-                    string mark = (cueWeak[i] ? "⚠ " : "") + (c.Raw != null ? "✎ " : "") + (cueProp[i] < 0 ? "" : proposals[cueProp[i]].IsMerge ? "Ihop?  " : "Dela?  ");
+                    string mark = (cueWeak[i] ? "⚠ " : "") + (alt ? "⇄ " : "") + (c.Raw != null ? "✎ " : "") + (cueProp[i] < 0 ? "" : proposals[cueProp[i]].IsMerge ? "Ihop?  " : "Dela?  ");
                     var it = new ListViewItem(new[] { HC ? "▶" : "Spela rad " + (i + 1), mark + (i + 1),
                         double.IsNaN(c.OrigStart) ? "— (ny rad)" : Srt.FormatTime(c.OrigStart),
                         Srt.FormatTime(c.Start), Srt.FormatTime(c.End),
@@ -454,6 +472,15 @@ namespace TextSync
                     {
                         it.ForeColor = PropRow;
                         it.ToolTipText = proposals[cueProp[i]].Describe() + "\nHögerklicka för att godkänna eller avvisa.";
+                    }
+                    // betydelsejämförelsen: visa radens tid i den andra varianten
+                    if (alt)
+                    {
+                        string diff = Fmt(Math.Abs(c.MeaningAlt - c.Start) / 1000, "0.00") + " s " + ((c.MeaningAlt < c.Start) == c.MeaningOff ? "tidigare" : "senare");
+                        string tip = c.MeaningOff
+                            ? "⇄ Vanlig synk visas. Betydelsejämförelsen flyttar raden " + diff + ", till " + Srt.FormatTime(c.MeaningAlt) + "."
+                            : "⇄ Betydelsejämförelsen flyttade raden " + diff + ". I den vanliga synken börjar den " + Srt.FormatTime(c.MeaningAlt) + ".";
+                        it.ToolTipText = (string.IsNullOrEmpty(it.ToolTipText) ? "" : it.ToolTipText + "\n\n") + tip + "\nLänken ovanför listan växlar mellan de två.";
                     }
                     // rättad vid inläsningen (kodade tecken, trasig formatering): visa vad som stod i filen
                     if (c.Raw != null) it.ToolTipText = (string.IsNullOrEmpty(it.ToolTipText) ? "" : it.ToolTipText + "\n\n") + "✎ Rättad vid inläsningen. I filen stod:\n" + (c.Raw.Length > 400 ? c.Raw.Substring(0, 400) + "…" : c.Raw);
@@ -485,6 +512,7 @@ namespace TextSync
             else if (view == ViewOnlyRed) viewInfo.Text = "Inga röda rader. Välj Alla rader i Visa för att se listan.";
             else if (view == ViewProposals && !proposeCheck.Checked) viewInfo.Text = "Förslag är avstängda. Kryssa i rutan bredvid, eller välj Alla rader.";
             else if (view == ViewFixed) viewInfo.Text = "Inga rader rättades vid inläsningen. Välj Alla rader i Visa för att se listan.";
+            else if (view == ViewMoved) viewInfo.Text = (meaningCheck.Checked ? "Betydelsejämförelsen flyttade inga rader." : "Betydelsejämförelsen är avstängd i Inställningar.") + " Välj Alla rader i Visa för att se listan.";
             else if (view == ViewProposals) viewInfo.Text = "Inga förslag" + (refIsText ? "" : " (görs bara mot text, inte mot ljud)") + ". Välj Alla rader i Visa.";
             else viewInfo.Text = "Inga rader att visa. Välj Alla rader i Visa.";
             list.BeginUpdate();

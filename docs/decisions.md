@@ -2,6 +2,26 @@
 
 Nyast först.
 
+## 2026-11-11 – 2.4.9: Växla mellan den vanliga synken och synken med betydelsejämförelsen
+- **Område:** GUI / synk
+- **Önskemål (ägaren):** "Kan du visa vanliga synken i programmet men även om det blev en förbättring med llama. Kan du bygga in llama i applikationen."
+- **Ägarens svar:** växla och jämför (siffror före och efter, märkta rader, en knapp som växlar). Om att bygga in: "Den är redan inbyggd", alltså ingen ändring. Verktygen laddas fortfarande ner första gången.
+- **Beslut:**
+  - **Länken ovanför listan** heter "Visa den vanliga synken (utan betydelsejämförelsen)" eller "Visa synken med betydelsejämförelsen". Den syns bara när jämförelsen flyttade något. Det som visas är det som sparas och spelas upp.
+  - **Växlingen är en vanlig ändring:** Ctrl+Z ångrar den, och rader som har ändrats för hand rörs inte.
+  - **Flyttade rader märks ⇄** i kolumnen #. Tipsrutan visar hur långt raden flyttades och tiden i den andra varianten.
+  - **Nytt val i Visa:** "Bara rader som betydelsejämförelsen flyttar (märkta ⇄)".
+  - **Rutan Betydelse** säger om det blev bättre: "9 rader flyttade – bättre", "– lika bra" eller "– sämre". Måttet är andelen rader som börjar inom 0,5 s från en referensrad, med den vanliga synken och med jämförelsen. Båda talen står under Detaljer och i tipsrutan.
+  - **Beskedet och procenten** ovanför listan räknas på det som visas, så de ändras när man växlar.
+- **Teknik:** varje flyttad rad bär sin andra tid (`Cue.MeaningAlt`, `Cue.MeaningOff`), så att växlingen fungerar efter redigering, extra justering och ångra. `Meaning.MarkMoved`, `Switch`, `MovedCount`, `ShowsPlain`, `MeaningReport.Compare`, `MainForm.SwitchMeaning`.
+- **Mätt på en text med inlagt fel** (kopior av den svenska texten till Blacklist S04E01 med ett stycke flyttat i filen, synkade från början):
+  - +8 s i två minuter (17 rader) och +9 s i två minuter (14 rader): den vanliga synken rättade felet själv, och jämförelsen hade inget att göra.
+  - −7 s i tre minuter (31 rader): den vanliga synken lämnade 9 rader 7,3 s fel och gav ändå beskedet Bra. Jämförelsen flyttade de 9 raderna rätt. Kontrollerat rad för rad: "Harold, samla ihop teamet." hamnade på 15:16,000, bredvid "Harold, gather your team." på 15:15,956. Andelen rader i takt gick från 81,4 % till 82,2 %.
+- **Test:** 229 av 229 kontroller (5 nya: märkning, växling fram och tillbaka, extra justering, rad ändrad för hand). Provat i fönstret i samma process, utan tangenttryckningar, med filen med −7 s: rutan "Betydelse: 9 rader flyttade", länken, 9 märkta rader, växling (status och ruta byter text), filtret i Visa med tipsrutan, och ångra. Skärmbild granskad i mörkt läge.
+- **Ej provat:** klick på själva länken med musen, ljust läge och 200 % skalning, spara efter växling, och Hel säsong (där finns ingen växling, avsnittet sparas med jämförelsen).
+- **Product-check:** Claude granskade själv (tillägg till en funktion som är av från början). Rättat: länken stod tätt intill "Sök:". Kan vänta (docs/next.md): F4 hoppar inte mellan flyttade rader, och ett avsnitt i Hel säsong kan inte växlas.
+- **Nivå:** LIVE
+
 ## 2026-11-11 – 2.4.8: Betydelsejämförelsen parar en rad med två eller tre referensrader, och rättar korta fel
 - **Område:** Synk
 - **Önskemål (ägaren):** "Bygg det", som svar på förslaget i 2.4.7 om att låta en svensk rad paras med två engelska rader i följd.
