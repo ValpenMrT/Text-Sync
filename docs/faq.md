@@ -223,7 +223,7 @@ Ja. Tab flyttar mellan fälten och Alt + understruken bokstav trycker på en kna
 **Kan programmet skriva över mina filer?**
 Nej. Text Sync skriver aldrig över en fil. Finns `Filmnamn.sv.srt` redan sparas den synkade texten som `Filmnamn.synkad.sv.srt`, nästa gång som `Filmnamn.synkad2.sv.srt`, och så vidare. Väljer du själv ett namn som finns säger programmet det och låter dig välja ett annat. Det gäller Spara SRT…, Lägg in i MKV…, texter ur ljudet och Hel säsong.
 
-Följden är att den gamla filen ligger kvar. Spelare som VLC, Plex och Kodi visar då två svenska texter för filmen: välj den med "synkad" i namnet, eller ta själv bort den gamla filen när du har sett att den nya är bra.
+Följden är att den gamla filen ligger kvar. Spelare som VLC, Plex och Kodi visar då två svenska texter för filmen: välj den med "synkad" i namnet, eller ta själv bort den gamla filen när du har sett att den nya är bra. Programmet säger till när det händer: efter **Spara SRT…** står det i statusraden, och länken **Visa den gamla filen** öppnar mappen med filen markerad. I **Hel säsong** står det "gamla filen kvar" på raden, och knappen **Visa gamla filen** gör samma sak.
 
 **Jag skrev över min originalfil i en äldre version.**
 Till och med version 2.4.16 skrev programmet över filen och lade originalet i mappen `Text Sync original` bredvid filen. Det finns kvar där.

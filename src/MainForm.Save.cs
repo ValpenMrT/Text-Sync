@@ -99,6 +99,23 @@ namespace TextSync
             return FreePath(Path.Combine(Path.GetDirectoryName(film), Path.GetFileNameWithoutExtension(film) + "." + lang + ".srt"), "whisper");
         }
 
+        // Den gamla undertexten som ligger kvar bredvid den nya, och som spelaren därför också visar: filen med det önskade namnet
+        // (Film.sv.srt när den nya blev Film.synkad.sv.srt), annars den osynkade filen om den ligger bredvid filmen och heter som den.
+        // Bara filer i samma mapp som den sparade räknas. null = ingen.
+        public static string OldFileBeside(string saved, string wanted, string target, string film)
+        {
+            try
+            {
+                string dir = Path.GetDirectoryName(Path.GetFullPath(saved));
+                if (!string.IsNullOrEmpty(wanted) && !SamePath(wanted, saved) && File.Exists(wanted) && SamePath(Path.GetDirectoryName(Path.GetFullPath(wanted)), dir)) return wanted;
+                if (!string.IsNullOrEmpty(target) && !string.IsNullOrEmpty(film) && !SamePath(target, saved) && File.Exists(target) &&
+                    SamePath(Path.GetDirectoryName(Path.GetFullPath(target)), dir) && SamePath(Path.GetDirectoryName(Path.GetFullPath(film)), dir) &&
+                    Path.GetFileName(target).StartsWith(Path.GetFileNameWithoutExtension(film) + ".", StringComparison.OrdinalIgnoreCase)) return target;
+            }
+            catch { }
+            return null;
+        }
+
         // Visar dialogen Spara. En fil som redan finns får inte väljas: programmet säger det, och dialogen visas igen. false = avbrutet.
         bool AskNewFile(SaveFileDialog d)
         {
@@ -142,8 +159,13 @@ namespace TextSync
                     if (mkvPath != null && SamePath(Path.GetDirectoryName(path), Path.GetDirectoryName(mkvPath))
                         && Path.GetFileName(path).StartsWith(Path.GetFileNameWithoutExtension(mkvPath) + ".", StringComparison.OrdinalIgnoreCase))
                         auto = "  Spelare som VLC, Plex och Kodi hittar den automatiskt.";
-                    SetStatus("✔ Sparad: " + Path.GetFileName(path) + "." + auto + backupNote + LastSaveNote, true);
+                    // den gamla texten skrivs aldrig över och ligger kvar: säg det, och visa den i mappen på begäran
+                    oldFile = fromAudio ? null : OldFileBeside(path, DefaultSrtPath(lang), tgtLoadedPath, mkvPath);
+                    string oldNote = oldFile != null ? "  Den gamla filen " + Path.GetFileName(oldFile) + " ligger kvar, så spelaren visar båda texterna tills du tar bort den." : "";
+                    SetStatus("✔ Sparad: " + Path.GetFileName(path) + "." + auto + oldNote + backupNote + LastSaveNote, true);
                     openLink.Visible = true; undoLink.Visible = false;
+                    oldLink.Visible = oldFile != null;
+                    if (oldFile != null) Log.Info("Den gamla filen ligger kvar: " + oldFile);
                     Log.Info("Sparad: " + path);
                 }
                 catch (Exception ex)

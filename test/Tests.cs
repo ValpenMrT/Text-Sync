@@ -531,8 +531,16 @@ namespace TextSync
                 Check("Skriver aldrig över: ett upptaget namn får .synkad före språkkoden, sedan .synkad2, och Namn.synkad.srt blir Namn.synkad2.srt",
                     freeWhenMissing && Path.GetFileName(n1) == "Film.synkad.sv.srt" && Path.GetFileName(n2) == "Film.synkad2.sv.srt" &&
                     Path.GetFileName(MainForm.FreePath(nRef, "synkad")) == "Text.synkad2.srt" && File.ReadAllText(n0) == "x");
+                // efter sparandet pekar programmet ut den gamla filen som ligger kvar bredvid den nya
+                string nFilm = Path.Combine(ndir, "Film.mkv"), nElse = Path.Combine(dir, "annan mapp.srt"), nSwe = Path.Combine(ndir, "Film.swe.srt"), nNew = Path.Combine(ndir, "Film.da.srt");
+                File.WriteAllText(nFilm, "x"); File.WriteAllText(nElse, "x"); File.WriteAllText(nSwe, "x");
+                Check("Skriver aldrig över: den gamla filen som ligger kvar pekas ut (önskat namn, eller den osynkade bredvid filmen), annars ingen",
+                    MainForm.OldFileBeside(n1, n0, nElse, nFilm) == n0 &&                                  // Film.sv.srt ligger kvar bredvid Film.synkad.sv.srt
+                    MainForm.OldFileBeside(nNew, nNew, nSwe, nFilm) == nSwe &&                            // osynkade Film.swe.srt bredvid filmen
+                    MainForm.OldFileBeside(nNew, nNew, nElse, nFilm) == null &&                           // den osynkade ligger i en annan mapp
+                    MainForm.OldFileBeside(Path.Combine(dir, "ny.srt"), n0, nSwe, nFilm) == null);        // sparad i en annan mapp
                 List<string> unS;
-                var planS = SeasonPlan.Build(new[] { @"C:\s\F.S01E01.mkv", @"C:\s\F.S01E01.synkad.sv.srt", @"C:\s\F.S01E01.synkad2.sv.srt", @"C:\s\F.S01E01.sv.srt" }, "sv", out unS);
+                var planS =SeasonPlan.Build(new[] { @"C:\s\F.S01E01.mkv", @"C:\s\F.S01E01.synkad.sv.srt", @"C:\s\F.S01E01.synkad2.sv.srt", @"C:\s\F.S01E01.sv.srt" }, "sv", out unS);
                 Check("Skriver aldrig över: programmets egna synkade texter väljs inte som undertext att synka",
                     planS.Count == 1 && planS[0].TargetPath == @"C:\s\F.S01E01.sv.srt" && unS.Count == 0);
 
@@ -1116,7 +1124,8 @@ namespace TextSync
                     Check("Hel säsong: de sparade undertexterna går i takt (förskjutning och fel bildfrekvens)", inSync(out1) && inSync(out2));
                     Check("Hel säsong: en undertext som redan finns skrivs aldrig över: den synkade sparas med .synkad i namnet, och beskedet säger det",
                         Path.GetFileName(out1) == "Serie.S01E01.synkad.sv.srt" && File.ReadAllBytes(t1).SequenceEqual(orig1) && res[0].Entry.Kept == null &&
-                        res[0].Detail.Contains("skrevs inte över") && res[1].Entry.Path == out2 && !res[1].Detail.Contains("skrevs inte över"));
+                        res[0].Detail.Contains("skrevs inte över") && res[1].Entry.Path == out2 && !res[1].Detail.Contains("skrevs inte över") &&
+                        res[0].OldPath == t1 && res[0].Text.Contains("gamla filen kvar") && res[1].OldPath == null && !res[1].Text.Contains("gamla filen"));
                     List<string> unAgain;
                     var planAgain = SeasonPlan.Build(SeasonPlan.Collect(new[] { sd }), "sv", out unAgain);
                     Check("Hel säsong: dras mappen in igen väljs den osynkade filen, inte programmets egen synkade, och den sparade filen hittas",

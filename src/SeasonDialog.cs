@@ -37,6 +37,7 @@ namespace TextSync
         ProgressBar progress;
         ComboBox refCombo;
         CheckBox mkvCheck, unsureCheck;
+        Button oldBtn;   // visar den gamla undertexten som ligger kvar bredvid den nya (programmet skriver aldrig över)
         Button addFolderBtn, addFilesBtn, clearBtn, swapBtn, skipBtn, openBtn, undoOneBtn, runBtn, muxBtn, restoreBtn, closeBtn;
         readonly float k;
 
@@ -168,7 +169,10 @@ namespace TextSync
             tips.SetToolTip(openBtn, "Läser in avsnittets film och osynkade undertext i huvudfönstret och synkar, så att du kan granska raderna och spela upp ställen i filmen.");
             tips.SetToolTip(undoOneBtn, "Tar tillbaka filen som fanns före synken, eller tar bort den nya undertexten om ingen fil fanns där.");
             tips.SetToolTip(swapBtn, "Välj en annan undertext för avsnittet (eller dubbelklicka på raden).");
-            rowBtns.Controls.AddRange(new Control[] { swapBtn, skipBtn, openBtn, undoOneBtn });
+            oldBtn = Btn("Visa &gamla filen", 150, false);
+            oldBtn.Click += (s, e) => { var r = Selected; if (r != null && r.Out.OldPath != null) MainForm.ShowInFolder(r.Out.OldPath); };
+            tips.SetToolTip(oldBtn, "Avsnittet hade redan en undertext bredvid filmen. Den skrevs inte över och ligger kvar, så spelaren visar båda texterna.\nKnappen visar den gamla filen i mappen, så att du kan ta bort den när du har sett att den nya är bra.");
+            rowBtns.Controls.AddRange(new Control[] { swapBtn, skipBtn, openBtn, undoOneBtn, oldBtn });
             root.Controls.Add(rowBtns, 0, 3);
 
             info = new Label { Anchor = AnchorStyles.Left | AnchorStyles.Right, UseMnemonic = false, ForeColor = Theme.Muted, Margin = new Padding(0, 0, 0, 6) };
@@ -254,7 +258,7 @@ namespace TextSync
             intro.Text = "Dra in mappen med säsongens filmer och undertexter hit, eller klicka Lägg till mapp…. Programmet parar ihop dem efter avsnittsnumret i filnamnen (S04E01, 4x01). " +
                 "Kontrollera listan och klicka Synka alla. Varje undertext sparas som Filmnamn." + Options.Lang + ".srt bredvid sitt avsnitt, så att spelaren hittar den" +
                 (mkvCheck != null && mkvCheck.Checked ? ", och läggs också in i en kopia av filmen (Filmnamn (Text Sync).mkv). " : ". ") +
-                (unsureCheck != null && unsureCheck.Checked ? "Osäkra avsnitt sparas också. " : "Osäkra avsnitt sparas inte. ") + "Allt går att ångra efteråt med Återställ….";
+                (unsureCheck != null && unsureCheck.Checked ? "Osäkra avsnitt sparas också. " : "Osäkra avsnitt sparas inte. ") + "En fil som redan finns skrivs aldrig över. Allt går att ångra efteråt med Återställ….";
         }
 
         // ------------------------------------------------------------ lägga till filer
@@ -473,6 +477,7 @@ namespace TextSync
             skipBtn.Text = sel != null && sel.Out.State == EpisodeState.Done ? "Synka &igen" : sel != null && Paired(sel.Item) && !sel.Item.Include ? "T&a med" : "&Hoppa över";
             openBtn.Enabled = !busy && sel != null && Paired(sel.Item);
             undoOneBtn.Enabled = !busy && sel != null && sel.Out.Saved;
+            oldBtn.Enabled = sel != null && sel.Out.Saved && sel.Out.OldPath != null && File.Exists(sel.Out.OldPath);
             if (busy && cts == null) runBtn.Enabled = false;   // återställning pågår: knappen behåller sin text
             else if (busy)
             {

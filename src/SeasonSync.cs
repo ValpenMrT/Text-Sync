@@ -33,7 +33,8 @@ namespace TextSync
         public string Detail = "";    // mer i tipsrutan
         public UndoEntry Entry;       // filen som sparades (null = inget sparat)
         public UndoRun Run;           // omgången som Entry hör till
-        public string DonePath;       // filen som en tidigare säsongssynk sparade (bara när State = Done)
+        public string OldPath;        // undertexten som redan fanns bredvid filmen och inte skrevs över (null = ingen)
+        public string DonePath;      // filen som en tidigare säsongssynk sparade (bara när State = Done)
         public UndoEntry MkvEntry;    // MKV-kopian med undertexten inlagd (null = ingen skapad)
         public UndoRun MkvRun;        // omgången som MkvEntry hör till
         public bool Saved { get { return Entry != null && !Entry.Restored; } }
@@ -194,7 +195,12 @@ namespace TextSync
                 res.Text = unsure ? "✖ Osäkert – sparad ändå" : good ? "✔ Bra – sparad" : "⚠ Kontrollera – sparad";
                 detail.Add("Sparad: " + outPath);
                 if (!MainForm.SamePath(outPath, wanted))
-                    detail.Add(Path.GetFileName(wanted) + " fanns redan och skrevs inte över. Spelaren visar därför båda texterna: välj den med \"synkad\" i namnet, eller ta bort den gamla filen själv.");
+                {
+                    res.OldPath = wanted;
+                    res.Text += ", gamla filen kvar";   // syns på raden, inte bara i tipsrutan
+                }
+                if (!MainForm.SamePath(outPath, wanted))
+                    detail.Add(Path.GetFileName(wanted) + " fanns redan och skrevs inte över. Spelaren visar därför båda texterna: välj den med \"synkad\" i namnet, eller ta bort den gamla filen själv (knappen Visa gamla filen).");
                 if (unsure) detail.Add("Texten verkar inte passa " + (it.RefIsVideo ? "filmen" : "referensen") + ". Den kan höra till ett annat avsnitt eller en annan version. " +
                     "Den sparades ändå, eftersom Spara även osäkra avsnitt är ikryssad. Återställ avsnittet tar bort den.");
                 else if (!good)

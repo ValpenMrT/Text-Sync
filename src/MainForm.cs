@@ -103,6 +103,7 @@ namespace TextSync
         ComboBox trackCombo, modeCombo, encCombo;
         Label refInfo, tgtInfo, statusLabel, trackLabel;
         LinkLabel openLink, helpLink;
+        LinkLabel oldLink; string oldFile;   // "Visa den gamla filen" efter Spara SRT…, och filen den visar
         CheckBox fpsCheck, hiCheck, plainCheck, meaningCheck;
         int plainCount;                // rader där formatering (kursiv m.m.) tas bort av rutan "Ta bort kursiv och annan formatering"
         string hiInfo;                 // vad som togs bort som text för hörselskadade (visas i resultatet)
@@ -365,6 +366,12 @@ namespace TextSync
             openLink = new LinkLabel { Text = "Visa i mappen", AutoSize = true, Margin = new Padding(0, 9, 0, 0), Visible = false, LinkColor = Accent };
             openLink.LinkClicked += (s, e) => ShowInFolder(lastOutput);
             opts.Controls.Add(openLink);
+            // efter Spara SRT…: den gamla filen som ligger kvar bredvid den nya (programmet skriver aldrig över). Följer "Visa i mappen".
+            oldLink = new LinkLabel { Text = "Visa den gamla filen", AutoSize = true, Margin = new Padding(10, 9, 0, 0), Visible = false, LinkColor = Accent };
+            oldLink.LinkClicked += (s, e) => ShowInFolder(oldFile);
+            tips.SetToolTip(oldLink, "Den gamla undertexten skrevs inte över och ligger kvar bredvid den nya. Ta bort den själv när du har sett att den nya är bra, så visar spelaren bara en text.");
+            openLink.VisibleChanged += (s, e) => { if (!openLink.Visible) oldLink.Visible = false; };
+            opts.Controls.Add(oldLink);
             undoLink = new LinkLabel { Text = "Ångra", AutoSize = true, Margin = new Padding(0, 9, 0, 0), Visible = false, LinkColor = Accent };
             undoLink.LinkClicked += (s, e) => UndoChange();
             opts.Controls.Add(undoLink);

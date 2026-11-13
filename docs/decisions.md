@@ -2,6 +2,18 @@
 
 Nyast först.
 
+## 2026-11-14 – 2.4.18: Programmet säger till när den gamla filen ligger kvar, och visar den i mappen
+- **Område:** GUI
+- **Ägarens svar:** "ja fixa det", på frågan om programmet ska säga till efter sparandet att den gamla filen ligger kvar, med en länk som visar den i mappen.
+- **Beslut:**
+  - **Huvudfönstret:** efter Spara SRT… säger statusraden "Den gamla filen X ligger kvar, så spelaren visar båda texterna tills du tar bort den", och länken **Visa den gamla filen** visas bredvid Visa i mappen. Den gamla filen är den med det önskade namnet (`Film.sv.srt` när den nya blev `Film.synkad.sv.srt`), annars den osynkade filen om den ligger bredvid filmen och heter som den (`MainForm.OldFileBeside`). Länken döljs tillsammans med Visa i mappen.
+  - **Hel säsong:** raden säger "…– sparad, gamla filen kvar", och knappen **Visa gamla filen** bland knapparna för markerat avsnitt visar filen i mappen. Förklaringen överst säger att en fil som finns aldrig skrivs över.
+  - **Programmet tar aldrig bort den gamla filen.** Användaren gör det själv i Utforskaren.
+- **Provat:** fönstret Hel säsong ritat till en bild (samma process, utan klick): knappen får plats på raden och är grå utan markerat avsnitt.
+- **Test:** 258 av 258 kontroller (1 ny: vilken gammal fil som pekas ut, och att ingen pekas ut när filerna ligger i olika mappar).
+- **Ej provat:** länken och knappen med klick, och statusradens längd i ett smalt fönster.
+- **Product-check:** Claude granskade själv (liten ändring). Inget blockerande.
+
 ## 2026-11-14 – 2.4.17: Programmet skriver aldrig över en fil, och Parakeet är förvalt
 - **Område:** GUI / data / Hel säsong
 - **Ägarens svar:** (1) Parakeet ska vara förvalt. (2) "Ja, inget får skrivas över", på frågan om det också ska gälla en synkad text och Hel säsong.

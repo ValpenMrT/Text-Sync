@@ -70,7 +70,7 @@ Det som inte är gjort:
 - **Övriga idéer från samma samtal:** mäta på fler filmer, rätta den fasta avvikelsen på cirka 0,24 s mot ljud, Silero-taldetektering i Ljud A, flera referenser som röstar, scenklipp med ffmpeg, exakt ordtid mot ljudet (wav2vec2).
 
 ## Kvar efter "skriver aldrig över" 2.4.17 (2026-11-14)
-- **Två texter i spelaren:** den gamla `Film.sv.srt` ligger kvar bredvid `Film.synkad.sv.srt`. Förslag: säg det i statusraden efter Spara SRT… och på raden i Hel säsong, och erbjud "Visa i mappen" så att den gamla är lätt att ta bort för hand. Programmet tar aldrig bort den själv.
+- **Två texter i spelaren:** den gamla `Film.sv.srt` ligger kvar bredvid `Film.synkad.sv.srt`. Från 2.4.18 säger programmet det och visar filen i mappen. Programmet tar aldrig bort den själv. Kvar: efter en omstart står avsnittet som Redan synkad utan knappen Visa gamla filen.
 - **Flera synkar ger flera filer** (`.synkad2`, `.synkad3`). Förslag: fråga om den förra synkade filen (programmets egen, oförändrad) ska ersättas. Kräver ägarens ja, eftersom det är en överskrivning.
 - **`SaveWithBackup` och `WriteSafely`** kan fortfarande skriva över en fil om de anropas med en som finns. Ingen väg i gränssnittet gör det längre, men ett `Check` som bevisar det för varje dialog saknas.
 - **Inte provat med klick**, och inte i fönstret Hel säsong med en riktig säsong.
