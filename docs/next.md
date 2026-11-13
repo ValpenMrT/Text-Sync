@@ -75,7 +75,15 @@ Mätt mot Blacklist S04E01 (`test/SubDiag.cs`, se beslutsloggen). Kvar:
 - **Besvarat 2026-11-13 (2.4.14):** Ljud C använder den rättade och sparade texten, programmet frågar innan en osparad text ur ljudet försvinner, och funktionen behövs inte i Hel säsong.
 - **Besvarat 2026-11-13 (2.4.15):** en text ur ljudet skriver aldrig över en fil.
 - **Fråga till ägaren:** ska "aldrig skriva över" också gälla Spara SRT… för en synkad text (i dag: Windows frågar, och en kopia läggs i "Text Sync original") och Hel säsong (i dag: skriver över, Återställ… ångrar)?
-- **Parakeet som alternativ till Whisper (ägarens önskemål 2026-11-13, påbörjat):** se beslutsloggen 2.4.15. Nästa steg:
+- **Parakeet är inbyggd i 2.4.16** (beslutsloggen 2026-11-14). Kvar:
+  - **Fråga till ägaren:** ska Parakeet vara förvalt i stället för Whisper? Mätningen talar för det, men bara ett engelskt avsnitt är mätt.
+  - **Bara engelska provat.** Svenskt tal är inte provat, och språkgissningen skiljer inte säkert norska från danska (då blir koden `und`).
+  - **Dialogen Inställningar är cirka 980 bildpunkter hög** vid 100 %. På en liten skärm når man inte OK. Förslag: flikar eller två kolumner.
+  - **Ljudet läses ur filmen två gånger** (en gång för taldetekteringen till listan, en gång för Parakeet), cirka 15 s extra.
+  - **Parakeet på grafikkortet** finns som eget paket (cirka 500 MB till) men behövs knappast: processorn räcker.
+  - **Whisper-kontrollen och Ljud B/A+B använder fortfarande Whisper.** Parakeets ordtider kunde användas där också.
+  - **Smart App Control** kan blockera sherpa-onnx hos vännerna, som de andra verktygen. Beskedet säger då "Ljudsynk går inte att använda", vilket inte nämner text ur ljudet.
+- **Anteckningar från undersökningen av Parakeet (2.4.15), för historiken:**
   1. Kör `sherpa-onnx-offline.exe` på korta bitar och se hur tiderna per ord skrivs ut (stoppades av behörighetsskyddet i Claudes miljö: ägaren behöver tillåta körningen eller köra den själv).
   2. Dela ljudet i bitar efter taldetekteringen (A), kör alla bitar i ett anrop, och lägg ihop ordens tider.
   3. Mät med `SubDiag` mot Blacklist S04E01 och jämför med Whisper (453 rader, 92 % inom 0,5 s vid synk).

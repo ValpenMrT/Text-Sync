@@ -18,6 +18,7 @@ namespace TextSync
         public long Size;
         public string Folder;    // undermapp i tools\
         public bool Zip;         // packas upp, annars sparas som fil
+        public bool Tar;         // .tar.bz2: packas upp med tar.exe som finns i Windows 10 och 11 (.NET Framework kan inte bzip2)
         public string FileName;  // filnamn om inte zip
     }
 
@@ -83,6 +84,43 @@ namespace TextSync
             Sha256 = "6d39681b26c61279ac1f82db35a04a05009e94c415b51c858ff571489a82fc06",
             Size = 437778496, Folder = "models", FileName = "bge-m3-Q4_K_M.gguf"
         };
+
+        // Parakeet (NVIDIA) som alternativ till Whisper för text ur ljudet. Körs med sherpa-onnx på processorn.
+        // Innehållet är kontrollerat 2026-11-14: sherpa-onnx-offline.exe finns i paketet, och modellen har encoder, decoder, joiner och tokens.
+        public static readonly ToolPackage SherpaOnnx = new ToolPackage
+        {
+            Name = "sherpa-onnx 2.0.1 (kör Parakeet)",
+            Url = "https://github.com/k2-fsa/sherpa-onnx/releases/download/v2.0.1/sherpa-onnx-v2.0.1-win-x64-shared-MT-Release-no-tts.tar.bz2",
+            Sha256 = "a644dfe2f7944afec9a356d2557c0452380f20ffcf2f8c704653cfce37558596",
+            Size = 25567228, Folder = "sherpa-onnx", Tar = true
+        };
+        public static readonly ToolPackage ModelParakeet = new ToolPackage
+        {
+            Name = "Språkmodell Parakeet v3 (25 europeiska språk)",
+            Url = "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2",
+            Sha256 = "1495e91b59d7fc53ddca91f3431758ec99f8fa253fdb0e1e851be0f72b14b0f9",
+            Size = 487211443, Folder = "parakeet-v3", Tar = true
+        };
+
+        public static string FindSherpa() { return FindIn(Path.Combine(Root, SherpaOnnx.Folder), "sherpa-onnx-offline.exe"); }
+
+        // Mappen med Parakeet-modellens filer, eller null
+        public static string FindParakeet()
+        {
+            string enc = FindIn(Path.Combine(Root, ModelParakeet.Folder), "encoder.int8.onnx");
+            if (enc == null) return null;
+            string dir = Path.GetDirectoryName(enc);
+            return File.Exists(Path.Combine(dir, "decoder.int8.onnx")) && File.Exists(Path.Combine(dir, "joiner.int8.onnx")) && File.Exists(Path.Combine(dir, "tokens.txt")) ? dir : null;
+        }
+
+        // Det som saknas för Parakeet (utöver ffmpeg)
+        public static List<ToolPackage> ParakeetNeeds()
+        {
+            var need = new List<ToolPackage>();
+            if (!IsInstalled(SherpaOnnx)) need.Add(SherpaOnnx);
+            if (!IsInstalled(ModelParakeet)) need.Add(ModelParakeet);
+            return need;
+        }
 
         public static string FindLlamaServer() { return FindIn(Path.Combine(Root, LlamaCpu.Folder), "llama-server.exe"); }
 
@@ -172,7 +210,7 @@ namespace TextSync
         // Utrymme som en nedladdning behöver: zip-filen och det uppackade samtidigt (uppackat är oftast större än zip-filen)
         public static long SpaceNeeded(IEnumerable<ToolPackage> pkgs)
         {
-            return pkgs.Sum(p => p.Zip ? (long)(p.Size * 2.5) : p.Size) + 100L * 1048576;
+            return pkgs.Sum(p => p.Zip || p.Tar ? (long)(p.Size * 2.5) : p.Size) + 100L * 1048576;
         }
 
         // Inställningar som sparas mellan körningar (t.ex. valt grafikkort)
@@ -310,7 +348,29 @@ namespace TextSync
             if (p == WhisperCpu) return FindWhisper(false) != null;
             if (p == WhisperGpu) return FindWhisper(true) != null;
             if (p == LlamaCpu) return FindLlamaServer() != null;
+            if (p == SherpaOnnx) return FindSherpa() != null;
+            if (p == ModelParakeet) return FindParakeet() != null;
             return FindModel(p) != null;
+        }
+
+        // Packar upp ett .tar.bz2-arkiv med tar.exe ur Windows (System32, finns från Windows 10 version 1803). Arkivet är redan kontrollerat mot SHA-256.
+        static void Untar(string archive, string dir, CancellationToken ct)
+        {
+            string tar = Path.Combine(Environment.SystemDirectory, "tar.exe");
+            if (!File.Exists(tar)) throw new UserMessageException("Verktyget kunde inte packas upp, eftersom tar.exe saknas i Windows. Det finns i Windows 10 (version 1803 och senare) och Windows 11.");
+            var psi = new System.Diagnostics.ProcessStartInfo(tar, "-xf \"" + archive + "\" -C \"" + dir + "\"") { UseShellExecute = false, CreateNoWindow = true, RedirectStandardError = true };
+            using (var pr = System.Diagnostics.Process.Start(psi))
+            using (ct.Register(() => { try { if (!pr.HasExited) pr.Kill(); } catch { } }))
+            {
+                string err = pr.StandardError.ReadToEnd();
+                pr.WaitForExit();
+                ct.ThrowIfCancellationRequested();
+                if (pr.ExitCode != 0)
+                {
+                    Log.Info("tar misslyckades, kod " + pr.ExitCode + ": " + err.Trim());
+                    throw new UserMessageException("Verktyget kunde inte packas upp. Det kan vara för lite ledigt utrymme på disken. Mer står i loggen (Hjälp → loggmapp).");
+                }
+            }
         }
 
         // Ladda ner, kontrollera SHA-256 och packa upp. Kastar vid fel; inget halvfärdigt lämnas kvar.
@@ -356,6 +416,16 @@ namespace TextSync
                     string unz = target + ".unzip";
                     if (Directory.Exists(unz)) Directory.Delete(unz, true);
                     ZipFile.ExtractToDirectory(tmp, unz);
+                    Directory.Move(unz, target);
+                }
+                else if (p.Tar)
+                {
+                    if (Directory.Exists(target)) Directory.Delete(target, true);
+                    string unz = target + ".unzip";
+                    if (Directory.Exists(unz)) Directory.Delete(unz, true);
+                    Directory.CreateDirectory(unz);
+                    try { Untar(tmp, unz, ct); }
+                    catch { try { Directory.Delete(unz, true); } catch { } throw; }
                     Directory.Move(unz, target);
                 }
                 else

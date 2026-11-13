@@ -2,6 +2,35 @@
 
 Nyast först.
 
+## 2026-11-14 – 2.4.16: Parakeet som alternativ till Whisper för text ur ljudet
+- **Område:** Synk / GUI / verktyg
+- **Önskemål (ägaren):** "lägg gärna till nvidia parakeet som alternativ", och efter att körningen stoppats av behörighetsskyddet: "ja fortsätt med parakeet".
+- **Beslut:**
+  - **Val i Inställningar**, under den nya rubriken Text ur ljudet: "Text ur ljudet skrivs med" Whisper (förvalt) eller Parakeet. Sparas som `textengine`. Valet gäller länken "Skapa text ur ljudet…" och Ljud C.
+  - **Whisper är kvar som förval** (Claudes val: ägaren bad om ett alternativ, och bara ett avsnitt är mätt). Mätningen talar för Parakeet, särskilt utan grafikkort. Fråga till ägaren om förvalet ska bytas.
+  - **Verktyg:** sherpa-onnx 2.0.1 (25 MB) och modellen Parakeet TDT 0.6b v3 int8 (487 MB hämtat, cirka 670 MB uppackat), med fasta URL:er och SHA-256 som de andra verktygen. De är `.tar.bz2` och packas upp med `tar.exe` ur Windows (`Tools.Untar`). Programmet frågar före nedladdningen.
+  - **Så körs den** (`Audio.GetParakeetWords`): ljudet (mittkanalen) delas i bitar om högst 20 s med snitten mitt i tystnader enligt taldetekteringen (A). Bitar helt utan tal hoppas över. `sherpa-onnx-offline.exe` körs på processorn med 24 bitar per körning, så att förloppet syns och Avbryt går fort. Varje bit ger orddelar med tider, som sätts ihop till ord.
+  - **Språket** säger Parakeet inte. Det gissas ur texten med vanliga småord (engelska, svenska, norska, danska, tyska, franska, spanska). Går det inte att avgöra blir språkkoden `und`.
+  - **Radindelningen** är densamma som för Whisper (`Subtitler`), men utan flytten mot taldetekteringen och utan försprång, eftersom Parakeets ordtider redan stämmer.
+- **Mätt mot Blacklist S04E01** (filmens engelska textspår som facit, `test/SubDiag.cs`):
+
+  | | Parakeet | Whisper |
+  |---|---|---|
+  | Ord | 3 590 | 3 412 |
+  | Rader | 405 | 453 |
+  | Radstart inom 0,5 s från facit | 81,5 % | 66 % |
+  | Svensk text synkad mot texten: medianfel | 76 ms | 83 ms |
+  | … inom 0,5 s | 97 % | 92 % |
+  | … rader över 1 s fel | 6 (största 1,05 s) | 18 |
+  | Tid för avsnittet | 157–197 s på processorn | 64 s på RTX A2000 |
+
+  A+B som jämförelse: 182 ms, 96 %, 12 rader. Parakeet hörde "He's a cop.", som Whisper missade. Namn blir fel i båda ("Ruddington", "Keene").
+- **Provat och taget tillbaka:** (1) flytten mot taldetekteringen (`SnapToSpeech`) gav sämre radstarter för Parakeet (73 % mot 82 % inom 0,5 s), (2) att klippa bort tystnaden runt talet i varje bit gav färre ord (3 524) och en rad 22 s fel, utan att gå fortare.
+- **Provat i fönstret** (samma process, utan klick): Skapa text ur ljudet med Parakeet gav 405 rader, språkkod en, 5 röda rader. Dialogen Inställningar granskad på skärmbild. Frågan om osparad text (2.4.14) visades när skriptet bytte i listan Referens.
+- **Test:** 253 av 253 kontroller (4 nya: orddelar till ord, undertext utan flytt, bitar om högst 20 s, språkgissning).
+- **Ej provat:** andra språk än engelska, nedladdningsfrågan i fönstret (verktygen hämtades med `test/ToolsDl.cs`, samma nedladdningskod), Avbryt under Parakeet, en dator med Smart App Control som blockerar sherpa-onnx, Ljud C med Parakeet i fönstret (bara mätt).
+- **Product-check:** Claude granskade själv; den oberoende granskningen gjordes för text ur ljudet i 2.4.13. Inget blockerande. Kan vänta (docs/next.md): dialogen Inställningar är 980 bildpunkter hög, ljudet läses ur filmen två gånger, beskedstexten "Windows stoppade verktyget" nämner ljudsynk.
+
 ## 2026-11-13 – 2.4.15: En text ur ljudet skriver aldrig över en fil. Parakeet påbörjad, inte inbyggd
 - **Område:** GUI / Synk
 - **Ägarens svar:** "så får programmet aldrig skriva över något", på frågan om den skapade texten får skriva över en befintlig `Film.en.srt`. Och: "lägg gärna till nvidia parakeet som alternativ".

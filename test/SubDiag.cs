@@ -33,14 +33,18 @@ namespace TextSync
             string lang; int lastP = -1;
             // fjärde argumentet: en färdig ordfil från whisper-cli (-ml 1 -sow -osrt), för att jämföra olika sätt att köra Whisper
             List<Cue> words;
-            if (args.Length > 3) { words = Srt.LoadInOrder(args[3], 65001); lang = "(ordfil)"; }
+            if (args.Length > 3 && args[3] == "parakeet")
+                words = Audio.GetParakeetWords(mkv, audioIdx, (p, s) => { if (p / 10 != lastP) { lastP = p / 10; Console.WriteLine("  " + s); } }, CancellationToken.None, out lang);
+            else if (args.Length > 3) { words = Srt.LoadInOrder(args[3], 65001); lang = "(ordfil)"; }
             else words = Audio.GetTextWords(mkv, audioIdx, (p, s) => { if (p / 10 != lastP) { lastP = p / 10; Console.WriteLine("  " + s); } }, CancellationToken.None, out lang);
             Console.WriteLine("Whisper ord för ord: " + words.Count + " ord, språk " + lang + ", " + sw.Elapsed.TotalSeconds.ToString("0") + " s (" + (Audio.WhisperDevice >= 0 ? "grafikkort" : "processor") + ")");
             Console.WriteLine("De första orden: " + string.Join("|", words.Take(40).Select(w => w.Text)));
 
             var speechA = Audio.GetReference(mkv, new AudioRefOption { Mode = AudioMode.Speech, AudioIndex = audioIdx }, (p, s) => { }, CancellationToken.None).Cues;
             Report("Text ur ljudet utan taldetekteringen", Subtitler.FromWords(words), truth);
-            var subs = Subtitler.FromWords(words, speechA);
+            bool pk = args.Length > 3 && args[3] == "parakeet";
+            if (pk) Report("Parakeet utan taldetekteringen, utan försprång", Subtitler.FromWords(words, null, 0), truth);
+            var subs = pk ? Subtitler.FromWords(words, null, Subtitler.ParakeetLeadMs) : Subtitler.FromWords(words, speechA);
             if (outFile != null) { Srt.Save(outFile, subs); Console.WriteLine("Sparad: " + outFile); }
             Report("Text ur ljudet", subs, truth);
             Report("Facit mot sig självt (jämförelse)", truth, truth);

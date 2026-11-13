@@ -81,7 +81,9 @@ namespace TextSync
         LinkLabel origLink; int refAudioIndex; string refInfoDefault = "";
         LinkLabel createLink;          // "Skapa text ur ljudet…" under ruta 1
         bool createdText;              // listan visar en text som skapades ur ljudet (Subtitler), inte en synk
-        string langBeforeCreate;       // språkkoden som stod i rutan innan texten ur ljudet satte sin egen
+        // text ur ljudet görs med Parakeet i stället för Whisper (Inställningar, sparas som textengine)
+        bool useParakeet = Tools.GetSetting("textengine", "whisper") == "parakeet";
+        string langBeforeCreate;      // språkkoden som stod i rutan innan texten ur ljudet satte sin egen
         // ruta 2 innehåller texten ur ljudet, inte en fil
         bool TargetFromAudio { get { return tgtCues != null && tgtLoadedPath == null; } }
         bool trackQuiet; int lastTrackIndex;   // listan Referens ställs tillbaka av programmet efter Avbryt i frågan nedan
@@ -252,7 +254,7 @@ namespace TextSync
             // film utan text: Whisper lyssnar ord för ord och orden blir en undertext som visas i listan och kan sparas
             createLink = new LinkLabel { Text = "Skapa text ur ljudet (film utan text)…", AutoSize = true, Margin = new Padding(0, 6, 0, 0), Visible = false, LinkColor = Accent };
             createLink.LinkClicked += async (s, e) => await CreateTextFromAudio();
-            tips.SetToolTip(createLink, "Whisper lyssnar på filmen och skriver en undertext på filmens språk. Texten visas i listan, där du kan rätta den och spara den bredvid filmen.");
+            tips.SetToolTip(createLink, "Programmet lyssnar på filmen och skriver en undertext på filmens språk (med Whisper eller Parakeet, se Inställningar). Texten visas i listan, där du kan rätta den och spara den bredvid filmen.");
             rinfo.Controls.Add(createLink, 0, 4); rinfo.SetColumnSpan(createLink, 2);
             Tools.GpuScan();   // letar efter NVIDIA-kort i bakgrunden redan nu, så att listan Grafikkort är klar när den behövs
             var refCard = MakeCard("1.  Referens – undertext i takt med filmen (textspår i MKV eller SRT) eller filmens ljud", refName, refBtn, refInfo, rinfo, BrowseRef, LoadReference);
@@ -739,7 +741,7 @@ namespace TextSync
         void OpenSettings()
         {
             if (busy) return;
-            using (var d = new SettingsDialog(themeIndex, !HC, fpsCheck.Checked, hiCheck.Checked, plainCheck.Checked, Srt.SaveFormat, meaningCheck.Checked, autoAccept))
+            using (var d = new SettingsDialog(themeIndex, !HC, fpsCheck.Checked, hiCheck.Checked, plainCheck.Checked, Srt.SaveFormat, meaningCheck.Checked, autoAccept, useParakeet))
             {
                 if (d.ShowDialog(this) != DialogResult.OK) return;
                 if (d.SrtFormat != Srt.SaveFormat)
@@ -761,6 +763,14 @@ namespace TextSync
                 hiCheck.Checked = d.RemoveHi;
                 plainCheck.Checked = d.StripFormatting;
                 meaningCheck.Checked = d.CompareMeaning;
+                if (d.UseParakeet != useParakeet)
+                {
+                    useParakeet = d.UseParakeet;
+                    Tools.SetSetting("textengine", useParakeet ? "parakeet" : "whisper");
+                    Log.Info("Text ur ljudet görs med: " + (useParakeet ? "Parakeet" : "Whisper"));
+                    UpdateOptInfo();
+                    if (result != null) SetStatus("Gäller nästa gång en text skapas ur ljudet, och nästa synk mot Ljud C.", false);
+                }
                 if (d.AutoAccept != autoAccept)
                 {
                     autoAccept = d.AutoAccept;
@@ -803,6 +813,7 @@ namespace TextSync
             if (!fpsCheck.Checked) parts.Add("bildfrekvensfel upptäcks inte");
             if (meaningCheck != null && meaningCheck.Checked) parts.Add("radernas betydelse jämförs");
             if (autoAccept) parts.Add("radindelning som referensen godkänns automatiskt");
+            if (useParakeet) parts.Add("text ur ljudet görs med Parakeet");
             if (Srt.SaveFormat == Srt.FormatUtf8) parts.Add("SRT sparas som UTF-8 utan BOM");
             if (Srt.SaveFormat == Srt.FormatLegacy) parts.Add("SRT sparas för mycket gamla spelare");
             optInfo.Text = parts.Count == 0 ? "" : "Inställningar: " + string.Join("  ·  ", parts);
@@ -1322,7 +1333,8 @@ namespace TextSync
                 "Visar din TV <i> som text? Kryssa i \"Ta bort kursiv och annan formatering\" i Inställningar. Kryssar du ur rutan kommer formateringen tillbaka.\n\n" +
                 "Hel säsong (knappen Hel säsong… uppe till höger, eller dra in en mapp): alla avsnitt synkas i kö och varje undertext sparas bredvid sitt avsnitt. " +
                 "Lägg in i MKV… i det fönstret lägger in de sparade undertexterna i en kopia av varje film. Där väljer du också om osäkra avsnitt ska sparas. Återställ… i det fönstret ångrar allt: filerna som fanns före kommer tillbaka och nya undertexter tas bort. Det går även efter att programmet har stängts.\n\n" +
-                "Har du ingen undertext alls: dra in filmen och klicka \"Skapa text ur ljudet (film utan text)…\". Whisper skriver ner vad som sägs på filmens språk. Läs igenom texten, rätta med dubbelklick och spara med Spara SRT…. Programmet översätter inte.\n\n" +
+                "Har du ingen undertext alls: dra in filmen och klicka \"Skapa text ur ljudet (film utan text)…\". Programmet skriver ner vad som sägs på filmens språk. Läs igenom texten, rätta med dubbelklick och spara med Spara SRT…. Programmet översätter inte. " +
+                "I Inställningar väljer du om texten skrivs med Whisper (snabb med NVIDIA-grafikkort) eller Parakeet (snabb utan grafikkort).\n\n" +
                 "Tips: dra in båda filerna samtidigt. Rödmarkerade rader saknar engelsk text samtidigt – ofta helt i sin ordning (t.ex. utrop).\n" +
                 "Kryssa i \"Föreslå radindelning som referensen\" så föreslår programmet att dela eller slå ihop rader som de engelska (blå, \"Dela?\"/\"Ihop?\") – högerklicka för att godkänna. " +
                 "Under varje förslag står hur raden blir om du godkänner det (→ blir). " +

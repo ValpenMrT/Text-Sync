@@ -12,11 +12,34 @@ namespace TextSync
     public class SpeechTextOption
     {
         public int AudioIndex;
-        public override string ToString() { return "Ljud C – text ur ljudet med Whisper (nytt, ger radindelning)"; }
+        public override string ToString() { return "Ljud C – text ur ljudet (nytt, ger radindelning)"; }
+    }
+
+    // Resultatet av "text ur ljudet": undertexterna, talavsnitten från taldetekteringen (A) och språket ("" = okänt)
+    public class AudioText
+    {
+        public List<Cue> Subs, Speech;
+        public string Language = "", Engine = "";
     }
 
     public static class Subtitler
     {
+        // Hela kedjan för text ur ljudet med vald motor (Inställningar): Whisper eller Parakeet.
+        // Whisper: orden rättas mot taldetekteringen och texten visas 0,2 s före första ordet. Parakeet: ordtiderna används som de är
+        // (mätt 2026-11-14: flytten mot taldetekteringen gjorde Parakeet sämre, 73 % mot 82 % av radstarterna inom 0,5 s).
+        public static AudioText Create(string film, int audioIndex, bool parakeet, Action<int, string> progress, System.Threading.CancellationToken ct)
+        {
+            var res = new AudioText { Engine = parakeet ? "Parakeet" : "Whisper" };
+            res.Speech = Audio.GetReference(film, new AudioRefOption { Mode = AudioMode.Speech, AudioIndex = audioIndex }, (p, s) => progress(p * 20 / 100, s), ct).Cues;
+            string lang;
+            var words = parakeet ? Audio.GetParakeetWords(film, audioIndex, (p, s) => progress(20 + p * 75 / 100, s), ct, out lang)
+                                 : Audio.GetTextWords(film, audioIndex, (p, s) => progress(20 + p * 75 / 100, s), ct, out lang);
+            res.Language = lang ?? "";
+            progress(97, "Delar in texten i rader…");
+            res.Subs = parakeet ? FromWords(words, null, ParakeetLeadMs) : FromWords(words, res.Speech);
+            return res;
+        }
+
         // Gränserna är satta mot Blacklist S04E01, där filmens engelska textspår är facit (test/SubDiag.cs)
         public const int MaxChars = LineAligner.MaxChars * LineAligner.MaxLines;   // 2 rader à 42 tecken
         public static double MaxDurMs = 6000;    // längsta undertext
@@ -25,7 +48,8 @@ namespace TextSync
         public static double GapMs = 80;         // minsta lucka till nästa undertext
         public static double LingerMs = 300;     // texten står kvar så här länge efter sista ordet, om det finns plats
         public static double LeadMs = 200;       // texten visas så här långt före första ordet, som i vanliga undertexter
-        public static double CharsPerSec = 17;   // läshastighet: texten står kvar minst så länge, om det finns plats
+        public static double ParakeetLeadMs = 0; // Parakeets ordtider ligger redan cirka 0,2 s före Whispers (mätt 2026-11-14), så inget försprång läggs till
+        public static double CharsPerSec = 17;  // läshastighet: texten står kvar minst så länge, om det finns plats
 
         static readonly Regex Noise = new Regex(@"\[[^\]]*\]|\([^)]*\)|[♪♫]|\*[^*]*\*", RegexOptions.Compiled);
 
@@ -147,7 +171,10 @@ namespace TextSync
 
         // Orden blir undertexter. Varje undertext börjar strax före sitt första ord.
         // speech = talavsnitten från taldetekteringen (A), eller null.
-        public static List<Cue> FromWords(IEnumerable<Cue> raw, IList<Cue> speech)
+        public static List<Cue> FromWords(IEnumerable<Cue> raw, IList<Cue> speech) { return FromWords(raw, speech, LeadMs); }
+
+        // leadMs = hur långt före första ordet texten visas (Whisper 200 ms; Parakeets ordtider ligger redan tidigt, se ParakeetLeadMs)
+        public static List<Cue> FromWords(IEnumerable<Cue> raw, IList<Cue> speech, double leadMs)
         {
             var w = Words(raw);
             SnapToSpeech(w, speech);
@@ -186,10 +213,10 @@ namespace TextSync
             {
                 var c = res[k];
                 double prevEnd = k > 0 ? res[k - 1].End + GapMs : 0;
-                c.Start = Math.Max(Math.Min(prevEnd, firstWord[k]), firstWord[k] - LeadMs);
+                c.Start = Math.Max(Math.Min(prevEnd, firstWord[k]), firstWord[k] - leadMs);
                 double want = Math.Max(MinDurMs, c.Text.Replace("\n", " ").Length / CharsPerSec * 1000);
                 double end = Math.Max(lastWord[k] + LingerMs, c.Start + want);
-                if (k + 1 < res.Count) end = Math.Min(end, firstWord[k + 1] - LeadMs - GapMs);
+                if (k + 1 < res.Count) end = Math.Min(end, firstWord[k + 1] - leadMs - GapMs);
                 c.End = Math.Max(lastWord[k], end);
                 if (k + 1 < res.Count && c.End > firstWord[k + 1] - 1) c.End = Math.Max(c.Start + 1, firstWord[k + 1] - 1);
             }

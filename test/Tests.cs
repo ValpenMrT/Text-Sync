@@ -497,6 +497,28 @@ namespace TextSync
                 Audio.ForgetSavedText(fakeFilm, 0);
                 Check("Text ur ljudet: den sparade texten koms ihåg per film och ljudspår, och glöms när filen är borttagen", noneFirst && found && goneAfterDelete);
 
+                // Parakeet som alternativ till Whisper (2.4.16)
+                var pkw = Audio.ParakeetWords("{\"lang\": \"\", \"text\": \"He's a cop. Who?\", \"timestamps\": [0.00, 0.08, 0.16, 0.40, 0.56, 0.80, 1.20, 1.36], " +
+                    "\"durations\": [0.08, 0.08, 0.16, 0.16, 0.24, 0.08, 0.16, 0.08], \"tokens\":[\" He\", \"'\", \"s\", \" a\", \" cop\", \".\", \" W\", \"ho?\"], \"words\": []}", 10000);
+                Check("Parakeet: orddelar sätts ihop till ord med tider, räknat från bitens start i filmen",
+                    string.Join("|", pkw.Select(c => c.Text)) == " He's| a| cop.| Who?" && pkw[0].Start == 10000 && Math.Abs(pkw[0].End - 10320) < 1 && Math.Abs(pkw[2].Start - 10560) < 1 && Math.Abs(pkw[3].End - 11440) < 1);
+                Check("Parakeet: orden blir en undertext utan flytt mot taldetekteringen och utan försprång",
+                    Subtitler.FromWords(pkw, null, Subtitler.ParakeetLeadMs)[0].Text == "He's a cop. Who?" && Subtitler.FromWords(pkw, null, Subtitler.ParakeetLeadMs)[0].Start == 10000);
+                // tal 1–9 s, 9,5–30 s (långt utan paus), 31–35 s, tystnad, 100–104 s
+                var spIv = new List<Iv> { new Iv(1000, 9000), new Iv(9500, 30000), new Iv(31000, 35000), new Iv(100000, 104000) };
+                var chunks = Audio.MakeChunks(spIv, 120000);
+                Console.WriteLine("Parakeet, bitar: " + string.Join("  ", chunks.Select(c => (c.S / 1000).ToString("0.0") + "–" + (c.E / 1000).ToString("0.0"))));
+                Check("Parakeet: ljudet delas i bitar om högst 20 s, med snitten i tystnader, och tystnad utan tal hoppas över",
+                    chunks.Count >= 3 && chunks.All(c => c.E - c.S <= Audio.MaxChunkMs + 1 && c.E > c.S) &&
+                    chunks.Zip(chunks.Skip(1), (a, b) => a.E <= b.S).All(x => x) &&
+                    spIv.All(s => chunks.Where(c => c.S < s.E && s.S < c.E).Sum(c => Math.Min(c.E, s.E) - Math.Max(c.S, s.S)) >= s.E - s.S - 1) &&
+                    !chunks.Any(c => c.S >= 40000 && c.E <= 95000) && Audio.MakeChunks(new List<Iv>(), 1000).Count == 0);
+                Func<string, List<Cue>> asWords = text => text.Split(' ').Select((x, k) => new Cue(k * 300, k * 300 + 200, " " + x)).ToList();
+                string enText = string.Join(" ", Enumerable.Repeat("I told you that the man is not what you think and it is the truth", 4));
+                string svText = string.Join(" ", Enumerable.Repeat("Jag sa att det inte är som du tror och det har jag sagt på en gång", 4));
+                Check("Parakeet: språket gissas ur texten (engelska, svenska), och för lite text ger inget språk",
+                    Audio.GuessLanguage(asWords(enText)) == "en" && Audio.GuessLanguage(asWords(svText)) == "sv" && Audio.GuessLanguage(asWords("Hello there.")) == "");
+
                 // en text ur ljudet skriver aldrig över en fil: namnet som föreslås är ledigt (2.4.15)
                 string fdir = Path.Combine(dir, "ledigt namn"); if (Directory.Exists(fdir)) Directory.Delete(fdir, true);
                 Directory.CreateDirectory(fdir);

@@ -24,12 +24,13 @@ src/
   Align.cs         Förslag om att slå ihop (2↔1) eller dela (1↔2) rader efter referensens radindelning (dynamisk programmering på tider).
                    Också det som gör som förslagen säger (Apply), och AcceptAll för inställningen "Godkänn förslag om radindelning automatiskt"
   Theme.cs         Ljust/mörkt läge: paletter, färgbyte på kontrollerna, mörka Windows-delar (rullister, rubriker, titelrad)
-  Audio.cs         Ljudreferens: ffmpeg → 16 kHz mono WAV (mittkanal), taldetektering (A), Whisper (B), kombination (A+B), cache
-  Tools.cs         Hittar/laddar ner ffmpeg, whisper.cpp, språkmodell, Silero, llama.cpp och bge-m3 (fasta URL:er + SHA-256), grafikkort, inställningar
+  Audio.cs         Ljudreferens: ffmpeg → 16 kHz mono WAV (mittkanal), taldetektering (A), Whisper (B), kombination (A+B), cache.
+                   Också orden till text ur ljudet: Whisper (GetTextWords) eller Parakeet via sherpa-onnx (GetParakeetWords: ljudet i bitar om högst 20 s)
+  Tools.cs         Hittar/laddar ner ffmpeg, whisper.cpp, språkmodell, Silero, llama.cpp, bge-m3, sherpa-onnx och Parakeet (fasta URL:er + SHA-256), grafikkort, inställningar
   TextCheck.cs     Kontroll av textspår mot Whisper ord för ord (ankare, utjämning, rättning); separat SRT på originalspråket synkas först grovt mot ljudet
   Meaning.cs       Jämför vad raderna betyder (inställning): vektorer från llama-server och modellen bge-m3, parning efter betydelse (rader och repliker),
                    rättning av rader som ligger fel, förslag om att flytta repliker mellan rader (Flytta?), växling mot den vanliga synken. Också cachen för vektorerna och en liten JSON-läsare
-  Subtitler.cs     Text ur ljudet: gör undertextrader av Whispers ord (meningsslut, pauser, replikstreck, 2 × 42 tecken), rättar ordtider mot taldetekteringen.
+  Subtitler.cs     Text ur ljudet: gör undertextrader av Whispers eller Parakeets ord (meningsslut, pauser, replikstreck, 2 × 42 tecken), rättar ordtider mot taldetekteringen.
                    Används av länken "Skapa text ur ljudet…" och av valet Ljud C i listan Referens
   Engine.cs        SRT läs/skriv och synkmotorn
   Sdh.cs           Tar bort text för hörselskadade: [MUSIK], (skrattar), ♪ och talarnamn i versaler

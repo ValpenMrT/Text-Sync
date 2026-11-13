@@ -117,7 +117,7 @@ namespace TextSync
         // ------------------------------------------------------------ verktyg för ljudsynk
         // Frågar en gång och laddar ner det som saknas (kontrolleras mot fasta kontrollsummor).
         // owner och prog: fönstret som frågar och visar förloppet (säsongsfönstret när en hel säsong synkas), annars huvudfönstret
-        internal async Task<bool> EnsureTools(bool whisper, CancellationToken token, IWin32Window owner = null, Action<int, string> prog = null)
+        internal async Task<bool> EnsureTools(bool whisper, CancellationToken token, IWin32Window owner = null, Action<int, string> prog = null, bool parakeet = false)
         {
             if (owner == null) owner = this;
             if (prog == null) prog = Progress;
@@ -125,6 +125,7 @@ namespace TextSync
             if (!Tools.IsInstalled(Tools.Ffmpeg)) need.Add(Tools.Ffmpeg);
             // bara det som behövs för valt grafikkort (eller processorn), inte allt som skulle kunna användas
             if (whisper) need.AddRange(Tools.WhisperNeeds(Audio.WhisperDevice >= 0));
+            if (parakeet) need.AddRange(Tools.ParakeetNeeds());
             if (need.Count == 0) return true;
             long total = need.Sum(p => p.Size);
             long free = Tools.FreeBytes(), want = Tools.SpaceNeeded(need);
@@ -248,6 +249,20 @@ namespace TextSync
 
         // Film utan text: Whisper lyssnar ord för ord, och orden blir en undertext (Subtitler) som visas i listan som texten i ruta 2.
         // Referensen i listan är taldetekteringen (A), så rader där inget tal hittades blir röda. Ingenting sparas förrän Spara SRT….
+        // Det som måste finnas innan text ur ljudet kan göras med den valda motorn (Inställningar). false = avbrutet.
+        // Whisper: grafikkortet ska vara känt, och på processorn frågar programmet först (lång tid). Parakeet körs alltid på processorn och är snabb.
+        async Task<bool> PrepareAudioText(int audioIndex, CancellationToken token)
+        {
+            if (useParakeet) return await EnsureTools(false, token, null, null, true);
+            if (gpuDevices == null)
+            {
+                statusLabel.Text = "Letar efter grafikkort…";
+                await Tools.GpuScan();
+                FillGpus();
+            }
+            return ConfirmSlowCpu(audioIndex, true, true) && await EnsureTools(true, token);
+        }
+
         async Task CreateTextFromAudio()
         {
             if (busy || mkvPath == null) return;
@@ -259,27 +274,11 @@ namespace TextSync
             string finalStatus = "";
             try
             {
-                if (gpuDevices == null)
-                {
-                    statusLabel.Text = "Letar efter grafikkort…";
-                    await Tools.GpuScan();
-                    FillGpus();
-                }
-                if (!ConfirmSlowCpu(refAudioIndex, true, true) || !await EnsureTools(true, token)) { finalStatus = "Avbrutet."; return; }
-                string path = mkvPath; int ai = refAudioIndex; string wl = "";
-                List<Cue> speech = null;
-                var subs = await Task.Run(() =>
-                {
-                    var sp = Audio.GetReference(path, new AudioRefOption { Mode = AudioMode.Speech, AudioIndex = ai },
-                        (p, s) => { token.ThrowIfCancellationRequested(); Progress(p * 20 / 100, s); }, token);
-                    speech = sp.Cues;
-                    string l;
-                    var words = Audio.GetTextWords(path, ai, (p, s) => { token.ThrowIfCancellationRequested(); Progress(20 + p * 75 / 100, s); }, token, out l);
-                    wl = l ?? "";
-                    Progress(97, "Delar in det Whisper hörde i rader…");
-                    return Subtitler.FromWords(words, speech);
-                });
-                if (subs.Count < 5) throw new InvalidDataException("Whisper hörde nästan inget tal i filmen.");
+                if (!await PrepareAudioText(refAudioIndex, token)) { finalStatus = "Avbrutet."; return; }
+                string path = mkvPath; int ai = refAudioIndex; bool pk = useParakeet;
+                var at = await Task.Run(() => Subtitler.Create(path, ai, pk, (p, s) => { token.ThrowIfCancellationRequested(); Progress(p, s); }, token));
+                var subs = at.Subs; var speech = at.Speech; string wl = at.Language;
+                if (subs.Count < 5) throw new InvalidDataException(at.Engine + " hörde nästan inget tal i filmen.");
                 string langName = wl.Length > 0 ? MkvTrack.LanguageName(wl) : "okänt språk";
                 // texten läggs i ruta 2 som om den vore inläst, men utan fil
                 ClearResult();
@@ -287,17 +286,17 @@ namespace TextSync
                 tgtName.Text = "Text ur filmens ljud (" + langName + ")"; tgtName.ForeColor = Theme.Fg;
                 tgtInfo.ForeColor = Muted; tgtInfo.Text = subs.Count + " rader, " + Duration(subs) + ". Inte sparad än.";
                 langBeforeCreate = langBox.Text;   // kommer tillbaka när texten ur ljudet lämnar ruta 2
-                if (wl.Length > 0) langBox.Text = wl;
+                langBox.Text = wl.Length > 0 ? wl : "und";   // okänt språk: hellre "und" än den förra texten språkkod
                 result = new SyncResult
                 {
                     Output = subs.Select(c => new Cue(c.Start, c.End, c.Text) { OrigStart = c.Start }).ToList(),
-                    Method = "Text skapad ur filmens ljud med Whisper, ord för ord (" + langName + ")", ScoreBefore = 1, ScoreAfter = 1
+                    Method = "Text skapad ur filmens ljud med " + at.Engine + ", ord för ord (" + langName + ")", ScoreBefore = 1, ScoreAfter = 1
                 };
                 refCuesUsed = speech; refIsText = false; createdText = true;
                 unsaved = true; extraNum.Value = 0; timeline.Highlight = null;
                 RefreshPreview();
                 finalStatus = "Text skapad ur ljudet: " + subs.Count + " rader. Läs igenom och klicka Spara SRT….";
-                Log.Info("Text skapad ur ljudet: " + path + ", ljudspår " + ai + ", språk " + wl + ", " + subs.Count + " rader");
+                Log.Info("Text skapad ur ljudet med " + at.Engine + ": " + path + ", ljudspår " + ai + ", språk " + wl + ", " + subs.Count + " rader");
             }
             catch (OperationCanceledException) { finalStatus = "Avbrutet."; }
             catch (Exception ex)

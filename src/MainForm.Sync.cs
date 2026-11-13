@@ -110,22 +110,13 @@ namespace TextSync
                     }
                     else
                     {
-                    if (!ConfirmSlowCpu(so.AudioIndex, true, true) || !await EnsureTools(true, token)) { finalStatus = "Avbrutet."; return; }
-                    string path = mkvPath; int ai = so.AudioIndex; string wl = "";
-                    refc = await Task.Run(() =>
-                    {
-                        // taldetekteringen (A) vet när talet börjar efter en tystnad, där Whispers ordtider är osäkra
-                        var sp = Audio.GetReference(path, new AudioRefOption { Mode = AudioMode.Speech, AudioIndex = ai },
-                            (p, s) => { token.ThrowIfCancellationRequested(); Progress(p * 20 / 100, s); }, token);
-                        string l;
-                        var words = Audio.GetTextWords(path, ai, (p, s) => { token.ThrowIfCancellationRequested(); Progress(20 + p * 75 / 100, s); }, token, out l);
-                        wl = l ?? "";
-                        Progress(96, "Delar in det Whisper hörde i rader…");
-                        return Subtitler.FromWords(words, sp.Cues);
-                    });
-                    if (refc.Count < 5) throw new InvalidDataException("Whisper hörde nästan inget tal i filmen. Prova en annan metod i listan Referens, eller en undertext (SRT) som referens.");
+                    if (!await PrepareAudioText(so.AudioIndex, token)) { finalStatus = "Avbrutet."; return; }
+                    string path = mkvPath; int ai = so.AudioIndex; bool pk = useParakeet;
+                    var at = await Task.Run(() => Subtitler.Create(path, ai, pk, (p, s) => { token.ThrowIfCancellationRequested(); Progress(p, s); }, token));
+                    refc = at.Subs; string wl = at.Language;
+                    if (refc.Count < 5) throw new InvalidDataException(at.Engine + " hörde nästan inget tal i filmen. Prova en annan metod i listan Referens, eller en undertext (SRT) som referens.");
                     transcript = refc; transcriptLang = wl;
-                    audioInfo = "text ur ljudet, " + refc.Count + " rader" + (wl.Length > 0 ? " (" + MkvTrack.LanguageName(wl) + ")" : "");
+                    audioInfo = "text ur ljudet med " + at.Engine + ", " + refc.Count + " rader" + (wl.Length > 0 ? " (" + MkvTrack.LanguageName(wl) + ")" : "");
                     }
                 }
                 else if (aopt != null)
@@ -264,7 +255,7 @@ namespace TextSync
             {
                 // en text som skapades ur ljudet är ingen synk: beskedet säger vad den är och vad man gör med den
                 verdictLabel.Text = "Text skapad ur ljudet"; verdictLabel.ForeColor = Theme.Fg;
-                summaryLabel.Text = "Whisper kan höra fel, särskilt namn. Läs igenom, rätta med dubbelklick och spara med Spara SRT…." +
+                summaryLabel.Text = "Taligenkänningen kan höra fel, särskilt namn. Läs igenom, rätta med dubbelklick och spara med Spara SRT…." +
                     (anyRed ? " Röda rader ligger där taldetekteringen inte hittade tal: kontrollera dem." : "");
                 more = "▶ spelar stället i filmen med texten ovanpå. F3 hoppar till nästa röda rad.";
             }

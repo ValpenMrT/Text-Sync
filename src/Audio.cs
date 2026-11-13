@@ -636,6 +636,190 @@ namespace TextSync
             catch { return false; }
         }
 
+        // ---------------------------------------------------------- Parakeet (sherpa-onnx) som alternativ till Whisper för text ur ljudet
+        // Parakeet tar korta ljudbitar. Filmen delas därför i bitar om högst MaxChunkMs, med snitten mitt i tystnader
+        // enligt taldetekteringen (A). Bitar helt utan tal hoppas över. Varje bit ger orddelar med egen tid.
+        public const double MaxChunkMs = 20000;
+
+        // Bitarna (start och slut i ms). speech = talavsnitten i tidsordning, totalMs = ljudets längd.
+        public static List<Iv> MakeChunks(List<Iv> speech, double totalMs)
+        {
+            var res = new List<Iv>();
+            if (speech == null || speech.Count == 0) return res;
+            // möjliga snitt: mitt i varje tystnad mellan två talavsnitt
+            var cuts = new List<double>();
+            for (int i = 0; i + 1 < speech.Count; i++)
+                if (speech[i + 1].S - speech[i].E >= 150) cuts.Add((speech[i].E + speech[i + 1].S) / 2);
+            double start = Math.Max(0, speech[0].S - 300), end = Math.Min(totalMs, speech[speech.Count - 1].E + 300);
+            int ci = 0, si = 0;
+            while (start < end - 50)
+            {
+                // sista snittet inom MaxChunkMs, annars ett rakt snitt (långt tal utan paus)
+                double cut = -1;
+                while (ci < cuts.Count && cuts[ci] <= start + 50) ci++;
+                for (int k = ci; k < cuts.Count && cuts[k] <= start + MaxChunkMs; k++) cut = cuts[k];
+                double stop = end - start <= MaxChunkMs ? end : cut > 0 ? cut : start + MaxChunkMs;
+                // bara bitar som innehåller tal. Tystnaden runt talet i biten körs med: att klippa bort den provades 2026-11-14
+                // och gav färre ord (3524 mot 3590) och en rad 22 s fel, utan att gå fortare.
+                while (si < speech.Count && speech[si].E <= start) si++;
+                if (si < speech.Count && speech[si].S < stop) res.Add(new Iv(start, stop));
+                start = stop;
+            }
+            return res;
+        }
+
+        static void WriteWav(string path, short[] samples, int from, int count)
+        {
+            using (var f = new FileStream(path, FileMode.Create, FileAccess.Write))
+            using (var w = new BinaryWriter(f))
+            {
+                int bytes = count * 2;
+                w.Write(Encoding.ASCII.GetBytes("RIFF")); w.Write(36 + bytes); w.Write(Encoding.ASCII.GetBytes("WAVEfmt "));
+                w.Write(16); w.Write((short)1); w.Write((short)1); w.Write(Rate); w.Write(Rate * 2); w.Write((short)2); w.Write((short)16);
+                w.Write(Encoding.ASCII.GetBytes("data")); w.Write(bytes);
+                var buf = new byte[bytes];
+                Buffer.BlockCopy(samples, from * 2, buf, 0, bytes);
+                w.Write(buf);
+            }
+        }
+
+        // En rad JSON från sherpa-onnx-offline ("tokens" = orddelar, "timestamps" = start i sekunder, "durations" = längd) → ord med tider.
+        // En orddel som börjar med mellanslag (eller ▁) börjar ett nytt ord. offsetMs = bitens start i filmen.
+        public static List<Cue> ParakeetWords(string json, double offsetMs)
+        {
+            var res = new List<Cue>();
+            var o = Json.Parse(json) as Dictionary<string, object>;
+            if (o == null || !o.ContainsKey("tokens") || !o.ContainsKey("timestamps")) return res;
+            var tok = o["tokens"] as List<object>; var ts = o["timestamps"] as List<object>;
+            var du = o.ContainsKey("durations") ? o["durations"] as List<object> : null;
+            if (tok == null || ts == null) return res;
+            Cue cur = null;
+            for (int i = 0; i < tok.Count && i < ts.Count; i++)
+            {
+                string t = (tok[i] as string ?? "").Replace('▁', ' ');
+                if (t.Trim().Length == 0) continue;
+                double s = offsetMs + Convert.ToDouble(ts[i], CultureInfo.InvariantCulture) * 1000;
+                double e = s + (du != null && i < du.Count ? Convert.ToDouble(du[i], CultureInfo.InvariantCulture) * 1000 : 80);
+                if (cur == null || t[0] == ' ') { cur = new Cue(s, Math.Max(e, s + 50), " " + t.Trim()); res.Add(cur); }
+                else { cur.Text += t.Trim(); cur.End = Math.Max(cur.End, e); }
+            }
+            return res;
+        }
+
+        // Språket gissas ur texten (Parakeet säger inte vilket språk den hörde): vanliga småord räknas. "" = oklart.
+        static readonly Dictionary<string, string[]> LangWords = new Dictionary<string, string[]> {
+            { "en", new[] { "the", "and", "you", "that", "is", "it", "what", "this", "of", "to" } },
+            { "sv", new[] { "och", "att", "det", "jag", "är", "inte", "en", "som", "på", "har" } },
+            { "no", new[] { "og", "jeg", "ikke", "det", "er", "på", "har", "hva", "meg", "deg" } },
+            { "da", new[] { "og", "jeg", "ikke", "det", "er", "på", "har", "hvad", "mig", "dig" } },
+            { "de", new[] { "und", "ich", "nicht", "das", "ist", "sie", "der", "die", "was", "ein" } },
+            { "fr", new[] { "et", "je", "pas", "que", "est", "vous", "le", "la", "les", "une" } },
+            { "es", new[] { "y", "que", "no", "es", "el", "la", "los", "una", "por", "lo" } } };
+
+        public static string GuessLanguage(IEnumerable<Cue> words)
+        {
+            var count = new Dictionary<string, int>();
+            int n = 0;
+            foreach (var w in words)
+            {
+                string t = new string((w.Text ?? "").ToLowerInvariant().Where(char.IsLetter).ToArray());
+                if (t.Length == 0) continue;
+                n++;
+                int c; count.TryGetValue(t, out c); count[t] = c + 1;
+            }
+            if (n < 30) return "";
+            string best = ""; int bestHits = 0, second = 0;
+            foreach (var kv in LangWords)
+            {
+                int hits = 0;
+                foreach (var x in kv.Value) { int c; if (count.TryGetValue(x, out c)) hits += c; }
+                if (hits > bestHits) { second = bestHits; bestHits = hits; best = kv.Key; }
+                else if (hits > second) second = hits;
+            }
+            // tydligt: minst var tionde ord är ett av småorden, och klart fler än för nästa språk (norska och danska är för lika: då "")
+            return bestHits >= n / 10 && bestHits >= second * 1.3 ? best : "";
+        }
+
+        public static bool HasParakeetCache(string file, int audioIndex)
+        {
+            try { return File.Exists(Path.Combine(CacheDir, CacheKey(file, audioIndex) + ".pkwords.srt")); }
+            catch { return false; }
+        }
+
+        // Parakeet ord för ord för "text ur ljudet" (Subtitler). Körs på processorn, ungefär 20 gånger snabbare än filmens längd.
+        public static List<Cue> GetParakeetWords(string file, int audioIndex, Action<int, string> progress, CancellationToken ct, out string language)
+        {
+            Directory.CreateDirectory(CacheDir);
+            string key = CacheKey(file, audioIndex);
+            string wFile = Path.Combine(CacheDir, key + ".pkwords.srt");
+            string langFile = Path.Combine(CacheDir, key + ".pkwords.lang.txt");
+            if (File.Exists(wFile))
+            {
+                language = File.Exists(langFile) ? File.ReadAllText(langFile).Trim() : "";
+                return Srt.LoadInOrder(wFile, 65001);
+            }
+            string exe = Tools.FindSherpa(), model = Tools.FindParakeet();
+            if (exe == null || model == null) throw new UserMessageException("Verktygen för Parakeet saknas. Försök igen – Text Sync erbjuder då att ladda ner dem.");
+            int ch; double dur; string alang;
+            progress(0, "Undersöker ljudspåret…");
+            Probe(file, audioIndex, out ch, out dur, out alang, ct);
+            string wav = Path.Combine(Path.GetTempPath(), "TextSync_" + key + "_p.wav");
+            string dir = Path.Combine(Path.GetTempPath(), "TextSync_pk_" + Guid.NewGuid().ToString("N").Substring(0, 12));
+            try
+            {
+                ExtractWav(file, audioIndex, ch, dur, wav, p => progress(p * 20 / 100, "Läser ljudet ur filmen… " + p + " %"), ct);
+                progress(20, "Letar efter tal i ljudet…");
+                var samples = ReadWav(wav);
+                var chunks = MakeChunks(DetectSpeech(wav, ct), samples.Length * 1000.0 / Rate);
+                if (chunks.Count == 0) { language = ""; return new List<Cue>(); }
+                Directory.CreateDirectory(dir);
+                var sw = Stopwatch.StartNew();
+                int threads = Math.Max(1, Math.Min(8, Environment.ProcessorCount - 2));
+                string common = "--tokens=" + Q(AnsiSafePath(Path.Combine(model, "tokens.txt"))) + " --encoder=" + Q(AnsiSafePath(Path.Combine(model, "encoder.int8.onnx"))) +
+                    " --decoder=" + Q(AnsiSafePath(Path.Combine(model, "decoder.int8.onnx"))) + " --joiner=" + Q(AnsiSafePath(Path.Combine(model, "joiner.int8.onnx"))) +
+                    " --model-type=nemo_transducer --num-threads=" + threads;
+                string sdir = AnsiSafePath(dir);
+                var words = new List<Cue>();
+                const int Batch = 24;   // bitar per körning: förloppet syns, och Avbryt går fort
+                for (int b = 0; b < chunks.Count; b += Batch)
+                {
+                    ct.ThrowIfCancellationRequested();
+                    int n = Math.Min(Batch, chunks.Count - b);
+                    progress(25 + 73 * b / chunks.Count, "Parakeet skriver ner vad som sägs… " + (100 * b / chunks.Count) + " %");
+                    var args = new StringBuilder(common);
+                    for (int k = 0; k < n; k++)
+                    {
+                        var c = chunks[b + k];
+                        int from = Math.Max(0, (int)(c.S * Rate / 1000)), to = Math.Min(samples.Length, (int)(c.E * Rate / 1000));
+                        string name = "c" + (b + k).ToString("00000") + ".wav";
+                        WriteWav(Path.Combine(dir, name), samples, from, Math.Max(0, to - from));
+                        args.Append(' ').Append(Q(Path.Combine(sdir, name)));
+                    }
+                    var json = new List<string>();
+                    string tail;
+                    int code = Run(exe, args.ToString(), l => { if (l.StartsWith("{") && l.Contains("\"timestamps\"")) lock (json) json.Add(l); }, ct, out tail);
+                    if (code != 0 || json.Count != n)
+                    {
+                        Log.Info("Parakeet misslyckades, kod " + code + ", " + json.Count + " svar för " + n + " bitar: " + Last(tail, 1000));
+                        throw new UserMessageException("Taligenkänningen (Parakeet) misslyckades. Välj Whisper i Inställningar och försök igen.\n\nDetaljer finns i loggfilen (Hjälp → Öppna mappen med loggfilen).");
+                    }
+                    for (int k = 0; k < n; k++) words.AddRange(ParakeetWords(json[k], chunks[b + k].S));
+                    for (int k = 0; k < n; k++) { try { File.Delete(Path.Combine(dir, "c" + (b + k).ToString("00000") + ".wav")); } catch { } }
+                }
+                // språket: ljudspårets märkning räcker inte (ofta fel eller saknas), så det gissas ur texten
+                language = GuessLanguage(words);
+                File.WriteAllText(wFile, Srt.ToSrt(words), new UTF8Encoding(false));
+                File.WriteAllText(langFile, language);
+                Log.Info("Parakeet klar på " + sw.Elapsed.TotalSeconds.ToString("0") + " s, " + chunks.Count + " bitar, " + words.Count + " ord, språk " + (language.Length > 0 ? language : "okänt") + ", " + threads + " trådar");
+                return words;
+            }
+            finally
+            {
+                try { File.Delete(wav); } catch { }
+                try { if (Directory.Exists(dir)) Directory.Delete(dir, true); } catch { }   // bara programmets egna tillfälliga bitar
+            }
+        }
+
         // Whisper ord för ord för "text ur ljudet" (Subtitler): som GetWords, men med språket bestämt i förväg och en inledande text,
         // så att orden kommer med stor bokstav och skiljetecken, och i den ordning de sades. Egen cache, så att Whisper-kontrollen
         // av textspår (GetWords, TextCheck) är som den var när den mättes.

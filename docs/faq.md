@@ -155,12 +155,16 @@ Synka mot filmens **ljud** i stället. Välj i listan **Referens** under filnamn
 - **Ljud A – taldetektering:** snabbast, ungefär en minut. Den hittar var det pratas.
 - **Ljud B – Whisper:** taligenkänning som hör vad som sägs. Den är säkrare men tar längre tid, särskilt utan NVIDIA-grafikkort.
 - **Ljud A+B – kombinerat:** säkrast. Rekommenderas när verktygen finns.
-- **Ljud C – text ur ljudet:** nytt. Whisper skriver ner vad som sägs som en riktig undertext, och din text synkas mot den. Eftersom referensen då är en text fungerar förslagen om radindelning och betydelsejämförelsen, som inte går mot A, B och A+B. I ett provat avsnitt blev synken ungefär lika bra som med A+B.
+- **Ljud C – text ur ljudet:** nytt. Whisper eller Parakeet (valet görs i Inställningar) skriver ner vad som sägs som en riktig undertext, och din text synkas mot den. Eftersom referensen då är en text fungerar förslagen om radindelning och betydelsejämförelsen, som inte går mot A, B och A+B. I ett provat avsnitt blev synken ungefär lika bra som med A+B.
 
 Första gången laddar Text Sync ner de gratisverktyg som behövs. Programmet frågar först och visar hur stort det är. Vad som hämtas beror på valet i listan **Grafikkort**: cirka 1,4 GB med NVIDIA-grafikkort och cirka 0,6 GB med processorn. Medan det laddas ner behövs ungefär dubbelt så mycket ledigt utrymme. Finns det inte säger programmet till innan något hämtas. Efter en Whisper-synk kan du också spara den igenkända texten som en egen undertext med **Spara igenkänd text…**. Den är automatisk och kan innehålla fel.
 
 **Jag har ingen undertext alls till filmen. Kan programmet skriva en?**
-Ja, på filmens eget språk. Dra in filmen i ruta 1 och klicka **Skapa text ur ljudet (film utan text)…** under listan Referens. Whisper lyssnar på filmen och skriver ner vad som sägs, och programmet delar in det i undertextrader om högst två rader à 42 tecken. Det tar ungefär en och en halv minut per avsnitt med NVIDIA-grafikkort, och ungefär lika lång tid som filmen utan.
+Ja, på filmens eget språk. Dra in filmen i ruta 1 och klicka **Skapa text ur ljudet (film utan text)…** under listan Referens. Programmet lyssnar på filmen och skriver ner vad som sägs, och delar in det i undertextrader om högst två rader à 42 tecken.
+
+I **Inställningar** väljer du vad som lyssnar, under **Text ur ljudet skrivs med**:
+- **Whisper** (förvalt): över 90 språk. Ungefär en och en halv minut per avsnitt med NVIDIA-grafikkort, och ungefär lika lång tid som filmen utan.
+- **Parakeet** (nytt): ungefär tre minuter per avsnitt utan grafikkort. Klarar 25 europeiska språk, bland annat svenska, norska, danska, finska, engelska, tyska, franska och spanska. I ett provat engelskt avsnitt hörde den fler repliker än Whisper, och tiderna blev något bättre. Första gången frågar programmet om det får hämta Parakeet (cirka 490 MB).
 - Texten visas i listan och ligger i ruta 2 som "Text ur filmens ljud". Ingenting är sparat än. **Synka** är grå, eftersom texten redan går i takt. Väljer du något annat i listan Referens eller läser in en ny fil försvinner texten. Är den inte sparad frågar programmet först.
 - **Läs igenom den.** Whisper hör fel ibland, särskilt namn, och kan missa korta repliker. Dubbelklicka på en rad för att rätta den, och klicka **▶** för att höra stället i filmen.
 - **Röda rader** ligger där taldetekteringen inte hittade något tal. Kontrollera dem först (**F3** hoppar till nästa).

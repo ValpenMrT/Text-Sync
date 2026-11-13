@@ -11,6 +11,8 @@ namespace TextSync
         readonly ComboBox themeCombo;
         readonly CheckBox fpsCheck, hiCheck, plainCheck, meaningCheck, autoCheck;
         public bool AutoAccept { get { return autoCheck.Checked; } }
+        readonly ComboBox engineCombo;
+        public bool UseParakeet { get { return engineCombo.SelectedIndex == 1; } }   // text ur ljudet: 0 = Whisper, 1 = Parakeet
         public bool CompareMeaning { get { return meaningCheck.Checked; } }
 
         public int ThemeIndex { get { return themeCombo.SelectedIndex; } }   // 0 = som Windows, 1 = ljust, 2 = mörkt
@@ -27,7 +29,7 @@ namespace TextSync
             "Mycket gamla spelare – Windows-teckentabell efter språket" };
 
         // showTheme = false i högkontrastläge, där Windows färger alltid används
-        public SettingsDialog(int themeIndex, bool showTheme, bool detectFps, bool removeHi, bool stripFormatting, int srtFormat, bool compareMeaning, bool autoAccept)
+        public SettingsDialog(int themeIndex, bool showTheme, bool detectFps, bool removeHi, bool stripFormatting, int srtFormat, bool compareMeaning, bool autoAccept, bool useParakeet)
         {
             SuspendLayout();
             AutoScaleDimensions = new SizeF(96F, 96F);
@@ -73,6 +75,20 @@ namespace TextSync
             t.Controls.Add(note("Rader delas, slås ihop och får repliker flyttade så att de följer referensens rader och tider (Dela?, Ihop? och Flytta?), utan att du godkänner varje förslag. " +
                 "Gäller både en enskild fil och Hel säsong. I huvudfönstret ångrar Ctrl+Z, i Hel säsong Återställ…. " +
                 "Delningar och sammanslagningar jämför bara tider och längd, så en delning kan ibland hamna fel."));
+
+            t.Controls.Add(head("Text ur ljudet"));
+            engineCombo = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 500, Margin = new Padding(0, 2, 0, 4), AccessibleName = "Text ur ljudet skrivs med" };
+            engineCombo.Items.AddRange(new object[] {
+                "Whisper – över 90 språk, snabb med NVIDIA-grafikkort",
+                "Parakeet – nytt, snabb utan grafikkort, 25 europeiska språk" });
+            engineCombo.SelectedIndex = useParakeet ? 1 : 0;
+            t.Controls.Add(new Label { Text = "Te&xt ur ljudet skrivs med:", AutoSize = true, Margin = new Padding(0, 2, 0, 2) });
+            t.Controls.Add(engineCombo);
+            long pkMb = (Tools.SherpaOnnx.Size + Tools.ModelParakeet.Size) / 1048576;
+            t.Controls.Add(note("Gäller \"Skapa text ur ljudet…\" och valet Ljud C i listan Referens. Parakeet tar ett par minuter per avsnitt utan grafikkort, " +
+                "där Whisper tar ungefär lika lång tid som filmen. I ett provat engelskt avsnitt blev Parakeets text och tider något bättre än Whispers. " +
+                "Parakeet klarar bland annat svenska, norska, danska, finska, engelska, tyska, franska och spanska. " +
+                (Tools.ParakeetNeeds().Count == 0 ? "Verktygen för Parakeet finns redan på datorn." : "Första gången frågar programmet om det får hämta Parakeet (cirka " + pkMb + " MB).")));
 
             t.Controls.Add(head("Texten"));
             hiCheck = new CheckBox { Text = "Ta bort text för &hörselskadade ([MUSIK], (skrattar), talarnamn)", AutoSize = true, Checked = removeHi, Margin = new Padding(0, 2, 0, 0) };
