@@ -227,9 +227,10 @@ namespace TextSync
         {
             string lang = Norm(GuessLang(origUsed.Path)) ?? (Regex.IsMatch(origLang, "^[a-z]{2,3}$") ? Norm(origLang) : null) ?? "en";
             string dir = Path.GetDirectoryName(mkvPath);
-            using (var d = new SaveFileDialog { Title = "Spara synkad originaltext", Filter = "SRT-undertext (*.srt)|*.srt", FileName = Path.GetFileNameWithoutExtension(mkvPath) + "." + lang + ".srt", InitialDirectory = dir, OverwritePrompt = true })
+            string def = FreePath(Path.Combine(dir, Path.GetFileNameWithoutExtension(mkvPath) + "." + lang + ".srt"), "synkad");   // skriver aldrig över en fil
+            using (var d = new SaveFileDialog { Title = "Spara synkad originaltext", Filter = "SRT-undertext (*.srt)|*.srt", FileName = Path.GetFileName(def), InitialDirectory = dir })
             {
-                if (d.ShowDialog(this) != DialogResult.OK) return;
+                if (!AskNewFile(d)) return;
                 try
                 {
                     int stripped;
@@ -318,12 +319,12 @@ namespace TextSync
             string lang = transcriptLang.Length > 0 ? transcriptLang : "und";
             string dir = Path.GetDirectoryName(mkvPath ?? tgtLoadedPath);
             string name = Path.GetFileNameWithoutExtension(mkvPath ?? tgtLoadedPath) + ".whisper." + lang + ".srt";   // eget namn: skriver aldrig över en riktig undertext
-            using (var d = new SaveFileDialog { Title = "Spara igenkänd text (automatisk textning)", Filter = "SRT-undertext (*.srt)|*.srt", FileName = name, InitialDirectory = dir, OverwritePrompt = false })
+            using (var d = new SaveFileDialog { Title = "Spara igenkänd text (automatisk textning)", Filter = "SRT-undertext (*.srt)|*.srt", FileName = name, InitialDirectory = dir })
             {
                 // skriver aldrig över en fil (ägarens svar 2026-11-13)
                 for (int n = 2; File.Exists(Path.Combine(dir, d.FileName)) && n < 1000; n++)
                     d.FileName = Path.GetFileNameWithoutExtension(mkvPath ?? tgtLoadedPath) + ".whisper" + n + "." + lang + ".srt";
-                if (!AskNewFile(d, true)) return;
+                if (!AskNewFile(d)) return;
                 try
                 {
                     // utan "(tal)"-rader; bara det Whisper faktiskt hörde

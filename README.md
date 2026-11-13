@@ -15,9 +15,9 @@ Text Sync får en undertext som inte går i takt med filmen, till exempel en sve
 
 Har filmen ingen engelsk text kan Text Sync synka mot filmens ljud i stället. Första gången frågar programmet om det får hämta gratisverktyg som behövs för det. Utan NVIDIA-grafikkort tar det längre tid.
 
-En hel säsong: klicka **Hel säsong…** och dra in mappen. Blir det inte bra ångrar **Återställ…** allt.
+En hel säsong: klicka **Hel säsong…** och dra in mappen. Blir det inte bra tar **Återställ…** bort det som sparades.
 
-Originalfilen ändras aldrig utan att en kopia sparas.
+Text Sync skriver aldrig över en fil. Finns `Filmnamn.sv.srt` redan sparas den synkade texten som `Filmnamn.synkad.sv.srt`.
 
 **Mer hjälp:** klicka **Hjälp** i programmet.
 **Problem?** Klicka **Hjälp**, öppna loggmappen och skicka `log.txt` till den som gav dig programmet.

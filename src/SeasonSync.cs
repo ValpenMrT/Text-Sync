@@ -33,6 +33,7 @@ namespace TextSync
         public string Detail = "";    // mer i tipsrutan
         public UndoEntry Entry;       // filen som sparades (null = inget sparat)
         public UndoRun Run;           // omgången som Entry hör till
+        public string DonePath;       // filen som en tidigare säsongssynk sparade (bara när State = Done)
         public UndoEntry MkvEntry;    // MKV-kopian med undertexten inlagd (null = ingen skapad)
         public UndoRun MkvRun;        // omgången som MkvEntry hör till
         public bool Saved { get { return Entry != null && !Entry.Restored; } }
@@ -180,17 +181,10 @@ namespace TextSync
             }
             else
             {
-                string outPath = it.OutputPath(o.Lang);
+                string wanted = it.OutputPath(o.Lang);
+                string outPath = it.FreeOutputPath(o.Lang);   // skriver aldrig över en fil: finns den önskade redan får den nya ".synkad" i namnet
                 if (outPath == null || MainForm.SamePath(outPath, it.RefPath)) throw new InvalidDataException("Det går inte att avgöra var undertexten ska sparas.");
-                // skrivs en fil över läggs en kopia i mappen "Text Sync original", som när man sparar över originalet i huvudfönstret.
-                // En kopia som redan finns där skrivs aldrig över. (Kopian för Återställ… sparas dessutom alltid av SeasonUndo.)
-                if (File.Exists(outPath))
-                {
-                    string bdir = Path.Combine(Path.GetDirectoryName(outPath), MainForm.BackupFolder);
-                    string backup = Path.Combine(bdir, Path.GetFileName(outPath));
-                    Directory.CreateDirectory(bdir);
-                    if (!File.Exists(backup)) File.Copy(outPath, backup);
-                }
+                if (File.Exists(outPath)) throw new InvalidDataException("Filen " + Path.GetFileName(outPath) + " finns redan och skrivs inte över. Synka avsnittet igen.");
                 int cp, replaced;
                 byte[] bytes = Srt.Encode(Srt.ToSrt(output), Srt.SaveFormat, out cp, out replaced);
                 res.Run = getRun();   // omgången skapas först när något ska sparas
@@ -199,6 +193,8 @@ namespace TextSync
                 res.State = unsure ? EpisodeState.Unsure : good ? EpisodeState.Good : EpisodeState.Check;
                 res.Text = unsure ? "✖ Osäkert – sparad ändå" : good ? "✔ Bra – sparad" : "⚠ Kontrollera – sparad";
                 detail.Add("Sparad: " + outPath);
+                if (!MainForm.SamePath(outPath, wanted))
+                    detail.Add(Path.GetFileName(wanted) + " fanns redan och skrevs inte över. Spelaren visar därför båda texterna: välj den med \"synkad\" i namnet, eller ta bort den gamla filen själv.");
                 if (unsure) detail.Add("Texten verkar inte passa " + (it.RefIsVideo ? "filmen" : "referensen") + ". Den kan höra till ett annat avsnitt eller en annan version. " +
                     "Den sparades ändå, eftersom Spara även osäkra avsnitt är ikryssad. Återställ avsnittet tar bort den.");
                 else if (!good)

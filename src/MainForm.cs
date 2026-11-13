@@ -81,8 +81,8 @@ namespace TextSync
         LinkLabel origLink; int refAudioIndex; string refInfoDefault = "";
         LinkLabel createLink;          // "Skapa text ur ljudet…" under ruta 1
         bool createdText;              // listan visar en text som skapades ur ljudet (Subtitler), inte en synk
-        // text ur ljudet görs med Parakeet i stället för Whisper (Inställningar, sparas som textengine)
-        bool useParakeet = Tools.GetSetting("textengine", "whisper") == "parakeet";
+        // text ur ljudet görs med Parakeet (förvalt, ägarens svar 2026-11-14) eller Whisper (Inställningar, sparas som textengine)
+        bool useParakeet = Tools.GetSetting("textengine", "parakeet") == "parakeet";
         string langBeforeCreate;      // språkkoden som stod i rutan innan texten ur ljudet satte sin egen
         // ruta 2 innehåller texten ur ljudet, inte en fil
         bool TargetFromAudio { get { return tgtCues != null && tgtLoadedPath == null; } }
@@ -1323,7 +1323,7 @@ namespace TextSync
                 "1. Referens: välj filmen (MKV) – eller en SRT som redan går i takt. Klicka i rutan eller dra in filen.\n" +
                 "2. Välj undertexten som inte går i takt.\n" +
                 "3. Klicka Synka. Medan programmet arbetar är samma knapp Avbryt. Beskedet ovanför listan säger om synken blev bra, och Detaljer bredvid visar förskjutningen, vad färgerna i listan betyder och hur du ändrar rader. Står det \"Kontrollera\" hoppar du mellan ställena med länkarna bredvid (märkta ⚠ i listan).\n" +
-                "4. Spara SRT: sparas som Filmnamn.sv.srt bredvid filmen, så hittar spelaren den.\n\n" +
+                "4. Spara SRT: sparas som Filmnamn.sv.srt bredvid filmen, så hittar spelaren den. Text Sync skriver aldrig över en fil: finns den redan föreslås Filmnamn.synkad.sv.srt.\n\n" +
                 "Klicka på ▶ på en rad (eller tryck P) för att spela filmen 5 sekunder före och efter raden, med texten ovanpå. Esc stänger filmfönstret.\n\n" +
                 "Har filmen ingen engelsk text men du har en engelsk SRT som inte går i takt: klicka \"Lägg till undertext på filmens originalspråk\" " +
                 "(eller dra in filmen och båda SRT-filerna). Den engelska synkas då mot filmens ljud och kontrolleras med Whisper, och sedan synkas den svenska mot den.\n\n" +
@@ -1332,7 +1332,7 @@ namespace TextSync
                 "Kodade tecken som &amp; i texten görs alltid om till riktiga tecken (&), och trasig formatering som <i> utan avslut lagas. Sådana rader är märkta ✎ i listan: håll muspekaren över raden för att se vad som stod i filen. " +
                 "Visar din TV <i> som text? Kryssa i \"Ta bort kursiv och annan formatering\" i Inställningar. Kryssar du ur rutan kommer formateringen tillbaka.\n\n" +
                 "Hel säsong (knappen Hel säsong… uppe till höger, eller dra in en mapp): alla avsnitt synkas i kö och varje undertext sparas bredvid sitt avsnitt. " +
-                "Lägg in i MKV… i det fönstret lägger in de sparade undertexterna i en kopia av varje film. Där väljer du också om osäkra avsnitt ska sparas. Återställ… i det fönstret ångrar allt: filerna som fanns före kommer tillbaka och nya undertexter tas bort. Det går även efter att programmet har stängts.\n\n" +
+                "Lägg in i MKV… i det fönstret lägger in de sparade undertexterna i en kopia av varje film. Där väljer du också om osäkra avsnitt ska sparas. Återställ… i det fönstret tar bort undertexterna som säsongssynken sparade. Filer som fanns före skrivs aldrig över. Det går även efter att programmet har stängts.\n\n" +
                 "Har du ingen undertext alls: dra in filmen och klicka \"Skapa text ur ljudet (film utan text)…\". Programmet skriver ner vad som sägs på filmens språk. Läs igenom texten, rätta med dubbelklick och spara med Spara SRT…. Programmet översätter inte. " +
                 "I Inställningar väljer du om texten skrivs med Whisper (snabb med NVIDIA-grafikkort) eller Parakeet (snabb utan grafikkort).\n\n" +
                 "Tips: dra in båda filerna samtidigt. Rödmarkerade rader saknar engelsk text samtidigt – ofta helt i sin ordning (t.ex. utrop).\n" +

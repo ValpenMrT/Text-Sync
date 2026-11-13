@@ -519,6 +519,23 @@ namespace TextSync
                 Check("Parakeet: språket gissas ur texten (engelska, svenska), och för lite text ger inget språk",
                     Audio.GuessLanguage(asWords(enText)) == "en" && Audio.GuessLanguage(asWords(svText)) == "sv" && Audio.GuessLanguage(asWords("Hello there.")) == "");
 
+                // ingenting skrivs över (2.4.17): lediga namn för synkade texter, med språkkoden sist
+                string ndir = Path.Combine(dir, "lediga namn"); if (Directory.Exists(ndir)) Directory.Delete(ndir, true);
+                Directory.CreateDirectory(ndir);
+                string n0 = Path.Combine(ndir, "Film.sv.srt"), nRef = Path.Combine(ndir, "Text.synkad.srt");
+                bool freeWhenMissing = MainForm.FreePath(n0, "synkad") == n0;
+                File.WriteAllText(n0, "x");
+                string n1 = MainForm.FreePath(n0, "synkad"); File.WriteAllText(n1, "x");
+                string n2 = MainForm.FreePath(n0, "synkad");
+                File.WriteAllText(nRef, "x");
+                Check("Skriver aldrig över: ett upptaget namn får .synkad före språkkoden, sedan .synkad2, och Namn.synkad.srt blir Namn.synkad2.srt",
+                    freeWhenMissing && Path.GetFileName(n1) == "Film.synkad.sv.srt" && Path.GetFileName(n2) == "Film.synkad2.sv.srt" &&
+                    Path.GetFileName(MainForm.FreePath(nRef, "synkad")) == "Text.synkad2.srt" && File.ReadAllText(n0) == "x");
+                List<string> unS;
+                var planS = SeasonPlan.Build(new[] { @"C:\s\F.S01E01.mkv", @"C:\s\F.S01E01.synkad.sv.srt", @"C:\s\F.S01E01.synkad2.sv.srt", @"C:\s\F.S01E01.sv.srt" }, "sv", out unS);
+                Check("Skriver aldrig över: programmets egna synkade texter väljs inte som undertext att synka",
+                    planS.Count == 1 && planS[0].TargetPath == @"C:\s\F.S01E01.sv.srt" && unS.Count == 0);
+
                 // en text ur ljudet skriver aldrig över en fil: namnet som föreslås är ledigt (2.4.15)
                 string fdir = Path.Combine(dir, "ledigt namn"); if (Directory.Exists(fdir)) Directory.Delete(fdir, true);
                 Directory.CreateDirectory(fdir);
@@ -1068,7 +1085,7 @@ namespace TextSync
                     WriteMkv(Path.Combine(sd, "Serie.S01E02.mkv"), r2, false, false);
                     WriteMkv(Path.Combine(sd, "Serie.S01E03.mkv"), r3, false, false);
                     string t1 = Path.Combine(sd, "Serie.S01E01.sv.srt"), t2 = Path.Combine(sd, @"Subs\serie 1x02.srt"), t3 = Path.Combine(sd, "Serie.S01E03.sv.srt");
-                    Srt.Save(t1, Distort(o1, t => t + 2500));                    // ligger redan där resultatet ska sparas: skrivs över
+                    Srt.Save(t1, Distort(o1, t => t + 2500));                    // ligger redan där resultatet skulle sparas: skrivs inte över, resultatet får ".synkad" i namnet
                     Srt.Save(t2, Distort(o2, t => t * 25 / 23.976 - 1200));      // i en undermapp: resultatet blir en ny fil bredvid filmen
                     Srt.Save(t3, wrong);
                     byte[] orig1 = File.ReadAllBytes(t1), orig3 = File.ReadAllBytes(t3);
@@ -1095,11 +1112,20 @@ namespace TextSync
                         (res[0].State == EpisodeState.Good || res[0].State == EpisodeState.Check) && (res[1].State == EpisodeState.Good || res[1].State == EpisodeState.Check) && File.Exists(out2));
                     // facit: texten på varje rad är den sanna starttiden
                     Func<string, bool> inSync = f => { var c = Srt.Load(f).Where(x => x.Text.StartsWith("T|")).ToList(); return c.Count > 100 && c.Count(x => Math.Abs(x.Start - double.Parse(x.Text.Substring(2))) < 300) > 0.97 * c.Count; };
-                    Check("Hel säsong: de sparade undertexterna går i takt (förskjutning och fel bildfrekvens)", inSync(t1) && inSync(out2));
+                    string out1 = res[0].Entry != null ? res[0].Entry.Path : "";
+                    Check("Hel säsong: de sparade undertexterna går i takt (förskjutning och fel bildfrekvens)", inSync(out1) && inSync(out2));
+                    Check("Hel säsong: en undertext som redan finns skrivs aldrig över: den synkade sparas med .synkad i namnet, och beskedet säger det",
+                        Path.GetFileName(out1) == "Serie.S01E01.synkad.sv.srt" && File.ReadAllBytes(t1).SequenceEqual(orig1) && res[0].Entry.Kept == null &&
+                        res[0].Detail.Contains("skrevs inte över") && res[1].Entry.Path == out2 && !res[1].Detail.Contains("skrevs inte över"));
+                    List<string> unAgain;
+                    var planAgain = SeasonPlan.Build(SeasonPlan.Collect(new[] { sd }), "sv", out unAgain);
+                    Check("Hel säsong: dras mappen in igen väljs den osynkade filen, inte programmets egen synkade, och den sparade filen hittas",
+                        planAgain.Count == 3 && planAgain[0].TargetPath == t1 && planAgain[0].SavedCandidates("sv").Contains(out1) && !unAgain.Contains(out1) &&
+                        Path.GetFileName(planAgain[0].FreeOutputPath("sv")) == "Serie.S01E01.synkad2.sv.srt");
                     Check("Hel säsong: en text som inte passar filmen blir Osäkert och sparas inte",
                         res[2].State == EpisodeState.Unsure && !res[2].Saved && File.ReadAllBytes(t3).SequenceEqual(orig3));
-                    Check("Hel säsong: den överskrivna filen finns också i mappen Text Sync original, och den osynkade i undermappen är orörd",
-                        File.ReadAllBytes(Path.Combine(sd, MainForm.BackupFolder, "Serie.S01E01.sv.srt")).SequenceEqual(orig1) && !inSync(t2));
+                    Check("Hel säsong: ingen kopia behövs i mappen Text Sync original, och den osynkade i undermappen är orörd",
+                        !Directory.Exists(Path.Combine(sd, MainForm.BackupFolder)) && !inSync(t2));
                     Check("Hel säsong: beskedet säger var filen sparades och vilken referens som användes",
                         res[1].Detail.Contains(out2) && res[1].Detail.Contains("textspår") && res[2].Detail.Contains("Ingenting har sparats"));
 
@@ -1108,16 +1134,16 @@ namespace TextSync
                     Srt.Save(t4, Distort(o2, t => t + 900).Select(c => new Cue(c.Start, c.End, "<i>" + c.Text + "</i>")).ToList());
                     var it4 = new SeasonItem { RefPath = plan[1].RefPath, RefIsVideo = true, TargetPath = t4, Include = true };
                     var r4 = SeasonSync.SyncOne(it4, new SeasonOptions { Lang = "sv", StripFormatting = true }, () => run, (a, b) => { }, System.Threading.CancellationToken.None);
-                    Check("Hel säsong: Ta bort formatering gäller det som sparas", r4.Saved && !File.ReadAllText(out2).Contains("<i>") && inSync(out2));
+                    Check("Hel säsong: Ta bort formatering gäller det som sparas", r4.Saved && r4.Entry.Path != out2 && !File.ReadAllText(r4.Entry.Path).Contains("<i>") && inSync(r4.Entry.Path));
 
                     // inställningen Godkänn förslag om radindelning automatiskt gäller också det som sparas i kön
-                    SeasonSync.SyncOne(plan[1], opt, () => run, (a, b) => { }, System.Threading.CancellationToken.None);
-                    int rowsPlain = Srt.Load(out2).Count;
+                    var rP = SeasonSync.SyncOne(plan[1], opt, () => run, (a, b) => { }, System.Threading.CancellationToken.None);
+                    int rowsPlain = Srt.Load(rP.Entry.Path).Count;
                     var rA = SeasonSync.SyncOne(plan[1], new SeasonOptions { Lang = "sv", AutoAccept = true }, () => run, (a, b) => { }, System.Threading.CancellationToken.None);
                     // en sammanslagen rad har två rader text ("T|a" och "T|b"): den första är radens sanna starttid
-                    var autoCues = Srt.Load(out2).Where(x => x.Text.StartsWith("T|")).ToList();
+                    var autoCues = Srt.Load(rA.Entry.Path).Where(x => x.Text.StartsWith("T|")).ToList();
                     bool autoInSync = autoCues.Count > 100 && autoCues.Count(x => Math.Abs(x.Start - double.Parse(x.Text.Split('\n')[0].Substring(2))) < 300) > 0.97 * autoCues.Count;
-                    int rowsAuto = Srt.Load(out2).Count;
+                    int rowsAuto = Srt.Load(rA.Entry.Path).Count;
                     Console.WriteLine("Hel säsong, radindelning: {0} rader utan inställningen, {1} med", rowsPlain, rowsAuto);
                     Check("Hel säsong: förslag om radindelning godkänns automatiskt när inställningen är på, och beskedet säger det",
                         rA.Saved && rowsAuto < rowsPlain && rA.Detail.Contains("Radindelning som referensen:") && rA.Detail.Contains("sammanslag") && autoInSync);
@@ -1130,8 +1156,8 @@ namespace TextSync
 
                     // återställning: det som fanns före kommer tillbaka, och den nya filen tas bort
                     var undone = SeasonUndo.RestoreAll(SeasonUndo.Latest());
-                    Check("Hel säsong: Återställ lägger tillbaka den osynkade filen och tar bort den nya",
-                        undone.Count == 2 && undone.All(x => x.Outcome == RestoreOutcome.Restored || x.Outcome == RestoreOutcome.Removed) &&
+                    Check("Hel säsong: Återställ tar bort alla filer som säsongssynken sparade, och det som fanns före är orört",
+                        undone.Count == 5 && undone.All(x => x.Outcome == RestoreOutcome.Removed) && Directory.GetFiles(sd, "*.synkad*.srt").Length == 0 &&
                         File.ReadAllBytes(t1).SequenceEqual(orig1) && !File.Exists(out2) && File.Exists(t2) && File.Exists(t3) && SeasonUndo.Latest() == null);
                     Check("Hel säsong: filmerna rörs aldrig", new[] { "Serie.S01E01.mkv", "Serie.S01E02.mkv", "Serie.S01E03.mkv" }.All(f => File.Exists(Path.Combine(sd, f))));
 
@@ -1152,8 +1178,8 @@ namespace TextSync
                     var runE = SeasonUndo.Begin("val");
                     var rU = SeasonSync.SyncOne(plan[2], new SeasonOptions { Lang = "sv", SaveUnsure = true }, () => runE, (a, b) => { }, System.Threading.CancellationToken.None);
                     Check("Hel säsong: med Spara även osäkra avsnitt sparas ett osäkert avsnitt, med ett besked som säger det",
-                        rU.State == EpisodeState.Unsure && rU.Saved && rU.Text.Contains("sparad ändå") && !File.ReadAllBytes(t3).SequenceEqual(orig3));
-                    Check("Hel säsong: det osäkra avsnittet går att återställa", SeasonUndo.Restore(runE, rU.Entry).Outcome == RestoreOutcome.Restored && File.ReadAllBytes(t3).SequenceEqual(orig3));
+                        rU.State == EpisodeState.Unsure && rU.Saved && rU.Text.Contains("sparad ändå") && File.Exists(rU.Entry.Path) && rU.Entry.Path != t3 && File.ReadAllBytes(t3).SequenceEqual(orig3));
+                    Check("Hel säsong: det osäkra avsnittet går att återställa", SeasonUndo.Restore(runE, rU.Entry).Outcome == RestoreOutcome.Removed && !File.Exists(rU.Entry.Path) && File.ReadAllBytes(t3).SequenceEqual(orig3));
                     string big = Path.Combine(sd, "Serie.S01E09 (Text Sync).mkv");
                     File.WriteAllText(big, "kopia av filmen");
                     var eBig = SeasonUndo.RegisterCreated(runE, big, "S01E09");

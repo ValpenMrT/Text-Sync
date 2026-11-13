@@ -335,7 +335,7 @@ namespace TextSync
             if (noNumber > 0) parts.Add("Filnamn utan avsnittsnummer (t.ex. S04E01) kan inte paras ihop automatiskt. Markera filmen och klicka Byt undertext….");
             else if (noSub > 0) parts.Add(noSub == 1 ? "1 avsnitt saknar undertext. Markera det och klicka Byt undertext… om filen finns någon annanstans." : noSub + " avsnitt saknar undertext. Markera ett avsnitt och klicka Byt undertext… om filen finns någon annanstans.");
             if (noSub > 0 && otherLang > 0) parts.Add(otherLang + (otherLang == 1 ? " undertext har" : " undertexter har") + " en annan språkkod än den som står i huvudfönstret (" + Options.Lang + ") och synkas inte.");
-            if (overwrite > 0) parts.Add((overwrite == 1 ? "1 undertext som redan finns skrivs över." : overwrite + " undertexter som redan finns skrivs över.") + " De gamla går att få tillbaka med Återställ….");
+            if (overwrite > 0) parts.Add((overwrite == 1 ? "1 avsnitt har redan en undertext bredvid filmen." : overwrite + " avsnitt har redan en undertext bredvid filmen.") + " Den skrivs inte över: den synkade texten sparas med \"synkad\" i namnet.");
             if (unused.Count > 0)
                 parts.Add((unused.Count == 1 ? "1 undertext används inte: " : unused.Count + " undertexter används inte: ") +
                     string.Join(", ", unused.Take(4).Select(f => Path.GetFileName(f))) + (unused.Count > 4 ? " med flera" : "") + ".");
@@ -361,14 +361,22 @@ namespace TextSync
             foreach (var r in rows)
             {
                 if (r.Edited || r.Out.State != EpisodeState.Waiting || r.Item.RefPath == null) continue;
-                string outPath = r.Item.OutputPath(Options.Lang);
-                KeyValuePair<UndoRun, UndoEntry> kv;
-                if (outPath == null || !own.TryGetValue(outPath, out kv)) continue;
-                try
+                // filen som programmet sparade: det önskade namnet, eller ett med ".synkad" när det önskade var upptaget.
+                // Den nyaste omgången gäller om flera finns.
+                string outPath = null;
+                var kv = default(KeyValuePair<UndoRun, UndoEntry>);
+                foreach (string cand in r.Item.SavedCandidates(Options.Lang))
                 {
-                    if (!File.Exists(outPath) || !string.Equals(SeasonUndo.HashBytes(File.ReadAllBytes(outPath)), kv.Value.Hash, StringComparison.OrdinalIgnoreCase)) continue;
+                    KeyValuePair<UndoRun, UndoEntry> k;
+                    if (!own.TryGetValue(cand, out k)) continue;
+                    try
+                    {
+                        if (!string.Equals(SeasonUndo.HashBytes(File.ReadAllBytes(cand)), k.Value.Hash, StringComparison.OrdinalIgnoreCase)) continue;
+                    }
+                    catch { continue; }
+                    if (outPath == null || k.Key.When > kv.Key.When) { outPath = cand; kv = k; }
                 }
-                catch { continue; }
+                if (outPath == null) continue;
                 var others = r.Item.Candidates.Where(c => !MainForm.SamePath(c, outPath)).ToList();
                 if (MainForm.SamePath(r.Item.TargetPath, outPath) && others.Count > 0) r.Item.TargetPath = others[0];   // den osynkade filen, inte programmets egen
                 if (others.Count <= 1 && r.Item.Note != null)
@@ -376,7 +384,7 @@ namespace TextSync
                     string note = r.Item.Note.Replace(SeasonPlan.NoteSeveral, "").Trim();
                     r.Item.Note = note.Length > 0 ? note : null;
                 }
-                r.Out = new EpisodeOutcome { State = EpisodeState.Done, Text = "✔ Redan synkad " + kv.Key.When.ToString("yyyy-MM-dd"),
+                r.Out = new EpisodeOutcome { State = EpisodeState.Done, DonePath = outPath, Text = "✔ Redan synkad " + kv.Key.When.ToString("yyyy-MM-dd"),
                     Detail = "Undertexten sparades av säsongssynken " + kv.Key.When.ToString("yyyy-MM-dd HH:mm") + ": " + outPath +
                         "\nKlicka Synka igen om avsnittet ska synkas en gång till. Återställ… ångrar säsongssynken." };
             }
@@ -432,10 +440,10 @@ namespace TextSync
             else if (!it.Include) { text = "Hoppas över"; tip = "Avsnittet synkas inte. Klicka Ta med för att synka det."; col = Theme.Muted; }
             else
             {
-                string outPath = it.OutputPath(Options.Lang);
-                bool exists = outPath != null && File.Exists(outPath);
-                text = it.Note != null ? "Väntar. " + it.Note : exists ? "Väntar – skriver över filen som finns" : "Väntar";
-                tip = "Sparas som " + outPath + "." + (exists ? "\nFilen finns redan och skrivs över. Den gamla går att få tillbaka med Återställ…." : "");
+                string wanted = it.OutputPath(Options.Lang), outPath = it.FreeOutputPath(Options.Lang);
+                bool exists = wanted != null && !MainForm.SamePath(wanted, outPath);
+                text = it.Note != null ? "Väntar. " + it.Note : exists ? "Väntar – sparas med nytt namn" : "Väntar";
+                tip = "Sparas som " + outPath + "." + (exists ? "\n" + Path.GetFileName(wanted) + " finns redan och skrivs inte över." : "");
                 if (it.Note != null) { tip = it.Note + "\n" + tip; col = Theme.Warn; }
             }
             v.SubItems[0].Text = it.Title;
@@ -782,7 +790,7 @@ namespace TextSync
             foreach (var r in rows)
             {
                 if (!HasSavedSub(r) || (r.Out.MkvEntry != null && !r.Out.MkvEntry.Restored)) continue;
-                string srt = r.Out.Saved ? r.Out.Entry.Path : r.Item.OutputPath(Options.Lang);
+                string srt = r.Out.Saved ? r.Out.Entry.Path : (r.Out.DonePath ?? r.Item.OutputPath(Options.Lang));
                 if (srt == null || !File.Exists(srt)) continue;
                 if (File.Exists(SeasonSync.MkvCopyPath(r.Item.RefPath))) { have++; continue; }
                 todo.Add(r); subs.Add(srt);

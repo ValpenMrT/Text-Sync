@@ -69,25 +69,45 @@ namespace TextSync
             return backup;
         }
 
-        // Ett ledigt filnamn bredvid filmen för en text ur ljudet: Film.en.srt, annars Film.whisper.en.srt, Film.whisper2.en.srt …
-        // Språkkoden står sist, så att spelare fortfarande känner igen språket.
-        public static string FreeTextPath(string film, string lang)
+        // Programmet skriver aldrig över en fil (ägarens svar 2026-11-14). Finns filen redan får den nya ett eget namn med ett märke:
+        // Film.sv.srt → Film.synkad.sv.srt → Film.synkad2.sv.srt …, och Namn.synkad.srt → Namn.synkad2.srt.
+        // Språkkoden står kvar sist, så att spelare känner igen språket. n = 1 ger märket utan siffra.
+        public static string TaggedPath(string preferred, string tag, int n)
         {
-            string dir = Path.GetDirectoryName(film), name = Path.GetFileNameWithoutExtension(film);
-            string p = Path.Combine(dir, name + "." + lang + ".srt");
-            for (int n = 1; File.Exists(p) && n < 1000; n++)
-                p = Path.Combine(dir, name + ".whisper" + (n > 1 ? n.ToString() : "") + "." + lang + ".srt");
-            return p;
+            string dir = Path.GetDirectoryName(preferred) ?? "", ext = Path.GetExtension(preferred), stem = Path.GetFileNameWithoutExtension(preferred), lang = "";
+            var m = Regex.Match(stem, @"\.([A-Za-z]{2,3})$");
+            if (m.Success && GuessLang(stem + ext) != null) { lang = "." + m.Groups[1].Value; stem = stem.Substring(0, m.Index); }
+            stem = Regex.Replace(stem, @"\." + Regex.Escape(tag) + @"\d*$", "", RegexOptions.IgnoreCase);
+            return Path.Combine(dir, stem + "." + tag + (n > 1 ? n.ToString() : "") + lang + ext);
         }
 
-        // Visar dialogen Spara. neverOverwrite: en fil som redan finns får inte väljas, och dialogen visas igen. false = avbrutet.
-        bool AskNewFile(SaveFileDialog d, bool neverOverwrite)
+        // Det önskade namnet om det är ledigt, annars det första lediga namnet med märket
+        public static string FreePath(string preferred, string tag)
         {
+            if (!File.Exists(preferred)) return preferred;
+            for (int n = 1; n < 10000; n++)
+            {
+                string p = TaggedPath(preferred, tag, n);
+                if (!File.Exists(p)) return p;
+            }
+            return TaggedPath(preferred, tag + "-" + Guid.NewGuid().ToString("N").Substring(0, 8), 1);
+        }
+
+        // Ett ledigt filnamn bredvid filmen för en text ur ljudet: Film.en.srt, annars Film.whisper.en.srt, Film.whisper2.en.srt …
+        public static string FreeTextPath(string film, string lang)
+        {
+            return FreePath(Path.Combine(Path.GetDirectoryName(film), Path.GetFileNameWithoutExtension(film) + "." + lang + ".srt"), "whisper");
+        }
+
+        // Visar dialogen Spara. En fil som redan finns får inte väljas: programmet säger det, och dialogen visas igen. false = avbrutet.
+        bool AskNewFile(SaveFileDialog d)
+        {
+            d.OverwritePrompt = false;
             while (true)
             {
                 if (d.ShowDialog(this) != DialogResult.OK) return false;
-                if (!neverOverwrite || !File.Exists(d.FileName)) return true;
-                MessageBox.Show(this, "Filen " + Path.GetFileName(d.FileName) + " finns redan.\n\nText Sync skriver inte över en fil med en text som är skapad ur ljudet. Välj ett annat namn.",
+                if (!File.Exists(d.FileName)) return true;
+                MessageBox.Show(this, "Filen " + Path.GetFileName(d.FileName) + " finns redan.\n\nText Sync skriver aldrig över en fil. Välj ett annat namn.",
                     Caption, MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
         }
@@ -98,13 +118,12 @@ namespace TextSync
             string lang;
             if (!TryGetLang(out lang)) return;
             if (!ConfirmLowMatch()) return;
-            // En text som skapades ur ljudet skriver aldrig över en fil (ägarens svar 2026-11-13): namnet som föreslås är ledigt,
-            // och väljer man en fil som finns får man välja ett annat namn.
+            // Ingenting skrivs över (ägarens svar 2026-11-14): namnet som föreslås är ledigt, och väljer man en fil som finns får man välja ett annat namn.
             bool fromAudio = TargetFromAudio;
-            string def = fromAudio ? FreeTextPath(mkvPath, lang) : DefaultSrtPath(lang);
-            using (var d = new SaveFileDialog { Title = fromAudio ? "Spara texten ur ljudet" : "Spara synkad undertext", Filter = "SRT-undertext (*.srt)|*.srt", FileName = Path.GetFileName(def), InitialDirectory = Path.GetDirectoryName(def), OverwritePrompt = !fromAudio })
+            string def = fromAudio ? FreeTextPath(mkvPath, lang) : FreePath(DefaultSrtPath(lang), "synkad");
+            using (var d = new SaveFileDialog { Title = fromAudio ? "Spara texten ur ljudet" : "Spara synkad undertext", Filter = "SRT-undertext (*.srt)|*.srt", FileName = Path.GetFileName(def), InitialDirectory = Path.GetDirectoryName(def) })
             {
-                if (!AskNewFile(d, fromAudio)) return;
+                if (!AskNewFile(d)) return;
                 string path = d.FileName;
                 try
                 {
@@ -195,9 +214,13 @@ namespace TextSync
                 }
             }
             string outPath;
-            using (var d = new SaveFileDialog { Title = "Spara ny MKV-fil (originalet ändras inte)", Filter = "MKV (*.mkv)|*.mkv", InitialDirectory = Path.GetDirectoryName(src), FileName = Path.GetFileNameWithoutExtension(src) + " (Text Sync).mkv", OverwritePrompt = true })
+            // en MKV-kopia som redan finns skrivs inte över: nästa heter "Film (Text Sync 2).mkv"
+            string mkvDef = Path.Combine(Path.GetDirectoryName(src), Path.GetFileNameWithoutExtension(src) + " (Text Sync).mkv");
+            for (int n = 2; File.Exists(mkvDef) && n < 10000; n++)
+                mkvDef = Path.Combine(Path.GetDirectoryName(src), Path.GetFileNameWithoutExtension(src) + " (Text Sync " + n + ").mkv");
+            using (var d = new SaveFileDialog { Title = "Spara ny MKV-fil (originalet ändras inte)", Filter = "MKV (*.mkv)|*.mkv", InitialDirectory = Path.GetDirectoryName(src), FileName = Path.GetFileName(mkvDef) })
             {
-                if (d.ShowDialog(this) != DialogResult.OK) return;
+                if (!AskNewFile(d)) return;
                 outPath = d.FileName;
             }
             if (SamePath(outPath, src))
@@ -271,7 +294,7 @@ namespace TextSync
                 cancelled = token.IsCancellationRequested;
                 if (!cancelled && (code == 0 || code == 1))
                 {
-                    if (File.Exists(outPath)) File.Delete(outPath);
+                    // filen fanns inte när namnet valdes. Har den kommit till under tiden skrivs den inte över: File.Move kastar då.
                     File.Move(muxPart, outPath);
                 }
             }

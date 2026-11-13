@@ -80,7 +80,7 @@ namespace TextSync
             engineCombo = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 500, Margin = new Padding(0, 2, 0, 4), AccessibleName = "Text ur ljudet skrivs med" };
             engineCombo.Items.AddRange(new object[] {
                 "Whisper – över 90 språk, snabb med NVIDIA-grafikkort",
-                "Parakeet – nytt, snabb utan grafikkort, 25 europeiska språk" });
+                "Parakeet – snabb utan grafikkort, 25 europeiska språk (rekommenderas)" });
             engineCombo.SelectedIndex = useParakeet ? 1 : 0;
             t.Controls.Add(new Label { Text = "Te&xt ur ljudet skrivs med:", AutoSize = true, Margin = new Padding(0, 2, 0, 2) });
             t.Controls.Add(engineCombo);

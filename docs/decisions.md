@@ -2,6 +2,20 @@
 
 Nyast först.
 
+## 2026-11-14 – 2.4.17: Programmet skriver aldrig över en fil, och Parakeet är förvalt
+- **Område:** GUI / data / Hel säsong
+- **Ägarens svar:** (1) Parakeet ska vara förvalt. (2) "Ja, inget får skrivas över", på frågan om det också ska gälla en synkad text och Hel säsong.
+- **Beslut, överskrivning.** Ersätter beslutet 2026-11-09 om att skriva över med en kopia i "Text Sync original", och beslutet 2026-11-11 om att Hel säsong skriver över med Återställ….
+  - **Ett ledigt namn föreslås alltid** (`MainForm.FreePath`): `Film.sv.srt`, annars `Film.synkad.sv.srt`, `Film.synkad2.sv.srt` och så vidare. Språkkoden står sist, så att spelare känner igen språket. `Namn.synkad.srt` blir `Namn.synkad2.srt`. Texter ur ljudet har märket "whisper" som förut.
+  - **Alla dialoger Spara** (`AskNewFile`): Spara SRT…, Spara synkad originaltext…, Spara igenkänd text… och Lägg in i MKV…. Väljer man en fil som finns säger programmet "Text Sync skriver aldrig över en fil" och visar dialogen igen. Lägg in i MKV… tog förut bort en befintlig fil: nu föreslås "Film (Text Sync 2).mkv".
+  - **Hel säsong** (`SeasonItem.FreeOutputPath`): finns `Film.sv.srt` redan sparas avsnittet som `Film.synkad.sv.srt`. Raden säger "Väntar – sparas med nytt namn" före synken, och tipsrutan säger efteråt att filen inte skrevs över. Ingen kopia läggs i "Text Sync original". Återställ… tar bort det som sparades.
+  - **Redan synkad:** programmet känner igen sin egen sparade fil också under namnen med ".synkad" (`SavedCandidates`), och väljer dem inte som undertext att synka när mappen dras in igen (`IsSynced`).
+- **Följd som ägaren bör känna till** (Claude frågade inte om den innan): den gamla, osynkade filen ligger kvar bredvid filmen. Spelare visar då två svenska texter, och användaren måste själv välja den med "synkad" i namnet eller ta bort den gamla. Synkas samma avsnitt flera gånger blir det flera filer.
+- **Beslut, Parakeet:** `textengine` är `parakeet` när inget är sparat. Valet i Inställningar heter nu "Parakeet – snabb utan grafikkort, 25 europeiska språk (rekommenderas)". Whisper väljs för språk som Parakeet inte klarar.
+- **Test:** 257 av 257 kontroller (4 nya: lediga namn, egna synkade texter väljs inte som mål, Hel säsong skriver inte över, mappen dragen in igen). Säsongstesterna som byggde på överskrivning är omskrivna.
+- **Ej provat:** dialogerna med klick, fönstret Hel säsong med en riktig säsong (raden "sparas med nytt namn", Redan synkad efter omstart), en säsong som synkades med en äldre version och återställs nu.
+- **Product-check:** Claude granskade själv. Inget blockerande: ändringen gör programmet försiktigare. Bör (docs/next.md): säg tydligare i huvudfönstret efter Spara att den gamla filen ligger kvar; `SaveWithBackup` och `WriteSafely` kan fortfarande skriva över om de anropas med en fil som finns, men ingen väg i gränssnittet gör det längre.
+
 ## 2026-11-14 – 2.4.16: Parakeet som alternativ till Whisper för text ur ljudet
 - **Område:** Synk / GUI / verktyg
 - **Önskemål (ägaren):** "lägg gärna till nvidia parakeet som alternativ", och efter att körningen stoppats av behörighetsskyddet: "ja fortsätt med parakeet".

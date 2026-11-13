@@ -50,4 +50,4 @@ Kopiera den senaste `Build\TextSync-<version>.exe` till USB. Har mottagaren en �
 - Vid oväntade fel visas ett svenskt felmeddelande som pekar på loggfilen.
 
 ## Säkerhetskopior
-När originalet skrivs över hamnar en kopia i `Text Sync original\` bredvid filen. Den tas aldrig bort automatiskt.
+Från 2.4.17 skriver programmet aldrig över en fil, så inga kopior behövs. Äldre versioner lade originalet i `Text Sync original\` bredvid filen när det skrevs över. De mapparna tas aldrig bort automatiskt, och Hel säsong hoppar fortfarande över dem.

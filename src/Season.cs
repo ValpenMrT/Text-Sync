@@ -51,6 +51,33 @@ namespace TextSync
                 o = Path.Combine(Path.GetDirectoryName(o) ?? "", Path.GetFileNameWithoutExtension(o) + ".synkad.srt");
             return o;
         }
+
+        // Där avsnittet faktiskt sparas: OutputPath om den är ledig, annars med ".synkad" i namnet (Film.synkad.sv.srt, Film.synkad2.sv.srt …).
+        // Programmet skriver aldrig över en fil (ägarens svar 2026-11-14).
+        public string FreeOutputPath(string lang)
+        {
+            string o = OutputPath(lang);
+            return o == null ? null : MainForm.FreePath(o, "synkad");
+        }
+
+        // OutputPath och de namn med ".synkad" som finns på disken: filerna som en tidigare säsongssynk kan ha sparat för avsnittet
+        public List<string> SavedCandidates(string lang)
+        {
+            var res = new List<string>();
+            string o = OutputPath(lang);
+            if (o == null) return res;
+            try
+            {
+                if (File.Exists(o)) res.Add(o);
+                for (int n = 1; n <= 50; n++)
+                {
+                    string p = MainForm.TaggedPath(o, "synkad", n);
+                    if (File.Exists(p) && !res.Contains(p, StringComparer.OrdinalIgnoreCase)) res.Add(p);
+                }
+            }
+            catch { }
+            return res;
+        }
     }
 
     public static class SeasonPlan
@@ -283,13 +310,14 @@ namespace TextSync
         static string NameNoExt(string f) { try { return Path.GetFileNameWithoutExtension(f) ?? ""; } catch { return f ?? ""; } }
         static string DirOf(string f) { try { return Path.GetDirectoryName(Path.GetFullPath(f)) ?? ""; } catch { return ""; } }
         static bool SameDir(string a, string b) { return string.Equals(DirOf(a), DirOf(b), StringComparison.OrdinalIgnoreCase); }
-        static bool IsSynced(string f) { return FileName(f).EndsWith(".synkad.srt", StringComparison.OrdinalIgnoreCase); }
+        // programmets egna synkade texter: Namn.synkad.srt, Namn.synkad2.srt, Film.synkad.sv.srt, Film.synkad3.sv.srt
+        static bool IsSynced(string f) { return System.Text.RegularExpressions.Regex.IsMatch(FileName(f), @"\.synkad\d*(\.[A-Za-z]{2,3})?\.srt$", System.Text.RegularExpressions.RegexOptions.IgnoreCase); }
 
         // Språkkoden i filnamnet, normaliserad ("swe" → "sv"), eller null. ".synkad" räknas inte som en del av namnet.
         static string LangOf(string f)
         {
             string n = NameNoExt(f);
-            if (n.EndsWith(".synkad", StringComparison.OrdinalIgnoreCase)) n = n.Substring(0, n.Length - ".synkad".Length);
+            n = System.Text.RegularExpressions.Regex.Replace(n, @"\.synkad\d*$", "", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
             try { return MainForm.Norm(MainForm.GuessLang(n + ".srt")); } catch { return null; }
         }
 

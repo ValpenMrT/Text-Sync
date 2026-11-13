@@ -69,14 +69,19 @@ Det som inte är gjort:
 - **Cachen rensas aldrig.** Varje text tar några MB i `%LOCALAPPDATA%\TextSync\cache`.
 - **Övriga idéer från samma samtal:** mäta på fler filmer, rätta den fasta avvikelsen på cirka 0,24 s mot ljud, Silero-taldetektering i Ljud A, flera referenser som röstar, scenklipp med ffmpeg, exakt ordtid mot ljudet (wav2vec2).
 
+## Kvar efter "skriver aldrig över" 2.4.17 (2026-11-14)
+- **Två texter i spelaren:** den gamla `Film.sv.srt` ligger kvar bredvid `Film.synkad.sv.srt`. Förslag: säg det i statusraden efter Spara SRT… och på raden i Hel säsong, och erbjud "Visa i mappen" så att den gamla är lätt att ta bort för hand. Programmet tar aldrig bort den själv.
+- **Flera synkar ger flera filer** (`.synkad2`, `.synkad3`). Förslag: fråga om den förra synkade filen (programmets egen, oförändrad) ska ersättas. Kräver ägarens ja, eftersom det är en överskrivning.
+- **`SaveWithBackup` och `WriteSafely`** kan fortfarande skriva över en fil om de anropas med en som finns. Ingen väg i gränssnittet gör det längre, men ett `Check` som bevisar det för varje dialog saknas.
+- **Inte provat med klick**, och inte i fönstret Hel säsong med en riktig säsong.
+- **Besvarat 2026-11-14:** Parakeet är förvalt, och ingenting skrivs över.
+
 ## Kvar efter text ur ljudet 2.4.13 (2026-11-13)
 Mätt mot Blacklist S04E01 (`test/SubDiag.cs`, se beslutsloggen). Kvar:
 - **Bara ett avsnitt mätt, och bara engelska.** De inledande texterna för svenska, norska, danska, tyska, franska och spanska (`Audio.TextPrompts`) är inte provade. Andra språk får ingen inledande text och kan komma ut utan versaler och skiljetecken.
 - **Besvarat 2026-11-13 (2.4.14):** Ljud C använder den rättade och sparade texten, programmet frågar innan en osparad text ur ljudet försvinner, och funktionen behövs inte i Hel säsong.
 - **Besvarat 2026-11-13 (2.4.15):** en text ur ljudet skriver aldrig över en fil.
-- **Fråga till ägaren:** ska "aldrig skriva över" också gälla Spara SRT… för en synkad text (i dag: Windows frågar, och en kopia läggs i "Text Sync original") och Hel säsong (i dag: skriver över, Återställ… ångrar)?
 - **Parakeet är inbyggd i 2.4.16** (beslutsloggen 2026-11-14). Kvar:
-  - **Fråga till ägaren:** ska Parakeet vara förvalt i stället för Whisper? Mätningen talar för det, men bara ett engelskt avsnitt är mätt.
   - **Bara engelska provat.** Svenskt tal är inte provat, och språkgissningen skiljer inte säkert norska från danska (då blir koden `und`).
   - **Dialogen Inställningar är cirka 980 bildpunkter hög** vid 100 %. På en liten skärm når man inte OK. Förslag: flikar eller två kolumner.
   - **Ljudet läses ur filmen två gånger** (en gång för taldetekteringen till listan, en gång för Parakeet), cirka 15 s extra.

@@ -9,7 +9,7 @@ Text Sync är inte signerat med ett köpt certifikat.
 1. Dra in filmen (MKV) och den svenska SRT-filen i fönstret. Det går också att klicka var som helst i ruta 1 eller 2 och välja filen.
 2. Klicka **Synka**. Medan programmet arbetar är knappen du klickade på **Avbryt** (också **Lägg in i MKV…**).
 3. Titta på några rader i listan. Den engelska texten bredvid ska betyda samma sak, och **Synkad start** ska ligga nära **Referenstid**. **Före synk** visar tiden i din osynkade fil, och **Flyttad** hur mycket raden flyttades. Ett plötsligt hopp i Flyttad betyder ett klipp i filmen. Kontrollera gärna raderna där.
-4. Klicka **Spara SRT…**. Filen sparas som `Filmnamn.sv.srt` bredvid filmen, och då hittar VLC, Plex och Kodi den automatiskt.
+4. Klicka **Spara SRT…**. Filen sparas som `Filmnamn.sv.srt` bredvid filmen, och då hittar VLC, Plex och Kodi den automatiskt. Finns den filen redan föreslås `Filmnamn.synkad.sv.srt`: programmet skriver aldrig över en fil.
 
 **Kan jag synka en hel säsong på en gång?**
 Ja. Klicka **Hel säsong…** längst upp till höger, eller dra in mappen med säsongen i Text Sync-fönstret. Det går också att dra in flera filmer och undertexter samtidigt.
@@ -40,17 +40,16 @@ Ja, på två sätt. Båda ger en kopia av filmen med undertexten inlagd, `Filmna
 
 Drar du in samma mapp en annan dag känner programmet igen undertexterna det redan har sparat. De står som **✔ Redan synkad** och synkas inte en gång till, så du kan fortsätta med avsnitten som återstod. Markera ett avsnitt och klicka **Synka igen** om det ändå ska göras om. En undertext som du har ändrat efter synken räknas inte som redan synkad.
 
-Finns det redan en `Filmnamn.sv.srt` bredvid filmen skrivs den över. Det står på raden före synken ("Väntar – skriver över filen som finns"). Den gamla filen kommer tillbaka med Återställ…, och en kopia läggs i mappen `Text Sync original` bredvid filen.
+Finns det redan en `Filmnamn.sv.srt` bredvid filmen skrivs den inte över. Den synkade texten sparas som `Filmnamn.synkad.sv.srt`, och det står på raden före synken ("Väntar – sparas med nytt namn"). Den gamla filen ligger kvar, så spelaren visar båda texterna tills du tar bort den gamla. Återställ… tar bort den synkade.
 
 Extra justering i huvudfönstret gäller inte här. Finns ingen film för ett avsnitt, men två undertexter på olika språk, används den andra undertexten som referens, och resultatet sparas som `Namn.synkad.srt`.
 
 **Säsongssynken blev inte bra. Kan jag ångra den?**
-Ja. Klicka **Hel säsong…** och sedan **Återställ…**. Då byts varje undertext tillbaka mot filen som fanns före synken, och undertexter som inte fanns före tas bort. Filmerna rörs aldrig.
+Ja. Klicka **Hel säsong…** och sedan **Återställ…**. Då tas undertexterna som säsongssynken sparade bort. Filerna som fanns före är orörda, eftersom programmet aldrig skriver över något. Filmerna rörs aldrig. (En säsong som synkades med version 2.4.16 eller äldre får tillbaka filerna som skrevs över då.)
 - Det går även efter att programmet har stängts. Rutan som frågar säger vilken dag och vilken mapp det gäller, och hur många filer som byts tillbaka och tas bort.
 - Varje mapp du synkar är en egen omgång, alltså en hel säsong med alla sina avsnitt. Återställ… ångrar den senaste. Finns det en äldre omgång kvar säger programmet det efteråt, och då ångrar nästa klick på Återställ… den. De tio senaste omgångarna sparas.
 - **Återställ avsnittet** ångrar bara det markerade avsnittet. Den knappen fungerar så länge programmet är öppet. Efter en omstart ångrar du hela omgången med Återställ….
 - En undertext som du har ändrat efter synken rörs inte. Programmet säger vilka filer det gäller.
-- En fil som skrevs över finns dessutom kvar i mappen `Text Sync original` bredvid filen, som när du sparar i huvudfönstret.
 
 **Vad betyder röda rader och procenten?**
 Röda rader har ingen engelsk text samtidigt. Det är ofta helt rätt, till exempel ett utrop eller textarens namn. Procenten visar hur många rader som *har* engelsk text samtidigt, och en lyckad synk brukar ge 98–100 %. Under 95 % frågar programmet innan det sparar. Tryck **F3** för att hoppa till nästa röda rad. Är många rader röda i följd har synken gått fel. Prova då metoden **Avancerad**, eller välj ett annat engelskt spår.
@@ -163,8 +162,8 @@ Första gången laddar Text Sync ner de gratisverktyg som behövs. Programmet fr
 Ja, på filmens eget språk. Dra in filmen i ruta 1 och klicka **Skapa text ur ljudet (film utan text)…** under listan Referens. Programmet lyssnar på filmen och skriver ner vad som sägs, och delar in det i undertextrader om högst två rader à 42 tecken.
 
 I **Inställningar** väljer du vad som lyssnar, under **Text ur ljudet skrivs med**:
-- **Whisper** (förvalt): över 90 språk. Ungefär en och en halv minut per avsnitt med NVIDIA-grafikkort, och ungefär lika lång tid som filmen utan.
-- **Parakeet** (nytt): ungefär tre minuter per avsnitt utan grafikkort. Klarar 25 europeiska språk, bland annat svenska, norska, danska, finska, engelska, tyska, franska och spanska. I ett provat engelskt avsnitt hörde den fler repliker än Whisper, och tiderna blev något bättre. Första gången frågar programmet om det får hämta Parakeet (cirka 490 MB).
+- **Parakeet** (förvalt): ungefär tre minuter per avsnitt utan grafikkort. Klarar 25 europeiska språk, bland annat svenska, norska, danska, finska, engelska, tyska, franska och spanska. I ett provat engelskt avsnitt hörde den fler repliker än Whisper, och tiderna blev något bättre. Första gången frågar programmet om det får hämta Parakeet (cirka 490 MB).
+- **Whisper:** över 90 språk. Ungefär en och en halv minut per avsnitt med NVIDIA-grafikkort, och ungefär lika lång tid som filmen utan. Välj den för språk som Parakeet inte klarar.
 - Texten visas i listan och ligger i ruta 2 som "Text ur filmens ljud". Ingenting är sparat än. **Synka** är grå, eftersom texten redan går i takt. Väljer du något annat i listan Referens eller läser in en ny fil försvinner texten. Är den inte sparad frågar programmet först.
 - **Läs igenom den.** Whisper hör fel ibland, särskilt namn, och kan missa korta repliker. Dubbelklicka på en rad för att rätta den, och klicka **▶** för att höra stället i filmen.
 - **Röda rader** ligger där taldetekteringen inte hittade något tal. Kontrollera dem först (**F3** hoppar till nästa).
@@ -221,8 +220,13 @@ Ja. Tab flyttar mellan fälten och Alt + understruken bokstav trycker på en kna
 **Allt är lite för tidigt eller för sent.**
 Ändra **Extra justering**. 500 betyder en halv sekund senare och −500 en halv sekund tidigare.
 
-**Jag skrev över min originalfil.**
-Originalet finns kvar i mappen `Text Sync original` bredvid filen.
+**Kan programmet skriva över mina filer?**
+Nej. Text Sync skriver aldrig över en fil. Finns `Filmnamn.sv.srt` redan sparas den synkade texten som `Filmnamn.synkad.sv.srt`, nästa gång som `Filmnamn.synkad2.sv.srt`, och så vidare. Väljer du själv ett namn som finns säger programmet det och låter dig välja ett annat. Det gäller Spara SRT…, Lägg in i MKV…, texter ur ljudet och Hel säsong.
+
+Följden är att den gamla filen ligger kvar. Spelare som VLC, Plex och Kodi visar då två svenska texter för filmen: välj den med "synkad" i namnet, eller ta själv bort den gamla filen när du har sett att den nya är bra.
+
+**Jag skrev över min originalfil i en äldre version.**
+Till och med version 2.4.16 skrev programmet över filen och lade originalet i mappen `Text Sync original` bredvid filen. Det finns kvar där.
 
 **"Lägg in i MKV" säger att MKVToolNix behövs.**
 Installera gratisprogrammet MKVToolNix. Det behövs bara för den knappen. Det räcker oftast att spara SRT-filen.
