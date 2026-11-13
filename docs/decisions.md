@@ -2,6 +2,18 @@
 
 Nyast först.
 
+## 2026-11-13 – 2.4.14: Ljud C använder den rättade och sparade texten, och programmet frågar innan en osparad text ur ljudet försvinner
+- **Område:** GUI / Synk
+- **Ägarens svar** på frågorna efter 2.4.13: (1) "Använd den som är rättad och sparad", (2) "Ja fråga", (3) text ur ljudet behövs inte i Hel säsong.
+- **Beslut:**
+  - **Sparad text:** när en text som skapades ur ljudet sparas med Spara SRT… antecknar programmet var den sparades, per film och ljudspår (`Audio.RememberSavedText`, en liten fil i cachen). Ljud C läser då den filen i stället för att bygga texten av Whispers ord. Under Detaljer står "Referens: din sparade text ur ljudet, filnamn". Finns filen inte längre används Whispers text som förut. Whisper behöver då inte köras alls.
+  - **Fråga före förlust:** ligger en osparad text ur ljudet i ruta 2 frågar programmet innan den försvinner: vid annat val i listan Referens eller Ljudspår, ny film i ruta 1 och ny fil i ruta 2. Knapparna är "Fortsätt utan att spara" och "Avbryt". Vid Avbryt ställs valet i listan tillbaka.
+  - **Hel säsong:** text ur ljudet och Ljud C byggs inte in där.
+- **Provat i fönstret** (samma process, utan klick, Blacklist S04E01 med den svenska SRT-filen): Ljud C med Whispers text och med en sparad text gav samma resultat, och referensraden visar vilken som användes. Beskedet blev **Kontrollera** (91,8 % av raderna har referenstext samtidigt), eftersom Whisper missar en del repliker. Mot filmens riktiga textspår blir det Bra.
+- **Test:** 248 av 248 kontroller (1 ny: den sparade texten koms ihåg per film och ljudspår och glöms när filen är borttagen).
+- **Ej provat:** frågerutan med klick (den går inte att visa utan klick), och hela vägen Skapa text → rätta → Spara SRT… → Ljud C med riktiga klick.
+- **Product-check:** Claude granskade själv (liten ändring efter ägarens svar). Kan vänta: frågan ställs bara för text ur ljudet, inte för andra osparade ändringar (äldre fråga i docs/next.md); en sparad text som sedan ändras i ett annat program används som den är.
+
 ## 2026-11-13 – 2.4.13: Text ur ljudet – en undertext till en film som saknar text, och Ljud C som referens
 - **Område:** Synk / GUI
 - **Önskemål (ägaren):** en engelsk text till en MKV helt utan SRT, som man sedan kan synka en svensk SRT mot.

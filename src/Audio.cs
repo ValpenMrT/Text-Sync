@@ -604,6 +604,31 @@ namespace TextSync
             finally { try { File.Delete(wav); } catch { } }
         }
 
+        // Texten ur ljudet som användaren har rättat och sparat (Spara SRT…) kommer programmet ihåg per film och ljudspår,
+        // så att Ljud C använder den i stället för Whispers orättade text. null = ingen sparad, eller filen finns inte längre.
+        public static void RememberSavedText(string film, int audioIndex, string srtPath)
+        {
+            try { Directory.CreateDirectory(CacheDir); File.WriteAllText(Path.Combine(CacheDir, CacheKey(film, audioIndex) + ".textsaved.txt"), srtPath, new UTF8Encoding(false)); }
+            catch (Exception ex) { Log.Info("Kunde inte anteckna den sparade texten ur ljudet: " + ex.Message); }
+        }
+
+        public static void ForgetSavedText(string film, int audioIndex)
+        {
+            try { File.Delete(Path.Combine(CacheDir, CacheKey(film, audioIndex) + ".textsaved.txt")); } catch { }
+        }
+
+        public static string SavedTextPath(string film, int audioIndex)
+        {
+            try
+            {
+                string f = Path.Combine(CacheDir, CacheKey(film, audioIndex) + ".textsaved.txt");
+                if (!File.Exists(f)) return null;
+                string p = File.ReadAllText(f, Encoding.UTF8).Trim();
+                return p.Length > 0 && File.Exists(p) ? p : null;
+            }
+            catch { return null; }
+        }
+
         // Finns texten ur ljudet redan i cachen? (då behöver Whisper inte köras)
         public static bool HasTextCache(string file, int audioIndex)
         {

@@ -485,6 +485,18 @@ namespace TextSync
                     string.Join(" ", longSubs.Select(c => c.Text.Replace("\n", " "))).Split(' ').Length == 60);
                 Check("Text ur ljudet: inga ord ger ingen text", Subtitler.FromWords(new List<Cue>()).Count == 0);
 
+                // Ljud C använder texten som användaren har rättat och sparat (2.4.14)
+                string fakeFilm = Path.Combine(dir, "film för sparad text.mkv"), savedSrt = Path.Combine(dir, "film för sparad text.en.srt");
+                File.WriteAllText(fakeFilm, "x"); Srt.Save(savedSrt, subs);
+                Audio.ForgetSavedText(fakeFilm, 0);
+                bool noneFirst = Audio.SavedTextPath(fakeFilm, 0) == null;
+                Audio.RememberSavedText(fakeFilm, 0, savedSrt);
+                bool found = Audio.SavedTextPath(fakeFilm, 0) == savedSrt && Audio.SavedTextPath(fakeFilm, 1) == null;
+                File.Delete(savedSrt);
+                bool goneAfterDelete = Audio.SavedTextPath(fakeFilm, 0) == null;
+                Audio.ForgetSavedText(fakeFilm, 0);
+                Check("Text ur ljudet: den sparade texten koms ihåg per film och ljudspår, och glöms när filen är borttagen", noneFirst && found && goneAfterDelete);
+
                 // rättningar efter mätningen mot en riktig film (2.4.13)
                 var inOrder = Srt.Parse("1\n00:00:02,000 --> 00:00:02,100\n What's\n\n2\n00:00:02,000 --> 00:00:02,100\n wrong\n\n3\n00:00:01,950 --> 00:00:02,400\n with\n\n4\n00:00:02,400 --> 00:00:02,900\n you?\n", true);
                 Check("Text ur ljudet: ordfilen läses i filens ordning, också när tiderna är lika eller går omlott",

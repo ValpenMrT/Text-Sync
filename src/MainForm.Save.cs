@@ -87,7 +87,12 @@ namespace TextSync
                     if (backup != null) Log.Info("Säkerhetskopia av original: " + backup);
                     unsaved = false;
                     lastOutput = path;
-                    if (TargetFromAudio) tgtInfo.Text = synced.Count + " rader. Sparad som " + Path.GetFileName(path) + ".";
+                    if (TargetFromAudio)
+                    {
+                        tgtInfo.Text = synced.Count + " rader. Sparad som " + Path.GetFileName(path) + ".";
+                        // Ljud C använder den sparade, rättade texten nästa gång (ägarens svar 2026-11-13)
+                        if (mkvPath != null) Audio.RememberSavedText(mkvPath, refAudioIndex, path);
+                    }
                     string auto = "";
                     if (mkvPath != null && SamePath(Path.GetDirectoryName(path), Path.GetDirectoryName(mkvPath))
                         && Path.GetFileName(path).StartsWith(Path.GetFileNameWithoutExtension(mkvPath) + ".", StringComparison.OrdinalIgnoreCase))

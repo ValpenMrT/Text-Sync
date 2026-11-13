@@ -72,7 +72,10 @@ Det som inte är gjort:
 ## Kvar efter text ur ljudet 2.4.13 (2026-11-13)
 Mätt mot Blacklist S04E01 (`test/SubDiag.cs`, se beslutsloggen). Kvar:
 - **Bara ett avsnitt mätt, och bara engelska.** De inledande texterna för svenska, norska, danska, tyska, franska och spanska (`Audio.TextPrompts`) är inte provade. Andra språk får ingen inledande text och kan komma ut utan versaler och skiljetecken.
-- **Frågor till ägaren från granskningen:** (1) Ska Ljud C använda texten du har rättat och sparat (`Film.en.srt`) i stället för Whispers orättade? (2) Ska programmet fråga innan en osparad, rättad text försvinner när man byter i listan Referens eller läser in en ny fil? (3) Ska den skapade texten få skriva över en befintlig `Film.en.srt` (Windows frågar i dag), eller ha ett eget namn? (4) Behövs funktionen i Hel säsong?
+- **Besvarat 2026-11-13 (2.4.14):** Ljud C använder den rättade och sparade texten, programmet frågar innan en osparad text ur ljudet försvinner, och funktionen behövs inte i Hel säsong.
+- **Fråga till ägaren som återstår:** ska den skapade texten få skriva över en befintlig `Film.en.srt` (Windows frågar i dag), eller ha ett eget namn?
+- **Ljud C ger beskedet Kontrollera** på Blacklist S04E01 (91,8 % av raderna har referenstext samtidigt), eftersom Whisper missar repliker. Gränsen för Bra är satt för riktiga textspår.
+- **Alternativ till Whisper** (ägarens fråga 2026-11-13): inget är provat. Kandidater att mäta med `SubDiag`: NVIDIA Parakeet via sherpa-onnx (fristående exe, snabb på processorn), KB-Whisper för svenskt tal.
 - **Efter Ljud C** visas "Spara igenkänd text…", som sparar samma text som `.whisper.en.srt`: två namn för samma sak.
 - **Stängningsfrågan** säger "Den synkade undertexten" också om en text som skapades ur ljudet.
 - **Ljud C som referens ger 18 rader över 1 s fel** mot 12 för A+B (men lägre medianfel). Titta på vilka rader det är.
@@ -81,7 +84,7 @@ Mätt mot Blacklist S04E01 (`test/SubDiag.cs`, se beslutsloggen). Kvar:
 - **Replikstreck** sätts bara där Whisper själv skriver dem, vilket är sällan. Två talare står därför ofta i samma rad utan streck.
 - **6 rader är kortare än 1 s** och 61 går fortare än 20 tecken per sekund (facit: 0 och 155). Hör ihop med önskemål 8, Läsbarhet.
 - **Ljud C är inte förvalt.** A+B väljs fortfarande när filmen saknar text. Mät fler filmer innan det ändras.
-- **Ljud C i Hel säsong** finns inte. Kön använder textspår, A eller A+B.
+- **Ljud C i Hel säsong** finns inte och ska inte byggas (ägarens svar 2026-11-13). Kön använder textspår, A eller A+B.
 - **Whisper körs två gånger** om man både använder "+ Whisper-kontroll" och text ur ljudet på samma film: de har var sin cache, eftersom Whisper-kontrollen är mätt utan inledande text.
 - **`-dtw` gör ingenting** för ordtiderna i SRT-utdata (mätt: identiska filer med och utan). `Audio.DtwArg` kan tas bort, eller så läses tiderna ur JSON-utdata i stället. Med `--vad` är JSON-tiderna inte omräknade till filmens tid.
 - **Whisper-kontrollen** (`GetWords`, `TextCheck`) läser fortfarande orden sorterade efter tid, och utan inledande text kommer de med gemener. Den jämför ord utan skiljetecken, så det bör inte spela roll, men mät om med `TextCheckDiag` om den ändras.

@@ -36,7 +36,8 @@ namespace TextSync
 
         void LoadReference(string path)
         {
-            if (busy) return;
+            if (busy || !ConfirmDropAudioText()) return;
+            if (TargetFromAudio) ClearResult();   // texten ur ljudet hör till den förra filmen (frågan är redan ställd)
             path = (path ?? "").Trim().Trim('"');
             ShowFile(refName, path); refLoadedPath = path; playMovie = null;
             mkvPath = null; refSrtCues = null;
@@ -171,7 +172,7 @@ namespace TextSync
 
         void LoadTarget(string path)
         {
-            if (busy) return;
+            if (busy || !ConfirmDropAudioText()) return;
             path = (path ?? "").Trim().Trim('"');
             if (!SamePath(path, tgtLoadedPath) && encCombo.SelectedIndex != 0) { encReset = true; encCombo.SelectedIndex = 0; encReset = false; } // ny fil → automatisk igen
             // en riktig fil ersätter texten ur ljudet: språkkoden som den satte gäller inte den nya filen

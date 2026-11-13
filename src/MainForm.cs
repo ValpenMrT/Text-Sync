@@ -84,6 +84,17 @@ namespace TextSync
         string langBeforeCreate;       // språkkoden som stod i rutan innan texten ur ljudet satte sin egen
         // ruta 2 innehåller texten ur ljudet, inte en fil
         bool TargetFromAudio { get { return tgtCues != null && tgtLoadedPath == null; } }
+        bool trackQuiet; int lastTrackIndex;   // listan Referens ställs tillbaka av programmet efter Avbryt i frågan nedan
+
+        // Texten ur ljudet finns bara i listan. Innan något tömmer listan (annat val i Referens eller Ljudspår, ny film, ny fil i ruta 2)
+        // frågar programmet om en osparad text får försvinna (ägarens svar 2026-11-13). true = fortsätt.
+        bool ConfirmDropAudioText()
+        {
+            if (!TargetFromAudio || !unsaved || result == null) return true;
+            return ConfirmDialog.Ask(this, Caption,
+                "Texten som skapades ur filmens ljud är inte sparad. Den försvinner om du fortsätter.\n\nKlicka Avbryt och sedan Spara SRT… om du vill behålla den.",
+                "Fortsätt utan att spara", "Avbryt");
+        }
 
         TextBox langBox;
         Label refName, tgtName;        // filnamnen i ruta 1 och 2 (hela sökvägen står i tipsrutan)
@@ -190,6 +201,14 @@ namespace TextSync
             trackCombo.DropDown += WidenDropDown;
             trackCombo.SelectedIndexChanged += (s, e) =>
             {
+                if (trackQuiet) return;
+                // en osparad text ur ljudet försvinner när listan töms: fråga först, och ställ tillbaka valet vid Avbryt
+                if (!busy && !ConfirmDropAudioText())
+                {
+                    trackQuiet = true; trackCombo.SelectedIndex = Math.Min(lastTrackIndex, trackCombo.Items.Count - 1); trackQuiet = false;
+                    return;
+                }
+                lastTrackIndex = trackCombo.SelectedIndex;
                 if (!busy) ClearResult();
                 UpdateGpuVisibility();
                 var oo = trackCombo.SelectedItem as OrigSrtOption;
@@ -214,7 +233,16 @@ namespace TextSync
             audioLabel = new Label { Text = "Lj&udspår:", AutoSize = true, Margin = new Padding(0, 7, 6, 0), Visible = false };
             audioCombo = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Anchor = AnchorStyles.Left | AnchorStyles.Right, Margin = new Padding(0, 3, 0, 0), Visible = false, AccessibleName = "Ljudspår för synk mot ljudet" };
             audioCombo.DropDown += WidenDropDown;
-            audioCombo.SelectedIndexChanged += (s, e) => { if (!audioFilling && audioCombo.SelectedIndex >= 0) SetAudioIndex(audioCombo.SelectedIndex); };
+            audioCombo.SelectedIndexChanged += (s, e) =>
+            {
+                if (audioFilling || audioCombo.SelectedIndex < 0) return;
+                if (audioCombo.SelectedIndex != refAudioIndex && !busy && !ConfirmDropAudioText())
+                {
+                    audioFilling = true; audioCombo.SelectedIndex = Math.Min(refAudioIndex, audioCombo.Items.Count - 1); audioFilling = false;
+                    return;
+                }
+                SetAudioIndex(audioCombo.SelectedIndex);
+            };
             // under den klickbara delen: en rad per lista (namn till vänster, listan fyller resten), sist länken för originaltext
             var rinfo = MakeRows();
             rinfo.Controls.Add(trackLabel, 0, 0); rinfo.Controls.Add(trackCombo, 1, 0);

@@ -94,6 +94,22 @@ namespace TextSync
                 {
                     // Ljud C: Whisper lyssnar ord för ord, orden blir en undertext, och texten synkas mot den som mot ett textspår
                     var so = (SpeechTextOption)trackCombo.SelectedItem;
+                    // har användaren rättat och sparat texten ur ljudet används den, inte Whispers orättade
+                    string saved = Audio.SavedTextPath(mkvPath, so.AudioIndex);
+                    List<Cue> savedCues = null;
+                    if (saved != null)
+                    {
+                        try { savedCues = Markup.FixAll(Srt.Load(saved)); } catch (Exception ex) { Log.Info("Den sparade texten ur ljudet kunde inte läsas (" + saved + "): " + ex.Message); }
+                        if (savedCues != null && savedCues.Count < 5) savedCues = null;
+                    }
+                    if (savedCues != null)
+                    {
+                        refc = savedCues;
+                        audioInfo = "din sparade text ur ljudet, " + Path.GetFileName(saved) + " (" + refc.Count + " rader)";
+                        Log.Info("Ljud C använder den sparade texten: " + saved);
+                    }
+                    else
+                    {
                     if (!ConfirmSlowCpu(so.AudioIndex, true, true) || !await EnsureTools(true, token)) { finalStatus = "Avbrutet."; return; }
                     string path = mkvPath; int ai = so.AudioIndex; string wl = "";
                     refc = await Task.Run(() =>
@@ -110,6 +126,7 @@ namespace TextSync
                     if (refc.Count < 5) throw new InvalidDataException("Whisper hörde nästan inget tal i filmen. Prova en annan metod i listan Referens, eller en undertext (SRT) som referens.");
                     transcript = refc; transcriptLang = wl;
                     audioInfo = "text ur ljudet, " + refc.Count + " rader" + (wl.Length > 0 ? " (" + MkvTrack.LanguageName(wl) + ")" : "");
+                    }
                 }
                 else if (aopt != null)
                 {
