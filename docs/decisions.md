@@ -2,6 +2,16 @@
 
 Nyast först.
 
+## 2026-11-13 – Film utan text: engelsk SRT ur ljudet byggs först, översättningen väntar
+- **Område:** Synk / planering
+- **Önskemål (ägaren):** "Vad kan du göra för förbättringar för att synka en engelsk text till en mkv helt utan srt som man sen kan synka till en svensk srt eller kanske översätta tal till en svensk srt. Gärna som separata alternativ."
+- **Ägarens svar:**
+  - **Flytta? ingår** i inställningen Godkänn förslag om radindelning automatiskt (2.4.11), tillsammans med Dela? och Ihop?.
+  - **Engelsk SRT ur ljudet byggs först:** Whisper gör en riktig engelsk undertext (rader om högst 2 × 42 tecken, tider efter talet) som sparas bredvid filmen och kan användas som textreferens när en svensk SRT synkas.
+  - **Översättningen till svenska hoppas över för nu.** Ingen metod är vald (lokalt eller nättjänst). Önskemål 2 i docs/next.md står kvar.
+- **Claudes val:** funktionen byggs i huvudfönstret först. Frågan om Hel säsong förstod ägaren inte, och den gällde mest översättningen.
+- **Läget i koden:** Whisper ord för ord med tider (`Audio.GetWords`), taldetekteringen (A) och "Spara igenkänd text…" finns redan. Det som saknas är radindelningen av orden till en undertext, en väg in när bara en film är inläst, och att resultatet används som textreferens.
+
 ## 2026-11-13 – 2.4.11: Inställningen Godkänn förslag om radindelning automatiskt
 - **Område:** GUI / Hel säsong
 - **Önskemål (ägaren):** "Gör en inställning att alltid acceptera föreslå radindelning som referens. Detta ska gälla både enskild fil samt vid hel säsong."

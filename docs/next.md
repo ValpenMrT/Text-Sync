@@ -4,7 +4,8 @@
 
 ## Önskemål från ägaren
 1. ~~**Engelsk SRT som mellansteg.**~~ **Klart i 1.7.** Se beslutsloggen 2026-11-09, "Separat SRT på originalspråket + Whisper-kontroll".
-2. **Översättning engelska → svenska** när svensk text saknas helt. Undersök alternativ för lokal översättning på datorn (helst utan internet och utan kostnad), kvalitet, hastighet på RTX A2000 och vad vännerna utan grafikkort behöver.
+2. **Engelsk SRT ur ljudet** (ägarens val 2026-11-13, byggs först): Whisper ord för ord → en riktig undertext (högst 2 × 42 tecken per rad, delad vid meningsslut och pauser, tider efter talet), sparad som `Filmnamn.en.srt` och använd som textreferens för en svensk SRT. Mät mot Blacklist S04E01, där filmens engelska textspår är facit. ffmpeg och Whisper finns inte på den här datorn än (bara llama.cpp).
+   **Översättning engelska → svenska** när svensk text saknas helt (väntar, ägarens svar 2026-11-13). Undersök alternativ för lokal översättning på datorn (helst utan internet och utan kostnad), kvalitet, hastighet på RTX A2000 och vad vännerna utan grafikkort behöver.
 3. ~~**Versionsnummer i exe-filens namn.**~~ **Klart i 2.1.** Se beslutsloggen 2026-11-09, "Versionsnummer i filnamnet och mappen Build". Planen var:
    - `build.ps1` läser versionen ur `Program.Version` i `src/Program.cs`, så att den bara anges på ett ställe. Bygget avbryts med ett svenskt felmeddelande om versionen inte hittas.
    - Kontrollera samtidigt att `AssemblyVersion` och `AssemblyFileVersion` i `Program.cs` stämmer med `Program.Version`, och avbryt bygget om de inte gör det.
