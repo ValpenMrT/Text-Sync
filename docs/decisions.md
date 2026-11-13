@@ -2,6 +2,36 @@
 
 Nyast först.
 
+## 2026-11-13 – 2.4.13: Text ur ljudet – en undertext till en film som saknar text, och Ljud C som referens
+- **Område:** Synk / GUI
+- **Önskemål (ägaren):** en engelsk text till en MKV helt utan SRT, som man sedan kan synka en svensk SRT mot.
+- **Ägarens svar:** verktygen fick hämtas till den här datorn (ffmpeg fanns redan, Whisper för NVIDIA och processorn, large-v3-turbo och Silero hämtades med `test/ToolsDl.cs`). Funktionen startas med en knapp när filmen är inläst, och texten ska också kunna väljas som referens.
+- **Beslut:**
+  - **Länken "Skapa text ur ljudet (film utan text)…"** under listan Referens i ruta 1. Whisper lyssnar ord för ord, `Subtitler.FromWords` gör undertextrader, och texten läggs i ruta 2 som "Text ur filmens ljud (språk)" utan fil. Den visas i listan med taldetekteringen (A) som referens, så rader där inget tal hittades blir röda. Beskedet är "Text skapad ur ljudet" i stället för Bra/Kontrollera/Osäkert. Spara SRT… föreslår `Filmnamn.<språk>.srt`. Ingenting sparas automatiskt.
+  - **Ljud C – text ur ljudet** är ett nytt val sist i listan Referens. Den svenska texten synkas mot texten ur ljudet som mot ett textspår, så förslag om radindelning och betydelsejämförelsen fungerar. Inte förvalt.
+  - **Radindelningen** (`src/Subtitler.cs`): ny rad efter en paus på 0,9 s, helst vid meningsslut, annars vid komma; högst 2 × 42 tecken och 6 s; två talare får var sin rad med replikstreck när Whisper skriver streck; texten visas 0,2 s före första ordet och står kvar minst 1 s eller 17 tecken per sekund, om nästa rad inte kommer tidigare.
+  - **Ingen översättning.** Texten blir på språket som talas.
+- **Det mätningen visade, och rättningarna** (Blacklist S04E01, filmens engelska textspår som facit):
+  - **Whisper skrev hela filmen med gemener och utan skiljetecken** när den kördes som förut. Whisper får därför en kort inledande text på filmens språk ("Hello. How are you? I am fine, thanks."), efter att språket har avgjorts med `whisper-cli -dl` (4 s). Ord med versal: 440 utan, 810 med.
+  - **Orden kom i fel ordning** ("wrong What's with you?"), eftersom SRT-läsaren sorterar efter tid och Whispers ordtider är lika eller går omlott. Ordläget läses nu i filens ordning (`Srt.LoadInOrder`).
+  - **Sista ordet före en tystnad fick hela tystnaden som längd** (en rad blev 80 s). Ett ord är nu högst 0,4 s + 0,06 s per bokstav.
+  - **Första orden efter en tystnad låg för tidigt.** Ord utanför allt tal flyttas till nästa talavsnitt från taldetekteringen (`SnapToSpeech`), och ett ord som börjar en mening men ligger före en lång paus flyttas till efter pausen (`MoveDangling`).
+  - **`-dtw` ändrar inte tiderna** i SRT-utdata. Flaggan är kvar tills vidare.
+- **Mätt efter rättningarna:** 453 rader (facit 577). Radstart mot närmaste rad i facit: median 0,24 s, 66 % inom 0,5 s. Ingen rad längre än 2 × 42 tecken, kortaste raden 0,52 s. Den svenska texten synkad mot texten ur ljudet, jämfört med synk mot filmens textspår: median 83 ms, 92 % inom 0,5 s, 18 rader över 1 s. A+B: 182 ms, 96 %, 12 rader. A: 183 ms, 95 %, 11 rader. Whisper tog 64 s på RTX A2000.
+- **Provat i fönstret** (samma process, utan klick, hela avsnittet): länken syns, 453 rader skapades, ruta 2 visar "Text ur filmens ljud (engelska)", röda rader där inget tal hittades, språkkoden blev en och Spara SRT… föreslog `…NTb.en.srt`. Synka är släckt så länge texten ur ljudet ligger i ruta 2. Efter byte i listan Referens är ruta 2 tom igen och språkkoden tillbaka på sv. Skärmbild granskad i mörkt läge.
+- **Product-check:** oberoende granskning av en subagent (ny funktion). Inget blockerande. Rättat efter granskningen:
+  - texten ur ljudet blev kvar i ruta 2 när listan tömdes, och kunde synkas mot en annan film: ruta 2 töms nu tillsammans med listan,
+  - Synka var tänd och hade kastat rättningarna i listan: den är släckt medan texten ur ljudet ligger i ruta 2,
+  - språkkoden blev kvar på "en" för nästa svenska fil: den gamla koden kommer tillbaka,
+  - rader på 1 ms när flera ord flyttades till samma tid: flyttade ord läggs efter varandra (kortaste rad 0,52 s i stället för 0,20 s),
+  - ett resultat utan avgjort språk sparas inte i cachen,
+  - varningen om lång tid på processorn tittar i rätt cache,
+  - "Inte sparad än" byts mot filnamnet efter Spara SRT….
+  - **Provat och taget tillbaka:** granskaren misstänkte att ord strax efter ett talavsnitt flyttas fel. En marginal på 0,3 s gav sämre synk (87 % mot 94 % inom 0,5 s) och togs bort.
+  - Kan vänta (docs/next.md): programmet frågar inte innan en osparad text försvinner vid byte i listorna, Ljud C använder alltid Whispers orättade text, två namn för samma text ("Spara igenkänd text…" efter Ljud C).
+- **Test:** 247 av 247 kontroller (11 nya för text ur ljudet).
+- **Ej provat:** klick på länken, Avbryt under arbetet, andra språk än engelska, dator utan NVIDIA-kort, Ljud C i fönstret (bara mätt med `SubDiag`).
+
 ## 2026-11-13 – Film utan text: engelsk SRT ur ljudet byggs först, översättningen väntar
 - **Område:** Synk / planering
 - **Önskemål (ägaren):** "Vad kan du göra för förbättringar för att synka en engelsk text till en mkv helt utan srt som man sen kan synka till en svensk srt eller kanske översätta tal till en svensk srt. Gärna som separata alternativ."

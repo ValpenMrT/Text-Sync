@@ -87,6 +87,7 @@ namespace TextSync
                     if (backup != null) Log.Info("Säkerhetskopia av original: " + backup);
                     unsaved = false;
                     lastOutput = path;
+                    if (TargetFromAudio) tgtInfo.Text = synced.Count + " rader. Sparad som " + Path.GetFileName(path) + ".";
                     string auto = "";
                     if (mkvPath != null && SamePath(Path.GetDirectoryName(path), Path.GetDirectoryName(mkvPath))
                         && Path.GetFileName(path).StartsWith(Path.GetFileNameWithoutExtension(mkvPath) + ".", StringComparison.OrdinalIgnoreCase))

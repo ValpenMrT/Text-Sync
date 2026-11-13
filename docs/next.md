@@ -4,7 +4,7 @@
 
 ## Önskemål från ägaren
 1. ~~**Engelsk SRT som mellansteg.**~~ **Klart i 1.7.** Se beslutsloggen 2026-11-09, "Separat SRT på originalspråket + Whisper-kontroll".
-2. **Engelsk SRT ur ljudet** (ägarens val 2026-11-13, byggs först): Whisper ord för ord → en riktig undertext (högst 2 × 42 tecken per rad, delad vid meningsslut och pauser, tider efter talet), sparad som `Filmnamn.en.srt` och använd som textreferens för en svensk SRT. Mät mot Blacklist S04E01, där filmens engelska textspår är facit. ffmpeg och Whisper finns inte på den här datorn än (bara llama.cpp).
+2. ~~**Engelsk SRT ur ljudet.**~~ **Klart i 2.4.13**, se beslutsloggen 2026-11-13 och "Kvar efter text ur ljudet" nedan.
    **Översättning engelska → svenska** när svensk text saknas helt (väntar, ägarens svar 2026-11-13). Undersök alternativ för lokal översättning på datorn (helst utan internet och utan kostnad), kvalitet, hastighet på RTX A2000 och vad vännerna utan grafikkort behöver.
 3. ~~**Versionsnummer i exe-filens namn.**~~ **Klart i 2.1.** Se beslutsloggen 2026-11-09, "Versionsnummer i filnamnet och mappen Build". Planen var:
    - `build.ps1` läser versionen ur `Program.Version` i `src/Program.cs`, så att den bara anges på ett ställe. Bygget avbryts med ett svenskt felmeddelande om versionen inte hittas.
@@ -68,6 +68,24 @@ Det som inte är gjort:
 - **Mot ljud:** Whispers text kunde paras med den svenska på samma sätt (Ljud B och A+B).
 - **Cachen rensas aldrig.** Varje text tar några MB i `%LOCALAPPDATA%\TextSync\cache`.
 - **Övriga idéer från samma samtal:** mäta på fler filmer, rätta den fasta avvikelsen på cirka 0,24 s mot ljud, Silero-taldetektering i Ljud A, flera referenser som röstar, scenklipp med ffmpeg, exakt ordtid mot ljudet (wav2vec2).
+
+## Kvar efter text ur ljudet 2.4.13 (2026-11-13)
+Mätt mot Blacklist S04E01 (`test/SubDiag.cs`, se beslutsloggen). Kvar:
+- **Bara ett avsnitt mätt, och bara engelska.** De inledande texterna för svenska, norska, danska, tyska, franska och spanska (`Audio.TextPrompts`) är inte provade. Andra språk får ingen inledande text och kan komma ut utan versaler och skiljetecken.
+- **Frågor till ägaren från granskningen:** (1) Ska Ljud C använda texten du har rättat och sparat (`Film.en.srt`) i stället för Whispers orättade? (2) Ska programmet fråga innan en osparad, rättad text försvinner när man byter i listan Referens eller läser in en ny fil? (3) Ska den skapade texten få skriva över en befintlig `Film.en.srt` (Windows frågar i dag), eller ha ett eget namn? (4) Behövs funktionen i Hel säsong?
+- **Efter Ljud C** visas "Spara igenkänd text…", som sparar samma text som `.whisper.en.srt`: två namn för samma sak.
+- **Stängningsfrågan** säger "Den synkade undertexten" också om en text som skapades ur ljudet.
+- **Ljud C som referens ger 18 rader över 1 s fel** mot 12 för A+B (men lägre medianfel). Titta på vilka rader det är.
+- **Radstarterna:** 66 % ligger inom 0,5 s från filmens riktiga engelska rader (median 0,24 s). Resten är mest rader som börjar på ett annat ställe i meningen än facit, men några ligger fel i tid, t.ex. "Is it true?" 4,5 s för tidigt, där taldetekteringen hörde ett ljud.
+- **Whisper missar korta repliker** ("He's a cop.", "Red,") och hör fel på namn ("Keene", "missupply").
+- **Replikstreck** sätts bara där Whisper själv skriver dem, vilket är sällan. Två talare står därför ofta i samma rad utan streck.
+- **6 rader är kortare än 1 s** och 61 går fortare än 20 tecken per sekund (facit: 0 och 155). Hör ihop med önskemål 8, Läsbarhet.
+- **Ljud C är inte förvalt.** A+B väljs fortfarande när filmen saknar text. Mät fler filmer innan det ändras.
+- **Ljud C i Hel säsong** finns inte. Kön använder textspår, A eller A+B.
+- **Whisper körs två gånger** om man både använder "+ Whisper-kontroll" och text ur ljudet på samma film: de har var sin cache, eftersom Whisper-kontrollen är mätt utan inledande text.
+- **`-dtw` gör ingenting** för ordtiderna i SRT-utdata (mätt: identiska filer med och utan). `Audio.DtwArg` kan tas bort, eller så läses tiderna ur JSON-utdata i stället. Med `--vad` är JSON-tiderna inte omräknade till filmens tid.
+- **Whisper-kontrollen** (`GetWords`, `TextCheck`) läser fortfarande orden sorterade efter tid, och utan inledande text kommer de med gemener. Den jämför ord utan skiljetecken, så det bör inte spela roll, men mät om med `TextCheckDiag` om den ändras.
+- **Inte provat med klick** på länken, Avbryt under arbetet, eller på en dator utan NVIDIA-kort.
 
 ## Kvar efter "Godkänn förslag om radindelning automatiskt" 2.4.11 (2026-11-13)
 - **Bara ett avsnitt provat** (Blacklist S04E01: 154 delningar och 1 flytt, 367 rader blev 522). Delningarna är inte genomlästa rad för rad.

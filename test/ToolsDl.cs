@@ -8,7 +8,7 @@ namespace TextSync
     {
         static int Main(string[] args)
         {
-            foreach (var p in new[] { Tools.WhisperCpu, Tools.WhisperGpu, Tools.ModelTurbo })
+            foreach (var p in new[] { Tools.Ffmpeg, Tools.WhisperCpu, Tools.WhisperGpu, Tools.ModelTurbo, Tools.SileroVad })
             {
                 if (Tools.IsInstalled(p)) { Console.WriteLine("finns redan: " + p.Name); continue; }
                 var sw = System.Diagnostics.Stopwatch.StartNew();

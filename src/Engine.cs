@@ -112,7 +112,13 @@ namespace TextSync
             return ((int.Parse(h.Value) * 60.0 + int.Parse(m.Value)) * 60.0 + int.Parse(s.Value)) * 1000.0 + ms;
         }
 
-        public static List<Cue> Parse(string text)
+        // Raderna i filens ordning, utan sortering efter tid. Whispers ord (ett per rad) har tider som går omlott eller är lika,
+        // och då är ordningen i filen den enda som säger hur orden sades.
+        public static List<Cue> LoadInOrder(string path, int codepage) { return Parse(ReadTextFile(path, codepage), true); }
+
+        public static List<Cue> Parse(string text) { return Parse(text, false); }
+
+        public static List<Cue> Parse(string text, bool keepOrder)
         {
             var cues = new List<Cue>();
             string[] lines = text.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
@@ -143,7 +149,7 @@ namespace TextSync
                 if (en < st) en = st + 1000;
                 cues.Add(new Cue(st, en, string.Join("\n", sb)));
             }
-            cues.Sort((a, b) => a.Start.CompareTo(b.Start));
+            if (!keepOrder) cues.Sort((a, b) => a.Start.CompareTo(b.Start));
             return cues;
         }
 

@@ -369,17 +369,55 @@ namespace TextSync
         // onCpuRetry: anropas när grafikkortet inte fungerade och Whisper börjar om från början på processorn
         public static List<Cue> RunWhisper(string wavPath, double durationMs, Action<int> progress, CancellationToken ct, out string language, bool words, Action onCpuRetry)
         {
+            return RunWhisper(wavPath, durationMs, progress, ct, out language, words, onCpuRetry, null, null);
+        }
+
+        // En kort inledande text på filmens språk får Whisper att skriva stor bokstav och skiljetecken genom hela filmen.
+        // Utan den började Blacklist S04E01 med gemener och utan punkter, och fortsatte så (mätt 2026-11-13: 440 mot 810 ord med versal).
+        // Bara ASCII: whisper-cli läser argumenten i Windows teckentabell.
+        static readonly Dictionary<string, string> TextPrompts = new Dictionary<string, string> {
+            { "en", "Hello. How are you? I am fine, thanks." },
+            { "sv", "Hej. Hur ser det ut? Det ser bra ut, tack." },
+            { "no", "Hei. Hvordan har du det? Jeg har det bra, takk." },
+            { "da", "Hej. Hvordan har du det? Jeg har det godt, tak." },
+            { "de", "Hallo. Wie geht es dir? Mir geht es gut, danke." },
+            { "fr", "Bonjour. Comment allez-vous? Je vais bien, merci." },
+            { "es", "Hola. Estoy bien, gracias. Hasta luego." } };
+
+        // Vilket språk som talas, enligt Whisper (lyssnar bara på början, några sekunder). "" = gick inte att avgöra.
+        public static string DetectLanguage(string wavPath, CancellationToken ct)
+        {
+            var model = Tools.FindModel(Tools.ModelFor(WhisperDevice >= 0)) ?? Tools.FindModel(Tools.ModelTurbo) ?? Tools.FindModel(Tools.ModelSmall);
+            bool gpu = WhisperDevice >= 0 && Tools.FindWhisper(true) != null && Tools.GetSetting("gpuwhisperfailed", "") != "1";
+            string exe = gpu ? Tools.FindWhisper(true) : Tools.FindWhisper(false) ?? Tools.FindWhisper(true);
+            if (model == null || exe == null) return "";
+            string lang = "";
+            var rx = new Regex(@"auto-detected language:\s*([a-z]{2,3})");
+            try
+            {
+                string tail;
+                Run(exe, "-m " + Q(AnsiSafePath(model)) + " -f " + Q(AnsiSafePath(wavPath)) + " -l auto -dl" + (gpu ? " -dev " + WhisperDevice : " -ng"),
+                    l => { var m = rx.Match(l); if (m.Success) lang = m.Groups[1].Value; }, ct, out tail);
+            }
+            catch (UserMessageException ex) { Log.Info("Språket kunde inte avgöras: " + ex.Message); }
+            return lang;
+        }
+
+        // lang = språket som Whisper ska skriva på (null = avgör själv), prompt = inledande text (null = ingen)
+        public static List<Cue> RunWhisper(string wavPath, double durationMs, Action<int> progress, CancellationToken ct, out string language, bool words, Action onCpuRetry, string lang0, string prompt)
+        {
             language = "";
             var model = Tools.FindModel(Tools.ModelFor(WhisperDevice >= 0)) ?? Tools.FindModel(Tools.ModelTurbo) ?? Tools.FindModel(Tools.ModelSmall);
             if (model == null) throw new UserMessageException("Språkmodellen för Whisper saknas. Försök synka igen – Text Sync erbjuder då att ladda ner den.");
             string outBase = Path.Combine(Path.GetTempPath(), "TextSync_w_" + Guid.NewGuid().ToString("N"));
-            string lang = "";
+            string lang = lang0 ?? "";
             var rxLang = new Regex(@"auto-detected language:\s*([a-z]{2,3})");
             var rxProg = new Regex(@"progress\s*=\s*(\d+)%");
             int threads = Math.Max(1, Math.Min(16, Environment.ProcessorCount - 2));
             // Silero-taldetektering i Whisper: färre grova tidsfel och snabbare (testat mot facit). -dev: valt grafikkort
             string vad = Tools.FindModel(Tools.SileroVad);
-            string args = "-m " + Q(AnsiSafePath(model)) + " -f " + Q(AnsiSafePath(wavPath)) + " -l auto" + (words ? " -ml 1 -sow" + DtwArg(model) : "") +
+            string args = "-m " + Q(AnsiSafePath(model)) + " -f " + Q(AnsiSafePath(wavPath)) + " -l " + (string.IsNullOrEmpty(lang0) ? "auto" : lang0) +
+                (prompt != null ? " --prompt " + Q(prompt) : "") + (words ? " -ml 1 -sow" + DtwArg(model) : "") +
                 (vad != null ? " --vad -vm " + Q(AnsiSafePath(vad)) : "") + " -osrt -of " + Q(AnsiSafePath(outBase)) + " -pp -t " + threads;
             bool gpuFailed = false;
             Action<string> onLine = l =>
@@ -420,7 +458,8 @@ namespace TextSync
                     (Tools.FindWhisper(false) == null ? " Välj processorn i listan Grafikkort och synka igen. Text Sync erbjuder då att ladda ner Whisper för processorn (21 MB)." : "") +
                     " Du kan också välja \"Ljud A – taldetektering\", som inte behöver Whisper.\n\nDetaljer finns i loggfilen (Hjälp → Öppna mappen med loggfilen).");
                 language = lang;
-                return Srt.Load(outBase + ".srt", 65001).Where(c => c.Text.Trim().Length > 0).ToList();
+                // i ordläge gäller ordningen i filen: ordens tider går omlott, så en sortering efter tid kastar om orden
+                return (words ? Srt.LoadInOrder(outBase + ".srt", 65001) : Srt.Load(outBase + ".srt", 65001)).Where(c => c.Text.Trim().Length > 0).ToList();
             }
             finally { try { File.Delete(outBase + ".srt"); } catch { } }
         }
@@ -560,6 +599,57 @@ namespace TextSync
                 Srt.Save(wFile, words);
                 File.WriteAllText(langFile, language);
                 Log.Info("Whisper ordläge klar på " + sw.Elapsed.TotalSeconds.ToString("0") + " s, " + words.Count + " ord, språk " + language);
+                return words;
+            }
+            finally { try { File.Delete(wav); } catch { } }
+        }
+
+        // Finns texten ur ljudet redan i cachen? (då behöver Whisper inte köras)
+        public static bool HasTextCache(string file, int audioIndex)
+        {
+            try { return File.Exists(Path.Combine(CacheDir, CacheKey(file, audioIndex) + ".textwords.srt")); }
+            catch { return false; }
+        }
+
+        // Whisper ord för ord för "text ur ljudet" (Subtitler): som GetWords, men med språket bestämt i förväg och en inledande text,
+        // så att orden kommer med stor bokstav och skiljetecken, och i den ordning de sades. Egen cache, så att Whisper-kontrollen
+        // av textspår (GetWords, TextCheck) är som den var när den mättes.
+        public static List<Cue> GetTextWords(string file, int audioIndex, Action<int, string> progress, CancellationToken ct, out string language)
+        {
+            Directory.CreateDirectory(CacheDir);
+            string key = CacheKey(file, audioIndex);
+            string wFile = Path.Combine(CacheDir, key + ".textwords.srt");
+            string langFile = Path.Combine(CacheDir, key + ".textwords.lang.txt");
+            if (File.Exists(wFile))
+            {
+                language = File.Exists(langFile) ? File.ReadAllText(langFile).Trim() : "";
+                return Srt.LoadInOrder(wFile, 65001);
+            }
+            int ch; double dur; string alang;
+            progress(0, "Undersöker ljudspåret…");
+            Probe(file, audioIndex, out ch, out dur, out alang, ct);
+            string wav = Path.Combine(Path.GetTempPath(), "TextSync_" + key + "_t.wav");
+            try
+            {
+                ExtractWav(file, audioIndex, ch, dur, wav, p => progress(p * 28 / 100, "Läser ljudet ur filmen… " + p + " %"), ct);
+                progress(29, "Whisper avgör vilket språk som talas…");
+                string lang = DetectLanguage(wav, ct);
+                ct.ThrowIfCancellationRequested();
+                string prompt;
+                if (!TextPrompts.TryGetValue(lang, out prompt)) prompt = null;
+                var sw = Stopwatch.StartNew();
+                string phase = "Whisper skriver ner vad som sägs… ";
+                string l2;
+                var words = RunWhisper(wav, dur, p => progress(30 + p * 65 / 100, phase + p + " %"), ct, out l2, true, () => phase = CpuRetryText, lang.Length > 0 ? lang : null, prompt);
+                language = lang.Length > 0 ? lang : l2;
+                // gick språket inte att avgöra kördes Whisper utan inledande text, och texten kan sakna versaler och skiljetecken:
+                // det resultatet sparas inte i cachen, så att nästa försök kan bli bättre
+                if (lang.Length > 0)
+                {
+                    File.WriteAllText(wFile, Srt.ToSrt(words), new UTF8Encoding(false));   // i samma ordning, utan sortering
+                    File.WriteAllText(langFile, language);
+                }
+                Log.Info("Whisper för text ur ljudet klar på " + sw.Elapsed.TotalSeconds.ToString("0") + " s, " + words.Count + " ord, språk " + language + (prompt != null ? ", med inledande text" : ", utan inledande text"));
                 return words;
             }
             finally { try { File.Delete(wav); } catch { } }

@@ -79,6 +79,11 @@ namespace TextSync
         List<Cue> origSynced; OrigSrtOption origUsed; string origLang = "";    // originaltexten (t.ex. engelska) efter synk mot ljudet
         LinkLabel saveTextBtn;
         LinkLabel origLink; int refAudioIndex; string refInfoDefault = "";
+        LinkLabel createLink;          // "Skapa text ur ljudet…" under ruta 1
+        bool createdText;              // listan visar en text som skapades ur ljudet (Subtitler), inte en synk
+        string langBeforeCreate;       // språkkoden som stod i rutan innan texten ur ljudet satte sin egen
+        // ruta 2 innehåller texten ur ljudet, inte en fil
+        bool TargetFromAudio { get { return tgtCues != null && tgtLoadedPath == null; } }
 
         TextBox langBox;
         Label refName, tgtName;        // filnamnen i ruta 1 och 2 (hela sökvägen står i tipsrutan)
@@ -216,6 +221,11 @@ namespace TextSync
             rinfo.Controls.Add(gpuLabel, 0, 1); rinfo.Controls.Add(gpuCombo, 1, 1);
             rinfo.Controls.Add(audioLabel, 0, 2); rinfo.Controls.Add(audioCombo, 1, 2);
             rinfo.Controls.Add(origLink, 0, 3); rinfo.SetColumnSpan(origLink, 2);
+            // film utan text: Whisper lyssnar ord för ord och orden blir en undertext som visas i listan och kan sparas
+            createLink = new LinkLabel { Text = "Skapa text ur ljudet (film utan text)…", AutoSize = true, Margin = new Padding(0, 6, 0, 0), Visible = false, LinkColor = Accent };
+            createLink.LinkClicked += async (s, e) => await CreateTextFromAudio();
+            tips.SetToolTip(createLink, "Whisper lyssnar på filmen och skriver en undertext på filmens språk. Texten visas i listan, där du kan rätta den och spara den bredvid filmen.");
+            rinfo.Controls.Add(createLink, 0, 4); rinfo.SetColumnSpan(createLink, 2);
             Tools.GpuScan();   // letar efter NVIDIA-kort i bakgrunden redan nu, så att listan Grafikkort är klar när den behövs
             var refCard = MakeCard("1.  Referens – undertext i takt med filmen (textspår i MKV eller SRT) eller filmens ljud", refName, refBtn, refInfo, rinfo, BrowseRef, LoadReference);
 
@@ -903,10 +913,10 @@ namespace TextSync
         // Rader under den klickbara delen av en ruta: namn till vänster, lista som fyller resten
         static TableLayoutPanel MakeRows()
         {
-            var t = new TableLayoutPanel { AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, ColumnCount = 2, RowCount = 4 };
+            var t = new TableLayoutPanel { AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, ColumnCount = 2, RowCount = 5 };
             t.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
             t.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-            for (int i = 0; i < 4; i++) t.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            for (int i = 0; i < 5; i++) t.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             return t;
         }
 
@@ -1211,10 +1221,11 @@ namespace TextSync
             bool haveRef = refSrtCues != null || (mkvPath != null && trackCombo.SelectedItem != null);
             // medan programmet arbetar är knappen som startade arbetet Avbryt (Synka om inget annat är sagt)
             var owner = busyBtn ?? syncBtn;
-            syncBtn.Enabled = busy ? owner == syncBtn && !cancelling : haveRef && tgtCues != null;
+            // texten ur ljudet är redan i takt med filmen: en synk av den skulle bara kasta rättningarna i listan
+            syncBtn.Enabled = busy ? owner == syncBtn && !cancelling : haveRef && tgtCues != null && !TargetFromAudio;
             saveBtn.Enabled = !busy && synced != null;
             muxBtn.Enabled = busy ? owner == muxBtn && !cancelling : synced != null;
-            foreach (Control c in new Control[] { refBtn, tgtBtn, trackCombo, modeCombo, settingsBtn, seasonBtn, extraNum, langBox, encCombo, gpuCombo, audioCombo, origLink })
+            foreach (Control c in new Control[] { refBtn, tgtBtn, trackCombo, modeCombo, settingsBtn, seasonBtn, extraNum, langBox, encCombo, gpuCombo, audioCombo, origLink, createLink })
                 if (c != null) c.Enabled = !busy;
             gpuCombo.Enabled = !busy && !gpuPending;
         }
@@ -1283,6 +1294,7 @@ namespace TextSync
                 "Visar din TV <i> som text? Kryssa i \"Ta bort kursiv och annan formatering\" i Inställningar. Kryssar du ur rutan kommer formateringen tillbaka.\n\n" +
                 "Hel säsong (knappen Hel säsong… uppe till höger, eller dra in en mapp): alla avsnitt synkas i kö och varje undertext sparas bredvid sitt avsnitt. " +
                 "Lägg in i MKV… i det fönstret lägger in de sparade undertexterna i en kopia av varje film. Där väljer du också om osäkra avsnitt ska sparas. Återställ… i det fönstret ångrar allt: filerna som fanns före kommer tillbaka och nya undertexter tas bort. Det går även efter att programmet har stängts.\n\n" +
+                "Har du ingen undertext alls: dra in filmen och klicka \"Skapa text ur ljudet (film utan text)…\". Whisper skriver ner vad som sägs på filmens språk. Läs igenom texten, rätta med dubbelklick och spara med Spara SRT…. Programmet översätter inte.\n\n" +
                 "Tips: dra in båda filerna samtidigt. Rödmarkerade rader saknar engelsk text samtidigt – ofta helt i sin ordning (t.ex. utrop).\n" +
                 "Kryssa i \"Föreslå radindelning som referensen\" så föreslår programmet att dela eller slå ihop rader som de engelska (blå, \"Dela?\"/\"Ihop?\") – högerklicka för att godkänna. " +
                 "Under varje förslag står hur raden blir om du godkänner det (→ blir). " +

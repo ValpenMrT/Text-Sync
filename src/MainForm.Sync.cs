@@ -90,6 +90,27 @@ namespace TextSync
                     audioInfo = "originaltexten synkad mot ljudet (" + coarse.Method.ToLowerInvariant() + ", " + FmtOffset(coarse.OffsetMs) + "). " + chk.Summary("originaltexten");
                     Log.Info(audioInfo);
                 }
+                else if (refc == null && trackCombo.SelectedItem is SpeechTextOption)
+                {
+                    // Ljud C: Whisper lyssnar ord för ord, orden blir en undertext, och texten synkas mot den som mot ett textspår
+                    var so = (SpeechTextOption)trackCombo.SelectedItem;
+                    if (!ConfirmSlowCpu(so.AudioIndex, true, true) || !await EnsureTools(true, token)) { finalStatus = "Avbrutet."; return; }
+                    string path = mkvPath; int ai = so.AudioIndex; string wl = "";
+                    refc = await Task.Run(() =>
+                    {
+                        // taldetekteringen (A) vet när talet börjar efter en tystnad, där Whispers ordtider är osäkra
+                        var sp = Audio.GetReference(path, new AudioRefOption { Mode = AudioMode.Speech, AudioIndex = ai },
+                            (p, s) => { token.ThrowIfCancellationRequested(); Progress(p * 20 / 100, s); }, token);
+                        string l;
+                        var words = Audio.GetTextWords(path, ai, (p, s) => { token.ThrowIfCancellationRequested(); Progress(20 + p * 75 / 100, s); }, token, out l);
+                        wl = l ?? "";
+                        Progress(96, "Delar in det Whisper hörde i rader…");
+                        return Subtitler.FromWords(words, sp.Cues);
+                    });
+                    if (refc.Count < 5) throw new InvalidDataException("Whisper hörde nästan inget tal i filmen. Prova en annan metod i listan Referens, eller en undertext (SRT) som referens.");
+                    transcript = refc; transcriptLang = wl;
+                    audioInfo = "text ur ljudet, " + refc.Count + " rader" + (wl.Length > 0 ? " (" + MkvTrack.LanguageName(wl) + ")" : "");
+                }
                 else if (aopt != null)
                 {
                     if ((aopt.Mode != AudioMode.Speech && !ConfirmSlowCpu(aopt.AudioIndex, false)) || !await EnsureTools(aopt.Mode != AudioMode.Speech, token)) { finalStatus = "Avbrutet."; return; }
@@ -168,6 +189,7 @@ namespace TextSync
                 // raderna kan bara matchas mot riktig text: textspår, SRT eller originaltext, inte ljudet
                 refIsText = mkvPath == null || !(trackCombo.SelectedItem is AudioRefOption);
                 rejected.Clear();
+                createdText = false;
                 result = r;
                 undo.Clear();
                 unsaved = true;
@@ -221,7 +243,15 @@ namespace TextSync
             bool sparse = quality != null && quality.Sparse;
             bool weak = quality != null && quality.Weak.Count > 0;
             string more = null;   // fortsättningen på beskedet, under Detaljer
-            if (v == Verdict.Good)
+            if (createdText)
+            {
+                // en text som skapades ur ljudet är ingen synk: beskedet säger vad den är och vad man gör med den
+                verdictLabel.Text = "Text skapad ur ljudet"; verdictLabel.ForeColor = Theme.Fg;
+                summaryLabel.Text = "Whisper kan höra fel, särskilt namn. Läs igenom, rätta med dubbelklick och spara med Spara SRT…." +
+                    (anyRed ? " Röda rader ligger där taldetekteringen inte hittade tal: kontrollera dem." : "");
+                more = "▶ spelar stället i filmen med texten ovanpå. F3 hoppar till nästa röda rad.";
+            }
+            else if (v == Verdict.Good)
             {
                 verdictLabel.Text = "✔  Bra"; verdictLabel.ForeColor = OkColor;
                 summaryLabel.Text = refIsText ? "Texten går i takt med referensen." : "Raderna ligger på tal i filmens ljud. Mot ljud är beskedet mindre säkert än mot en text, så kontrollera några rader.";
@@ -249,12 +279,12 @@ namespace TextSync
                 more = "Texten kan höra till ett annat avsnitt eller en annan version av filmen.";
             }
             summaryLabel.ForeColor = Theme.Fg;
-            weakLinks = v != Verdict.Good && weakStops.Count > 0 && !sparse;
+            weakLinks = v != Verdict.Good && weakStops.Count > 0 && !sparse && !createdText;
             prevWeakLink.Visible = nextWeakLink.Visible = weakLinks;
 
             // ---- siffrorna
             var ao = trackCombo.SelectedItem as AudioRefOption;
-            bool speech = ao != null && ao.Mode != AudioMode.Whisper;   // referensen är tal i ljudet, inte text
+            bool speech = createdText || (ao != null && ao.Mode != AudioMode.Whisper);   // referensen är tal i ljudet, inte text
             int n = rowMatched != null ? rowMatched.Length : 0, ok = 0, red = 0;
             bool good = true;
             for (int i = 0; i < n; i++)
@@ -283,7 +313,7 @@ namespace TextSync
             chipFixed.Visible = fixedRows > 0;
             chipFixed.Text = "✎ " + (fixedRows == 1 ? "1 rättad rad" : fixedRows + " rättade rader");
             bool drift = Math.Abs(r.DriftMsPerHour) >= 1;
-            chipSeg.Visible = true;
+            chipSeg.Visible = !createdText;
             // "avsnitt" kan läsas som avsnitt av en tv-serie, därför "delar" här
             chipSeg.Text = r.Segments.Count > 1 ? "Flyttad olika mycket i " + r.Segments.Count + " delar" : "Förskjutning " + FmtOffset(r.OffsetMs) + (drift ? ", drift " + Fmt(r.DriftMsPerHour, "0") + " ms/timme" : "");
             tips.SetToolTip(chipSeg, r.Segments.Count > 1 ? "Texten har flyttats olika mycket i olika delar av filmen, t.ex. vid klipp eller reklampauser. Se Detaljer." : null);
@@ -326,7 +356,7 @@ namespace TextSync
                 for (int i = 0; i < half; i++) d.Append(parts[i] + (i + half < parts.Count ? "          " + parts[i + half] : "") + "\n");
                 if (r.Segments.Count > 8) d.Append("… (" + r.Segments.Count + " st)\n");
             }
-            else d.Append("Förskjutning: " + FmtOffset(r.OffsetMs) + (drift ? "     Drift: " + Fmt(r.DriftMsPerHour, "0") + " ms/timme" : "") + "\n");
+            else if (!createdText) d.Append("Förskjutning: " + FmtOffset(r.OffsetMs) + (drift ? "     Drift: " + Fmt(r.DriftMsPerHour, "0") + " ms/timme" : "") + "\n");
             if (r.FpsText.Length > 0) d.Append(r.FpsText + "\n");
             if (meaningText != null) d.Append(meaningText + "\n");
             if (more != null) d.Append(more + "\n");

@@ -42,7 +42,7 @@ namespace TextSync
             mkvPath = null; refSrtCues = null;
             trackCombo.Items.Clear(); trackCombo.Visible = trackLabel.Visible = false;
             audioFilling = true; audioCombo.Items.Clear(); audioFilling = false; audioLabel.Visible = audioCombo.Visible = false; refAudioIndex = 0;
-            origLink.Visible = false; origLink.Text = "Lägg till undertext på filmens originalspråk (SRT)…"; refInfoDefault = "";
+            origLink.Visible = createLink.Visible = false; origLink.Text = "Lägg till undertext på filmens originalspråk (SRT)…"; refInfoDefault = "";
             ClearResult();
             if (path.Length == 0) { refInfo.Text = ""; return; }
             if (!File.Exists(path)) { refInfo.Text = "Filen finns inte."; refInfo.ForeColor = ErrColor; UpdateButtons(); return; }
@@ -73,6 +73,7 @@ namespace TextSync
                     int firstAudio = trackCombo.Items.Count;
                     foreach (AudioMode m in new[] { AudioMode.Speech, AudioMode.Whisper, AudioMode.Combined })
                         trackCombo.Items.Add(new AudioRefOption { Mode = m });
+                    trackCombo.Items.Add(new SpeechTextOption());   // text ur ljudet som referens (Subtitler)
                     trackCombo.Visible = trackLabel.Visible = true;
                     FillAudio(audio);
                     // andra format än MKV: ljudspåren läses med ffprobe i bakgrunden (om ffmpeg redan är nedladdat)
@@ -84,7 +85,7 @@ namespace TextSync
                             if (!IsDisposed && !t.IsFaulted && t.Result.Count > 1 && refLoadedPath == p0 && mkvPath == p0 && !busy) FillAudio(t.Result);
                         }, TaskScheduler.FromCurrentSynchronizationContext());
                     }
-                    origLink.Visible = audio.Count > 0 || Audio.IsVideo(path);
+                    origLink.Visible = createLink.Visible = audio.Count > 0 || Audio.IsVideo(path);
                     if (text.Count == 0)
                     {
                         // ingen textundertext: synka mot ljudet. A+B om Whisper redan finns, annars A (snabbt, ingen stor nedladdning)
@@ -173,6 +174,8 @@ namespace TextSync
             if (busy) return;
             path = (path ?? "").Trim().Trim('"');
             if (!SamePath(path, tgtLoadedPath) && encCombo.SelectedIndex != 0) { encReset = true; encCombo.SelectedIndex = 0; encReset = false; } // ny fil → automatisk igen
+            // en riktig fil ersätter texten ur ljudet: språkkoden som den satte gäller inte den nya filen
+            if (TargetFromAudio && langBeforeCreate != null) { langBox.Text = langBeforeCreate; langBeforeCreate = null; }
             ShowFile(tgtName, path); tgtLoadedPath = path; playMovie = null;
             tgtCues = null; ClearResult();
             if (path.Length == 0) { tgtInfo.Text = ""; return; }
@@ -215,7 +218,17 @@ namespace TextSync
 
         void ClearResult()
         {
-            result = null; synced = null; refCuesUsed = null; unsaved = false;
+            result = null; synced = null; refCuesUsed = null; unsaved = false; createdText = false;
+            // En text som skapades ur ljudet finns bara i listan. När listan töms (ny referens, annat val i Referens eller Ljudspår)
+            // hör den inte längre till något, så ruta 2 blir tom igen och språkkoden blir den som stod där förut.
+            if (TargetFromAudio)
+            {
+                tgtCues = null;
+                if (tgtName != null) ShowFile(tgtName, "");
+                if (tgtInfo != null) { tgtInfo.ForeColor = Muted; tgtInfo.Text = "Klicka här eller dra in SRT-filen."; }
+                if (langBox != null && langBeforeCreate != null) langBox.Text = langBeforeCreate;
+                langBeforeCreate = null;
+            }
             if (list != null) list.Items.Clear();
             rowCue = null; cueRow = null; rowRef = null; rowProp = null; refOnlyTotal = 0;
             if (searchInfo != null) searchInfo.Text = "";

@@ -47,6 +47,7 @@ namespace TextSync
                 if (it is AudioRefOption) ((AudioRefOption)it).AudioIndex = idx;
                 else if (it is TextCheckOption) ((TextCheckOption)it).AudioIndex = idx;
                 else if (it is OrigSrtOption) ((OrigSrtOption)it).AudioIndex = idx;
+                else if (it is SpeechTextOption) ((SpeechTextOption)it).AudioIndex = idx;
             }
             if (changed && !busy) { ClearResult(); Log.Info("Ljudspår valt: " + audioCombo.SelectedItem); }
             UpdateGpuVisibility();
@@ -56,7 +57,7 @@ namespace TextSync
         void UpdateGpuVisibility()
         {
             var a = trackCombo.SelectedItem as AudioRefOption;
-            bool whisper = (a != null && a.Mode != AudioMode.Speech) || trackCombo.SelectedItem is TextCheckOption || trackCombo.SelectedItem is OrigSrtOption;
+            bool whisper = (a != null && a.Mode != AudioMode.Speech) || trackCombo.SelectedItem is TextCheckOption || trackCombo.SelectedItem is OrigSrtOption || trackCombo.SelectedItem is SpeechTextOption;
             if (whisper && gpuDevices == null) FillGpus();
             gpuLabel.Visible = gpuCombo.Visible = whisper;
             audioLabel.Visible = audioCombo.Visible = audioCombo.Items.Count > 1 && (a != null || whisper);
@@ -91,9 +92,12 @@ namespace TextSync
         }
 
         // Whisper på processorn tar lång tid: fråga först (inte om resultatet redan finns i cachen)
-        bool ConfirmSlowCpu(int audioIndex, bool words)
+        bool ConfirmSlowCpu(int audioIndex, bool words) { return ConfirmSlowCpu(audioIndex, words, false); }
+
+        // textMode = text ur ljudet (Audio.GetTextWords), som har en egen cache
+        bool ConfirmSlowCpu(int audioIndex, bool words, bool textMode)
         {
-            if (Audio.WhisperDevice >= 0 || mkvPath == null || Audio.HasWhisperCache(mkvPath, audioIndex, words)) return true;
+            if (Audio.WhisperDevice >= 0 || mkvPath == null || (textMode ? Audio.HasTextCache(mkvPath, audioIndex) : Audio.HasWhisperCache(mkvPath, audioIndex, words))) return true;
             var a = MessageBox.Show(this,
                 "Taligenkänningen (Whisper) körs på processorn, eftersom inget NVIDIA-grafikkort är valt.\n\n" +
                 "Det tar ungefär lika lång tid som filmen, för en film på 2 timmar alltså 1–2 timmar. Du kan avbryta när som helst, och nästa gång går det snabbt.\n\n" +
@@ -239,6 +243,72 @@ namespace TextSync
                     Log.Error("Kunde inte spara originaltext", ex);
                     MessageBox.Show(this, "Kunde inte spara: " + Friendly(ex), Caption, MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
+            }
+        }
+
+        // Film utan text: Whisper lyssnar ord för ord, och orden blir en undertext (Subtitler) som visas i listan som texten i ruta 2.
+        // Referensen i listan är taldetekteringen (A), så rader där inget tal hittades blir röda. Ingenting sparas förrän Spara SRT….
+        async Task CreateTextFromAudio()
+        {
+            if (busy || mkvPath == null) return;
+            if (unsaved && result != null && !ConfirmDialog.Ask(this, Caption,
+                "Texten i listan är inte sparad. Den försvinner när en ny text skapas ur ljudet.", "Skapa text ändå", "Avbryt")) return;
+            cts = new CancellationTokenSource();
+            var token = cts.Token;
+            SetBusy(true, "Förbereder…");
+            string finalStatus = "";
+            try
+            {
+                if (gpuDevices == null)
+                {
+                    statusLabel.Text = "Letar efter grafikkort…";
+                    await Tools.GpuScan();
+                    FillGpus();
+                }
+                if (!ConfirmSlowCpu(refAudioIndex, true, true) || !await EnsureTools(true, token)) { finalStatus = "Avbrutet."; return; }
+                string path = mkvPath; int ai = refAudioIndex; string wl = "";
+                List<Cue> speech = null;
+                var subs = await Task.Run(() =>
+                {
+                    var sp = Audio.GetReference(path, new AudioRefOption { Mode = AudioMode.Speech, AudioIndex = ai },
+                        (p, s) => { token.ThrowIfCancellationRequested(); Progress(p * 20 / 100, s); }, token);
+                    speech = sp.Cues;
+                    string l;
+                    var words = Audio.GetTextWords(path, ai, (p, s) => { token.ThrowIfCancellationRequested(); Progress(20 + p * 75 / 100, s); }, token, out l);
+                    wl = l ?? "";
+                    Progress(97, "Delar in det Whisper hörde i rader…");
+                    return Subtitler.FromWords(words, speech);
+                });
+                if (subs.Count < 5) throw new InvalidDataException("Whisper hörde nästan inget tal i filmen.");
+                string langName = wl.Length > 0 ? MkvTrack.LanguageName(wl) : "okänt språk";
+                // texten läggs i ruta 2 som om den vore inläst, men utan fil
+                ClearResult();
+                tgtLoadedPath = null; tgtCues = subs;
+                tgtName.Text = "Text ur filmens ljud (" + langName + ")"; tgtName.ForeColor = Theme.Fg;
+                tgtInfo.ForeColor = Muted; tgtInfo.Text = subs.Count + " rader, " + Duration(subs) + ". Inte sparad än.";
+                langBeforeCreate = langBox.Text;   // kommer tillbaka när texten ur ljudet lämnar ruta 2
+                if (wl.Length > 0) langBox.Text = wl;
+                result = new SyncResult
+                {
+                    Output = subs.Select(c => new Cue(c.Start, c.End, c.Text) { OrigStart = c.Start }).ToList(),
+                    Method = "Text skapad ur filmens ljud med Whisper, ord för ord (" + langName + ")", ScoreBefore = 1, ScoreAfter = 1
+                };
+                refCuesUsed = speech; refIsText = false; createdText = true;
+                unsaved = true; extraNum.Value = 0; timeline.Highlight = null;
+                RefreshPreview();
+                finalStatus = "Text skapad ur ljudet: " + subs.Count + " rader. Läs igenom och klicka Spara SRT….";
+                Log.Info("Text skapad ur ljudet: " + path + ", ljudspår " + ai + ", språk " + wl + ", " + subs.Count + " rader");
+            }
+            catch (OperationCanceledException) { finalStatus = "Avbrutet."; }
+            catch (Exception ex)
+            {
+                Log.Error("Kunde inte skapa text ur ljudet", ex);
+                MessageBox.Show(this, "Texten kunde inte skapas: " + Friendly(ex), Caption, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+            finally
+            {
+                cts = null;
+                SetBusy(false, finalStatus);
             }
         }
 

@@ -449,6 +449,61 @@ namespace TextSync
                 Check("Matchning: utan förslag lämnas texten orörd", none == null && same == auto);
             }
 
+            // Text ur ljudet: Whispers ord (ett ord per rad med egen tid) blir undertexter
+            {
+                // ord: text, start (ms), längd 200 ms. "-" för sig = en ny talare börjar.
+                Func<string, List<Cue>> mk = spec =>
+                {
+                    var l = new List<Cue>();
+                    foreach (var part in spec.Split(' '))
+                    {
+                        int at = part.LastIndexOf('@');
+                        double t = double.Parse(part.Substring(at + 1));
+                        l.Add(new Cue(t, t + 200, " " + part.Substring(0, at)));
+                    }
+                    return l;
+                };
+                var subs = Subtitler.FromWords(mk("-@1000 Where@1000 were@1300 you?@1600 -@2000 At@2000 the@2300 office.@2600 " +
+                    "I@5000 told@5300 you@5600 I'd@5900 be@6200 late,@6500 so@6800 don't@7100 wait@7400 up.@7700 Okay.@9000 [MUSIC]@10000 Fine.@12000"));
+                foreach (var c in subs) Console.WriteLine("Text ur ljudet: " + Srt.FormatTime(c.Start) + " → " + Srt.FormatTime(c.End) + "  " + c.Text.Replace("\n", " / "));
+                Check("Text ur ljudet: två talare i följd får var sin rad med replikstreck",
+                    subs.Count > 0 && subs[0].Text == "- Where were you?\n- At the office.");
+                Check("Text ur ljudet: en ny undertext börjar efter en lång paus och vid meningsslut",
+                    subs.Count == 4 && subs[1].Text.StartsWith("I told you") && subs[1].Text.Replace("\n", " ").EndsWith("wait up.") && subs[2].Text == "Okay." && subs[3].Text == "Fine.");
+                Check("Text ur ljudet: ljudbeskrivningar som [MUSIC] tas bort", !subs.Any(c => c.Text.Contains("MUSIC")));
+                Check("Text ur ljudet: texten visas strax före första ordet och går aldrig in i nästa undertext",
+                    subs.Count == 4 && subs[0].Start == 1000 - Subtitler.LeadMs && subs[1].Start == 5000 - Subtitler.LeadMs &&
+                    subs.Zip(subs.Skip(1), (a, b) => a.End < b.Start).All(x => x) && subs.All(c => c.End > c.Start));
+                Check("Text ur ljudet: en ensam undertext står kvar minst en sekund", subs.Count == 4 && subs[3].End - subs[3].Start >= 1000);
+                // en lång mening utan paus delas, och ingen undertext blir längre än två rader à 42 tecken
+                var longWords = new List<Cue>();
+                for (int k = 0; k < 60; k++) longWords.Add(new Cue(1000 + k * 300, 1200 + k * 300, " " + (k % 9 == 8 ? "ending," : "wording")));
+                var longSubs = Subtitler.FromWords(longWords);
+                Check("Text ur ljudet: en lång mening delas i undertexter om högst två rader à 42 tecken och högst sex sekunder",
+                    longSubs.Count >= 5 && longSubs.All(c => c.Text.Split('\n').Length <= 2 && c.Text.Split('\n').All(l => l.Length <= LineAligner.MaxChars)) &&
+                    longSubs.All(c => c.End - c.Start <= Subtitler.MaxDurMs + Subtitler.LeadMs + Subtitler.LingerMs) &&
+                    string.Join(" ", longSubs.Select(c => c.Text.Replace("\n", " "))).Split(' ').Length == 60);
+                Check("Text ur ljudet: inga ord ger ingen text", Subtitler.FromWords(new List<Cue>()).Count == 0);
+
+                // rättningar efter mätningen mot en riktig film (2.4.13)
+                var inOrder = Srt.Parse("1\n00:00:02,000 --> 00:00:02,100\n What's\n\n2\n00:00:02,000 --> 00:00:02,100\n wrong\n\n3\n00:00:01,950 --> 00:00:02,400\n with\n\n4\n00:00:02,400 --> 00:00:02,900\n you?\n", true);
+                Check("Text ur ljudet: ordfilen läses i filens ordning, också när tiderna är lika eller går omlott",
+                    string.Join("", inOrder.Select(c => c.Text)) == " What's wrong with you?" && Subtitler.FromWords(inOrder)[0].Text == "What's wrong with you?");
+                var stretched = Subtitler.FromWords(new List<Cue> { new Cue(1000, 1300, " Who"), new Cue(1300, 60000, " knows."), new Cue(60000, 60400, " Next.") });
+                Check("Text ur ljudet: sista ordet före en tystnad drar inte ut undertexten över tystnaden",
+                    stretched.Count == 2 && stretched[0].End < 4000 && stretched[1].Text == "Next.");
+                // Whisper lägger "Is it true?" mitt i tystnaden. Talet börjar 30 000 enligt taldetekteringen.
+                var early = new List<Cue> { new Cue(10000, 10300, " Fine."), new Cue(24850, 25100, " Is"), new Cue(25100, 25300, " it"), new Cue(25300, 25700, " true?"), new Cue(31250, 31600, " She's"), new Cue(31600, 32000, " alive?") };
+                var speechIv = new List<Cue> { new Cue(9900, 10500, "(tal)"), new Cue(30000, 32200, "(tal)") };
+                var snapped = Subtitler.FromWords(early, speechIv);
+                Check("Text ur ljudet: ord som Whisper lägger i en tystnad flyttas till nästa tal från taldetekteringen, i samma ordning",
+                    snapped.Count >= 2 && snapped[1].Text.StartsWith("Is it true?") && snapped[1].Start == 30000 - Subtitler.LeadMs &&
+                    string.Join(" ", snapped.Select(c => c.Text.Replace("\n", " "))) == "Fine. Is it true? She's alive?");
+                var dangling = Subtitler.FromWords(new List<Cue> { new Cue(1000, 1300, " He's"), new Cue(1300, 1700, " gone."), new Cue(1750, 1900, " As"), new Cue(8000, 8200, " you"), new Cue(8200, 8500, " know.") });
+                Check("Text ur ljudet: ett ord som börjar en mening före en lång paus hör till raden efter pausen",
+                    dangling.Count == 2 && dangling[0].Text == "He's gone." && dangling[1].Text == "As you know." && dangling[1].Start > 7000);
+            }
+
             // ---- grafikkort, ljudspår, Whisper-kontroll, sökvägar (product-check 2026-11-09)
             {
                 var g = Tools.ParseNvidiaSmi("0, NVIDIA RTX A2000 Laptop GPU, 8.6, 560.94\r\n1, NVIDIA GeForce GTX 680, 3.0, 470.10\r\n2, Quadro M2000, 5.2, 470.05\r\nField \"compute_cap\" is not a valid field to query.\r\n");

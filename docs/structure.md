@@ -29,6 +29,8 @@ src/
   TextCheck.cs     Kontroll av textspår mot Whisper ord för ord (ankare, utjämning, rättning); separat SRT på originalspråket synkas först grovt mot ljudet
   Meaning.cs       Jämför vad raderna betyder (inställning): vektorer från llama-server och modellen bge-m3, parning efter betydelse (rader och repliker),
                    rättning av rader som ligger fel, förslag om att flytta repliker mellan rader (Flytta?), växling mot den vanliga synken. Också cachen för vektorerna och en liten JSON-läsare
+  Subtitler.cs     Text ur ljudet: gör undertextrader av Whispers ord (meningsslut, pauser, replikstreck, 2 × 42 tecken), rättar ordtider mot taldetekteringen.
+                   Används av länken "Skapa text ur ljudet…" och av valet Ljud C i listan Referens
   Engine.cs        SRT läs/skriv och synkmotorn
   Sdh.cs           Tar bort text för hörselskadade: [MUSIK], (skrattar), ♪ och talarnamn i versaler
   Markup.cs        Kodade tecken (&amp; → &) och taggar (<i>, <b>, <u>, <s>, <font>): avkodas och lagas alltid vid inläsningen, tas bort som ett val.
@@ -42,7 +44,7 @@ test/
   Tests.cs         Tester: synk i 7 scenarier × 3 metoder (G = korta klipp), tid före synk, SRT/teckenkodningar, dra-och-släpp-fördelning,
                    spara med säkerhetskopia, MKV-läsning (egen MKV-skrivare, avkortade filer), mkvmerge-inbäddning,
                    matchning av rader (dela, slå ihop, radlängd, mitt i mening, gles referens),
-                   text för hörselskadade, kodade tecken och taggar,
+                   text för hörselskadade, kodade tecken och taggar, text ur ljudet (ord → undertexter),
                    hel säsong: parning av filmer och undertexter, återställning, kön från början till slut
   Diag.cs          Felsökning mot riktiga filer: skriver ut avsnitt, träffsäkerhet och rader utan referens
   AudioDiag.cs     Jämför ljudsynk A, B och A+B mot facit (synk mot filmens undertextspår)
@@ -52,6 +54,7 @@ test/
   QualityDiag.cs   Mäter beskedet mot en riktig film: rätt text, texten baklänges (som ett annat avsnitt) och ett missat klipp
   MeaningDiag.cs   Mäter betydelsejämförelsen mot en riktig film: vad den flyttar, tiden, och om text som förstörts med flit läggs tillbaka
   PairDiag.cs      Visar hur betydelsejämförelsen parar raderna i en riktig film: förslag om flytt, flyttade rader, avvikelser, och raderna runt ett sökord
+  SubDiag.cs       Mäter text ur ljudet mot en riktig film: radstarter mot filmens textspår (facit), radlängder, och synk av en svensk text mot den nya texten, A och A+B
   OrigSrtDiag.cs   Separat engelsk SRT (förstörd med flit) → ljud → svensk synk, mot facit
   bin/             Byggda testprogram (skapas av build.ps1 -Test, inte i git)
 docs/              Beslut, drift, FAQ, nästa fas (next.md)
