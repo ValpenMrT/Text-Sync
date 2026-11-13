@@ -73,9 +73,18 @@ Det som inte är gjort:
 Mätt mot Blacklist S04E01 (`test/SubDiag.cs`, se beslutsloggen). Kvar:
 - **Bara ett avsnitt mätt, och bara engelska.** De inledande texterna för svenska, norska, danska, tyska, franska och spanska (`Audio.TextPrompts`) är inte provade. Andra språk får ingen inledande text och kan komma ut utan versaler och skiljetecken.
 - **Besvarat 2026-11-13 (2.4.14):** Ljud C använder den rättade och sparade texten, programmet frågar innan en osparad text ur ljudet försvinner, och funktionen behövs inte i Hel säsong.
-- **Fråga till ägaren som återstår:** ska den skapade texten få skriva över en befintlig `Film.en.srt` (Windows frågar i dag), eller ha ett eget namn?
+- **Besvarat 2026-11-13 (2.4.15):** en text ur ljudet skriver aldrig över en fil.
+- **Fråga till ägaren:** ska "aldrig skriva över" också gälla Spara SRT… för en synkad text (i dag: Windows frågar, och en kopia läggs i "Text Sync original") och Hel säsong (i dag: skriver över, Återställ… ångrar)?
+- **Parakeet som alternativ till Whisper (ägarens önskemål 2026-11-13, påbörjat):** se beslutsloggen 2.4.15. Nästa steg:
+  1. Kör `sherpa-onnx-offline.exe` på korta bitar och se hur tiderna per ord skrivs ut (stoppades av behörighetsskyddet i Claudes miljö: ägaren behöver tillåta körningen eller köra den själv).
+  2. Dela ljudet i bitar efter taldetekteringen (A), kör alla bitar i ett anrop, och lägg ihop ordens tider.
+  3. Mät med `SubDiag` mot Blacklist S04E01 och jämför med Whisper (453 rader, 92 % inom 0,5 s vid synk).
+  4. Först därefter: paket i `Tools.cs` (uppackning med Windows `tar.exe`), val i gränssnittet och frågan om nedladdning.
+  - sherpa-onnx 2.0.1: `https://github.com/k2-fsa/sherpa-onnx/releases/download/v2.0.1/sherpa-onnx-v2.0.1-win-x64-shared-MT-Release-no-tts.tar.bz2`, 25 567 228 byte, SHA-256 `a644dfe2f7944afec9a356d2557c0452380f20ffcf2f8c704653cfce37558596`.
+  - Modellen: `https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2`, 487 211 443 byte, SHA-256 `1495e91b59d7fc53ddca91f3431758ec99f8fa253fdb0e1e851be0f72b14b0f9`.
+  - Taldetektering för sherpa-onnx: `…/asr-models/silero_vad.onnx`, 643 854 byte, SHA-256 `9e2449e1087496d8d4caba907f23e0bd3f78d91fa552479bb9c23ac09cbb1fd6`.
 - **Ljud C ger beskedet Kontrollera** på Blacklist S04E01 (91,8 % av raderna har referenstext samtidigt), eftersom Whisper missar repliker. Gränsen för Bra är satt för riktiga textspår.
-- **Alternativ till Whisper** (ägarens fråga 2026-11-13): inget är provat. Kandidater att mäta med `SubDiag`: NVIDIA Parakeet via sherpa-onnx (fristående exe, snabb på processorn), KB-Whisper för svenskt tal.
+- **Andra alternativ till Whisper**, inte provade: KB-Whisper för svenskt tal.
 - **Efter Ljud C** visas "Spara igenkänd text…", som sparar samma text som `.whisper.en.srt`: två namn för samma sak.
 - **Stängningsfrågan** säger "Den synkade undertexten" också om en text som skapades ur ljudet.
 - **Ljud C som referens ger 18 rader över 1 s fel** mot 12 för A+B (men lägre medianfel). Titta på vilka rader det är.

@@ -319,9 +319,12 @@ namespace TextSync
             string lang = transcriptLang.Length > 0 ? transcriptLang : "und";
             string dir = Path.GetDirectoryName(mkvPath ?? tgtLoadedPath);
             string name = Path.GetFileNameWithoutExtension(mkvPath ?? tgtLoadedPath) + ".whisper." + lang + ".srt";   // eget namn: skriver aldrig över en riktig undertext
-            using (var d = new SaveFileDialog { Title = "Spara igenkänd text (automatisk textning)", Filter = "SRT-undertext (*.srt)|*.srt", FileName = name, InitialDirectory = dir, OverwritePrompt = true })
+            using (var d = new SaveFileDialog { Title = "Spara igenkänd text (automatisk textning)", Filter = "SRT-undertext (*.srt)|*.srt", FileName = name, InitialDirectory = dir, OverwritePrompt = false })
             {
-                if (d.ShowDialog(this) != DialogResult.OK) return;
+                // skriver aldrig över en fil (ägarens svar 2026-11-13)
+                for (int n = 2; File.Exists(Path.Combine(dir, d.FileName)) && n < 1000; n++)
+                    d.FileName = Path.GetFileNameWithoutExtension(mkvPath ?? tgtLoadedPath) + ".whisper" + n + "." + lang + ".srt";
+                if (!AskNewFile(d, true)) return;
                 try
                 {
                     // utan "(tal)"-rader; bara det Whisper faktiskt hörde

@@ -2,6 +2,22 @@
 
 Nyast först.
 
+## 2026-11-13 – 2.4.15: En text ur ljudet skriver aldrig över en fil. Parakeet påbörjad, inte inbyggd
+- **Område:** GUI / Synk
+- **Ägarens svar:** "så får programmet aldrig skriva över något", på frågan om den skapade texten får skriva över en befintlig `Film.en.srt`. Och: "lägg gärna till nvidia parakeet som alternativ".
+- **Beslut, överskrivning:**
+  - När en text som skapades ur ljudet sparas (Spara SRT…) föreslås ett ledigt namn: `Film.en.srt`, annars `Film.whisper.en.srt`, `Film.whisper2.en.srt` och så vidare (`MainForm.FreeTextPath`). Språkkoden står sist, så att spelare känner igen språket.
+  - Väljer man ändå en fil som finns säger programmet att den inte skrivs över, och dialogen visas igen.
+  - Samma sak gäller **Spara igenkänd text…**.
+  - **Claudes tolkning:** svaret gäller texter ur ljudet, som frågan handlade om. Spara SRT… för en synkad text skriver fortfarande över efter Windows fråga, med en kopia i mappen "Text Sync original" (beslut 2026-11-09), och Hel säsong skriver över med Återställ…. Fråga till ägaren om det också ska ändras.
+- **Parakeet (inte inbyggd):**
+  - Undersökt: sherpa-onnx 2.0.1 för Windows (`…win-x64-shared-MT-Release-no-tts.tar.bz2`, 24 MB, bara processorn) och modellen `sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8` (465 MB hämtad, 640 MB uppackad, 25 europeiska språk, däribland svenska). Kontrollsummor står i docs/next.md. Paketen är `.tar.bz2`, som .NET Framework inte kan packa upp. Windows egen `tar.exe` klarar det.
+  - Provat på fyra minuter ur Blacklist S04E01 med `sherpa-onnx-vad-with-offline-asr.exe`: 13 s på processorn med fyra trådar (ungefär 2,5 min för ett avsnitt, utan grafikkort). Texten har versaler och skiljetecken utan inledande text, och "He's a cop.", som Whisper missade, kom med.
+  - **Det som saknas:** det programmet skriver bara ut en tid per talavsnitt (upp till 33 s långa), inte per ord. Tider per ord ges av `sherpa-onnx-offline.exe`, som behöver ljudet i korta bitar. Den körningen stoppades av behörighetsskyddet i Claudes miljö, så utdataformatet är inte kontrollerat och inget är mätt mot facit.
+- **Test:** 249 av 249 kontroller (1 ny: det föreslagna filnamnet är ledigt).
+- **Ej provat:** dialogen Spara med klick.
+- **Product-check:** Claude granskade själv (liten ändring). Inget blockerande.
+
 ## 2026-11-13 – 2.4.14: Ljud C använder den rättade och sparade texten, och programmet frågar innan en osparad text ur ljudet försvinner
 - **Område:** GUI / Synk
 - **Ägarens svar** på frågorna efter 2.4.13: (1) "Använd den som är rättad och sparad", (2) "Ja fråga", (3) text ur ljudet behövs inte i Hel säsong.

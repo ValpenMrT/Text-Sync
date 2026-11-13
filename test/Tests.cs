@@ -497,6 +497,18 @@ namespace TextSync
                 Audio.ForgetSavedText(fakeFilm, 0);
                 Check("Text ur ljudet: den sparade texten koms ihåg per film och ljudspår, och glöms när filen är borttagen", noneFirst && found && goneAfterDelete);
 
+                // en text ur ljudet skriver aldrig över en fil: namnet som föreslås är ledigt (2.4.15)
+                string fdir = Path.Combine(dir, "ledigt namn"); if (Directory.Exists(fdir)) Directory.Delete(fdir, true);
+                Directory.CreateDirectory(fdir);
+                string ffilm = Path.Combine(fdir, "Film.S01E01.mkv");
+                string free1 = MainForm.FreeTextPath(ffilm, "en");
+                File.WriteAllText(free1, "x");
+                string free2 = MainForm.FreeTextPath(ffilm, "en");
+                File.WriteAllText(free2, "x");
+                string free3 = MainForm.FreeTextPath(ffilm, "en");
+                Check("Text ur ljudet: filnamnet som föreslås är ledigt, och språkkoden står sist",
+                    Path.GetFileName(free1) == "Film.S01E01.en.srt" && Path.GetFileName(free2) == "Film.S01E01.whisper.en.srt" && Path.GetFileName(free3) == "Film.S01E01.whisper2.en.srt" && !File.Exists(free3));
+
                 // rättningar efter mätningen mot en riktig film (2.4.13)
                 var inOrder = Srt.Parse("1\n00:00:02,000 --> 00:00:02,100\n What's\n\n2\n00:00:02,000 --> 00:00:02,100\n wrong\n\n3\n00:00:01,950 --> 00:00:02,400\n with\n\n4\n00:00:02,400 --> 00:00:02,900\n you?\n", true);
                 Check("Text ur ljudet: ordfilen läses i filens ordning, också när tiderna är lika eller går omlott",

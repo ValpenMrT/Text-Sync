@@ -164,7 +164,7 @@ Ja, på filmens eget språk. Dra in filmen i ruta 1 och klicka **Skapa text ur l
 - Texten visas i listan och ligger i ruta 2 som "Text ur filmens ljud". Ingenting är sparat än. **Synka** är grå, eftersom texten redan går i takt. Väljer du något annat i listan Referens eller läser in en ny fil försvinner texten. Är den inte sparad frågar programmet först.
 - **Läs igenom den.** Whisper hör fel ibland, särskilt namn, och kan missa korta repliker. Dubbelklicka på en rad för att rätta den, och klicka **▶** för att höra stället i filmen.
 - **Röda rader** ligger där taldetekteringen inte hittade något tal. Kontrollera dem först (**F3** hoppar till nästa).
-- Klicka **Spara SRT…**. Filen föreslås som `Filmnamn.en.srt` (språkkoden följer språket som talas), så att spelaren hittar den.
+- Klicka **Spara SRT…**. Filen föreslås som `Filmnamn.en.srt` (språkkoden följer språket som talas), så att spelaren hittar den. Finns den filen redan föreslås `Filmnamn.whisper.en.srt`. En text ur ljudet skriver aldrig över en fil: väljer du en som finns får du välja ett annat namn.
 
 Programmet översätter inte. En engelsk film får engelsk text. När du sedan synkar en svensk SRT mot samma film och väljer **Ljud C** i listan Referens används texten du rättade och sparade, inte Whispers orättade. Under **Detaljer** står vilken som användes.
 

@@ -69,16 +69,42 @@ namespace TextSync
             return backup;
         }
 
+        // Ett ledigt filnamn bredvid filmen för en text ur ljudet: Film.en.srt, annars Film.whisper.en.srt, Film.whisper2.en.srt …
+        // Språkkoden står sist, så att spelare fortfarande känner igen språket.
+        public static string FreeTextPath(string film, string lang)
+        {
+            string dir = Path.GetDirectoryName(film), name = Path.GetFileNameWithoutExtension(film);
+            string p = Path.Combine(dir, name + "." + lang + ".srt");
+            for (int n = 1; File.Exists(p) && n < 1000; n++)
+                p = Path.Combine(dir, name + ".whisper" + (n > 1 ? n.ToString() : "") + "." + lang + ".srt");
+            return p;
+        }
+
+        // Visar dialogen Spara. neverOverwrite: en fil som redan finns får inte väljas, och dialogen visas igen. false = avbrutet.
+        bool AskNewFile(SaveFileDialog d, bool neverOverwrite)
+        {
+            while (true)
+            {
+                if (d.ShowDialog(this) != DialogResult.OK) return false;
+                if (!neverOverwrite || !File.Exists(d.FileName)) return true;
+                MessageBox.Show(this, "Filen " + Path.GetFileName(d.FileName) + " finns redan.\n\nText Sync skriver inte över en fil med en text som är skapad ur ljudet. Välj ett annat namn.",
+                    Caption, MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+        }
+
         void SaveSrt()
         {
             if (synced == null) return;
             string lang;
             if (!TryGetLang(out lang)) return;
             if (!ConfirmLowMatch()) return;
-            string def = DefaultSrtPath(lang);
-            using (var d = new SaveFileDialog { Title = "Spara synkad undertext", Filter = "SRT-undertext (*.srt)|*.srt", FileName = Path.GetFileName(def), InitialDirectory = Path.GetDirectoryName(def), OverwritePrompt = true })
+            // En text som skapades ur ljudet skriver aldrig över en fil (ägarens svar 2026-11-13): namnet som föreslås är ledigt,
+            // och väljer man en fil som finns får man välja ett annat namn.
+            bool fromAudio = TargetFromAudio;
+            string def = fromAudio ? FreeTextPath(mkvPath, lang) : DefaultSrtPath(lang);
+            using (var d = new SaveFileDialog { Title = fromAudio ? "Spara texten ur ljudet" : "Spara synkad undertext", Filter = "SRT-undertext (*.srt)|*.srt", FileName = Path.GetFileName(def), InitialDirectory = Path.GetDirectoryName(def), OverwritePrompt = !fromAudio })
             {
-                if (d.ShowDialog(this) != DialogResult.OK) return;
+                if (!AskNewFile(d, fromAudio)) return;
                 string path = d.FileName;
                 try
                 {
