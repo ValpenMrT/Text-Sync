@@ -2,6 +2,21 @@
 
 Nyast först.
 
+## 2026-11-13 – 2.4.11: Inställningen Godkänn förslag om radindelning automatiskt
+- **Område:** GUI / Hel säsong
+- **Önskemål (ägaren):** "Gör en inställning att alltid acceptera föreslå radindelning som referens. Detta ska gälla både enskild fil samt vid hel säsong."
+- **Beslut:**
+  - **Ny kryssruta i Inställningar**, under Synk: "Godkänn förslag om radindelning automatiskt (när referensen är en text)". Sparas som `autoaccept`, avstängd från början.
+  - **Vad som godkänns:** alla förslag som annars visas blå: Dela?, Ihop? och Flytta? (Claudes val: ägaren skrev "radindelning som referens", och Flytta? ger också referensens indelning. Säg till om Flytta? ska hållas utanför.)
+  - **Huvudfönstret:** förslagen godkänns en gång direkt efter synken, som ett enda steg. Statusraden säger vad som gjordes. Ctrl+Z ångrar, och då står förslagen kvar som blå förslag. De godkänns inte igen efter varje ändring. Slås inställningen på medan en text visas godkänns förslagen i den direkt.
+  - **Rutan ovanför listan** ("Föreslå radindelning som referensen") visas ikryssad och grå med texten "Radindelning som referensen godkänns automatiskt (Inställningar)" så länge inställningen är på. Det egna valet (`propose`) ändras inte och kommer tillbaka när inställningen slås av.
+  - **Hel säsong:** förslagen godkänns före sparandet (`LineAligner.AcceptAll`), också förslagen om flytt från betydelsejämförelsen. Vad som gjordes står i tipsrutan för avsnittet och i loggen. Återställ… ångrar.
+  - **Koden delas:** `LineAligner.MoveProposals`, `WithMoves`, `Apply` och `CountText` i `Align.cs` används av både huvudfönstret och kön.
+- **Provat i fönstret** (samma process, utan tangenttryckningar, Blacklist S04E01 mot filmens engelska textspår, med betydelsejämförelsen): "1 flytt av repliker och 154 delningar gjordes automatiskt", 367 rader blev 522, beskedet Bra både med och utan. Ingen rad kortare än 1 s. 9 rader går fortare än 20 tecken per sekund efter delningarna (ingen före). Ctrl+Z gav tillbaka 367 rader och 155 förslag.
+- **Test:** 236 av 236 kontroller (3 nya: alla förslag godkänns på en gång, text utan förslag lämnas orörd, Hel säsong sparar med förslagen godkända och säger det i beskedet).
+- **Ej provat:** klick i dialogen Inställningar, fönstret Hel säsong med en riktig säsong, andra filmer. Delningarna är inte genomlästa rad för rad.
+- **Product-check:** Claude granskade själv (liten ändring, avstängd från början). Inget blockerande: ändringen går att ångra i båda fönstren (Ctrl+Z, Återställ…), och statusraden, tipsrutan och loggen säger vad som gjordes. Fråga till ägaren: ska Flytta? ingå? Kan vänta (docs/next.md): antalet ändringar syns inte i listan i Hel säsong, snabba rader efter delning, bara ett avsnitt provat.
+
 ## 2026-11-11 – 2.4.10: Betydelsejämförelsen parar repliker: enskilda rader läggs på referensradens tid, och repliker i fel rad blir förslag
 - **Område:** Synk / GUI
 - **Önskemål (ägaren):** "Kan du testa på hela avsnittet om där blir en förbättring med llama då jag inte kan se någon skillnad", och en skärmbild där "- Han är polis." står sist i en svensk rad medan "He's a cop." står först i nästa engelska rad: "Kan du lösa detta."

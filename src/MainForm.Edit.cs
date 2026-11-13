@@ -144,24 +144,30 @@ namespace TextSync
         // Slå ihop eller dela raderna enligt förslagen. Ett enda steg att ångra, även för alla förslag på en gång.
         void AcceptProposals(List<AlignProposal> ps)
         {
-            if (busy || result == null || ps == null || ps.Count == 0) return;
+            if (busy) return;
+            AcceptProposals(ps, false);
+        }
+
+        // auto = inställningen "Godkänn förslag om radindelning automatiskt" (anropas också i slutet av synken, medan busy är satt).
+        // Returnerar texten till statusraden, null = inget att godkänna.
+        string AcceptProposals(List<AlignProposal> ps, bool auto)
+        {
+            if (result == null || ps == null || ps.Count == 0) return null;
             ps = new List<AlignProposal>(ps);
-            double extra = (double)extraNum.Value;
-            var replaced = new HashSet<int>(); var added = new List<Cue>();
-            foreach (var p in ps)
-            {
-                for (int k = 0; k < p.Count; k++) replaced.Add(p.First + k);
-                // en delad rad kan få halva taggar ("<i>Rad ett." och "Rad två.</i>"): de lagas
-                foreach (var c in p.NewCues) added.Add(new Cue(c.Start - extra, c.End - extra, Markup.Fix(c.Text)) { OrigStart = c.OrigStart });
-            }
-            var list2 = result.Output.Where((c, i) => !replaced.Contains(i)).Concat(added).ToList();
-            int moves = ps.Count(p => p.IsMove), merged = ps.Count(p => p.IsMerge && !p.IsMove), splits = ps.Count - merged - moves;
-            var parts = new List<string>();
-            if (moves > 0) parts.Add(moves == 1 ? "1 flytt av repliker" : moves + " flyttar av repliker");
-            if (merged > 0) parts.Add(merged == 1 ? "1 sammanslagning" : merged + " sammanslagningar");
-            if (splits > 0) parts.Add(splits == 1 ? "1 delning" : splits + " delningar");
-            string what = string.Join(" och ", parts);
-            Changed(list2, added[0], "Godkände " + what + ". Ctrl+Z ångrar.", "Godkände förslag: " + what);
+            List<Cue> added;
+            var list2 = LineAligner.Apply(result.Output, ps, (double)extraNum.Value, out added);
+            string what = LineAligner.CountText(ps);
+            string status = auto ? "Radindelning som referensen: " + what + " gjordes automatiskt (Inställningar). Ctrl+Z ångrar."
+                                 : "Godkände " + what + ". Ctrl+Z ångrar.";
+            Changed(list2, added[0], status, (auto ? "Godkände förslag automatiskt: " : "Godkände förslag: ") + what);
+            return status;
+        }
+
+        // Godkänner alla förslag som visas, om inställningen är på. Görs en gång efter synken och när inställningen slås på,
+        // inte efter varje ändring: efter Ctrl+Z står förslagen kvar som förslag.
+        string AutoAccept()
+        {
+            return autoAccept ? AcceptProposals(proposals, true) : null;
         }
 
         // Avvisade förslag visas inte igen förrän nästa synk

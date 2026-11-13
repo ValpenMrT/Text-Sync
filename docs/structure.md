@@ -19,9 +19,10 @@ src/
   SeasonSync.cs    Synkar ett avsnitt i kön utan gränssnitt: väljer referens (textspår eller ljud), synkar, bedömer och sparar via SeasonUndo
   Season.cs        Parar ihop filmer och undertexter efter avsnittsnummer (SeasonPlan) och återställer en säsongssynk (SeasonUndo, %LOCALAPPDATA%\TextSync\undo)
   Timeline.cs      Tidslinjen under listan (TimelinePanel)
-  SettingsDialog.cs Dialogen Inställningar: utseende, bildfrekvensfel, text för hörselskadade, formatering
+  SettingsDialog.cs Dialogen Inställningar: utseende, bildfrekvensfel, betydelsejämförelse, godkänn förslag automatiskt, text för hörselskadade, formatering
   CueDialog.cs     Dialog för att ändra eller lägga till en rad (start, slut, text)
-  Align.cs         Förslag om att slå ihop (2↔1) eller dela (1↔2) rader efter referensens radindelning (dynamisk programmering på tider)
+  Align.cs         Förslag om att slå ihop (2↔1) eller dela (1↔2) rader efter referensens radindelning (dynamisk programmering på tider).
+                   Också det som gör som förslagen säger (Apply), och AcceptAll för inställningen "Godkänn förslag om radindelning automatiskt"
   Theme.cs         Ljust/mörkt läge: paletter, färgbyte på kontrollerna, mörka Windows-delar (rullister, rubriker, titelrad)
   Audio.cs         Ljudreferens: ffmpeg → 16 kHz mono WAV (mittkanal), taldetektering (A), Whisper (B), kombination (A+B), cache
   Tools.cs         Hittar/laddar ner ffmpeg, whisper.cpp, språkmodell, Silero, llama.cpp och bge-m3 (fasta URL:er + SHA-256), grafikkort, inställningar

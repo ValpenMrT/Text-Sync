@@ -174,6 +174,9 @@ namespace TextSync
                 extraNum.Value = 0;
                 timeline.Highlight = null;
                 RefreshPreview();   // räknar beskedet och visar resultatet
+                // inställningen Godkänn förslag om radindelning automatiskt: ett steg som Ctrl+Z ångrar
+                string auto = AutoAccept();
+                if (auto != null) finalStatus = auto;
                 if (quality != null) Log.Info("Synkens kvalitet: " + quality.LogText() + (r.Meaning != null && r.Meaning.Moved > 0 ? " (efter betydelsejämförelsen)" : ""));
                 Log.Info("Synk: ref=" + (mkvPath ?? refLoadedPath) + (mkvPath != null ? " " + trackCombo.SelectedItem : "") +
                     ", mål=" + tgtLoadedPath + ", metod=" + opt.Mode + " → " + r.Method + ", matchning " + Fmt(r.ScoreBefore * 100, "0") + "→" + Fmt(r.ScoreAfter * 100, "0") + " %");
@@ -406,34 +409,12 @@ namespace TextSync
             refOnlyTotal = extraRef.Count;
 
             // 3) förslag på att slå ihop eller dela rader så att de följer referensens radindelning
-            proposals = refIsText && proposeCheck.Checked ? LineAligner.Propose(synced, refc).Where(p => !rejected.Contains(p.Key)).ToList() : new List<AlignProposal>();
+            //    (med inställningen "Godkänn förslag om radindelning automatiskt" räknas de alltid, så att de finns kvar som förslag efter Ctrl+Z)
+            proposals = refIsText && (proposeCheck.Checked || autoAccept) ? LineAligner.Propose(synced, refc).Where(p => !rejected.Contains(p.Key)).ToList() : new List<AlignProposal>();
             // förslag från betydelsejämförelsen om att flytta repliker mellan rader. De visas även när rutan för radindelning inte är ikryssad,
             // och går före förslagen som bara bygger på tider. Raderna känns igen på tid före synk och text.
             if (refIsText && result.Meaning != null && result.Meaning.Moves.Count > 0)
-            {
-                double extraMs = (double)extraNum.Value;
-                foreach (var mv in result.Meaning.Moves)
-                {
-                    int first = -1;
-                    for (int i = 0; i + mv.Texts.Length <= synced.Count && first < 0; i++)
-                    {
-                        bool same = true;
-                        for (int k = 0; k < mv.Texts.Length && same; k++)
-                            same = synced[i + k].OrigStart == mv.OrigStarts[k] && (synced[i + k].Text == mv.Texts[k] || (plainCheck.Checked && synced[i + k].Text == Markup.Strip(mv.Texts[k])));
-                        if (same) first = i;
-                    }
-                    string key = "V|" + mv.OrigStarts[0] + "|" + string.Join("|", mv.Texts);
-                    if (first < 0 || rejected.Contains(key)) continue;
-                    int f = first, cnt = mv.Texts.Length;
-                    proposals.RemoveAll(p => p.First < f + cnt && f < p.First + p.Count);
-                    proposals.Add(new AlignProposal
-                    {
-                        IsMove = true, First = f, Count = cnt, Refs = mv.Refs, Key = key,
-                        NewCues = mv.NewCues.Select(c => new Cue(c.Start + extraMs, c.End + extraMs, c.Text) { OrigStart = c.OrigStart }).ToList()
-                    });
-                }
-                proposals = proposals.OrderBy(p => p.First).ToList();
-            }
+                proposals = LineAligner.WithMoves(proposals, LineAligner.MoveProposals(synced, result.Meaning.Moves, plainCheck.Checked, (double)extraNum.Value).Where(p => !rejected.Contains(p.Key)));
             cueProp = new int[synced.Count];
             for (int i = 0; i < cueProp.Length; i++) cueProp[i] = -1;
             var propRefs = new HashSet<Cue>();
@@ -537,7 +518,7 @@ namespace TextSync
             else if (items.Count > 0) viewInfo.Text = "Visar " + (items.Count - previewRows) + " av " + total + " rader.";
             // tom lista: säg varför, så att det inte ser ut som att synken misslyckades
             else if (view == ViewOnlyRed) viewInfo.Text = "Inga röda rader. Välj Alla rader i Visa för att se listan.";
-            else if (view == ViewProposals && !proposeCheck.Checked) viewInfo.Text = "Förslag är avstängda. Kryssa i rutan bredvid, eller välj Alla rader.";
+            else if (view == ViewProposals && !proposeCheck.Checked && !autoAccept) viewInfo.Text = "Förslag är avstängda. Kryssa i rutan bredvid, eller välj Alla rader.";
             else if (view == ViewFixed) viewInfo.Text = "Inga rader rättades vid inläsningen. Välj Alla rader i Visa för att se listan.";
             else if (view == ViewMoved) viewInfo.Text = (meaningCheck.Checked ? "Betydelsejämförelsen flyttade inga rader." : "Betydelsejämförelsen är avstängd i Inställningar.") + " Välj Alla rader i Visa för att se listan.";
             else if (view == ViewProposals) viewInfo.Text = "Inga förslag" + (refIsText ? "" : " (görs bara mot text, inte mot ljud)") + ". Välj Alla rader i Visa.";

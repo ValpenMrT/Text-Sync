@@ -50,6 +50,9 @@ namespace TextSync
         int refOnlyTotal;              // antal grå referensrader, även de som är dolda
         // förslag på att slå ihop eller dela rader så att de följer referensens radindelning (blå rader)
         List<AlignProposal> proposals = new List<AlignProposal>();
+        // inställningen "Godkänn förslag om radindelning automatiskt": förslagen godkänns direkt efter synken, också i Hel säsong
+        bool autoAccept = Tools.GetSetting("autoaccept", "0") == "1";
+        bool proposeQuiet;             // rutan ovanför listan ställs om av programmet, inte av användaren
         int[] cueProp;                 // index i synced -> index i proposals, -1 = inget förslag
         int[] rowProp;                 // listrad -> index i proposals för raden "→ blir" som visar hur förslaget blir, annars -1
         Font propFont;                 // kursiv stil för de raderna
@@ -580,10 +583,12 @@ namespace TextSync
             proposeCheck = new CheckBox { Text = "Föreslå radindelning som referensen", AutoSize = true, Margin = new Padding(0, 6, 12, 0), Checked = Tools.GetSetting("propose", "0") == "1" };
             proposeCheck.CheckedChanged += (s, e) =>
             {
+                if (proposeQuiet) return;
                 Tools.SetSetting("propose", proposeCheck.Checked ? "1" : "0");
                 if (result != null) RefreshPreview();
             };
             vbar.Controls.Add(proposeCheck);
+            ShowAutoAccept();
             viewInfo = new Label { AutoSize = true, ForeColor = Muted, Margin = new Padding(0, 7, 12, 0) };
             vbar.Controls.Add(viewInfo);
             acceptAllLink = new LinkLabel { AutoSize = true, Margin = new Padding(0, 7, 0, 0), Visible = false, LinkColor = Accent };
@@ -696,7 +701,7 @@ namespace TextSync
         void OpenSettings()
         {
             if (busy) return;
-            using (var d = new SettingsDialog(themeIndex, !HC, fpsCheck.Checked, hiCheck.Checked, plainCheck.Checked, Srt.SaveFormat, meaningCheck.Checked))
+            using (var d = new SettingsDialog(themeIndex, !HC, fpsCheck.Checked, hiCheck.Checked, plainCheck.Checked, Srt.SaveFormat, meaningCheck.Checked, autoAccept))
             {
                 if (d.ShowDialog(this) != DialogResult.OK) return;
                 if (d.SrtFormat != Srt.SaveFormat)
@@ -718,7 +723,36 @@ namespace TextSync
                 hiCheck.Checked = d.RemoveHi;
                 plainCheck.Checked = d.StripFormatting;
                 meaningCheck.Checked = d.CompareMeaning;
+                if (d.AutoAccept != autoAccept)
+                {
+                    autoAccept = d.AutoAccept;
+                    Tools.SetSetting("autoaccept", autoAccept ? "1" : "0");
+                    Log.Info("Godkänn förslag om radindelning automatiskt: " + (autoAccept ? "på" : "av"));
+                    ShowAutoAccept();
+                    UpdateOptInfo();
+                    if (result != null)
+                    {
+                        // slås inställningen på godkänns förslagen i texten som visas direkt (Ctrl+Z ångrar)
+                        RefreshPreview();
+                        if (AutoAccept() == null)
+                            SetStatus(!autoAccept ? "Förslag om radindelning godkänns inte längre automatiskt. Det som redan är gjort står kvar (Ctrl+Z ångrar)."
+                                : refIsText ? "Det finns inga förslag om radindelning att godkänna i den här texten."
+                                : "Förslag om radindelning görs bara mot text, inte mot ljud.", false);
+                    }
+                }
             }
+        }
+
+        // Med inställningen "Godkänn förslag om radindelning automatiskt" räknas förslagen alltid, så rutan ovanför listan visar det och går inte att kryssa ur
+        void ShowAutoAccept()
+        {
+            if (proposeCheck == null) return;
+            proposeCheck.Enabled = !autoAccept;
+            // rutan visas ikryssad utan att det egna valet (propose) ändras: det kommer tillbaka när inställningen slås av
+            proposeQuiet = true;
+            proposeCheck.Checked = autoAccept || Tools.GetSetting("propose", "0") == "1";
+            proposeQuiet = false;
+            proposeCheck.Text = autoAccept ? "Radindelning som referensen godkänns automatiskt (Inställningar)" : "Föreslå radindelning som referensen";
         }
 
         // "Inställningar: text för hörselskadade tas bort · formatering tas bort". Tomt (dolt) när allt är som vanligt.
@@ -730,6 +764,7 @@ namespace TextSync
             if (plainCheck.Checked) parts.Add("kursiv och annan formatering tas bort");
             if (!fpsCheck.Checked) parts.Add("bildfrekvensfel upptäcks inte");
             if (meaningCheck != null && meaningCheck.Checked) parts.Add("radernas betydelse jämförs");
+            if (autoAccept) parts.Add("radindelning som referensen godkänns automatiskt");
             if (Srt.SaveFormat == Srt.FormatUtf8) parts.Add("SRT sparas som UTF-8 utan BOM");
             if (Srt.SaveFormat == Srt.FormatLegacy) parts.Add("SRT sparas för mycket gamla spelare");
             optInfo.Text = parts.Count == 0 ? "" : "Inställningar: " + string.Join("  ·  ", parts);
@@ -1095,7 +1130,7 @@ namespace TextSync
             // ett nytt fönster om utseendet har bytts sedan det byggdes (listan töms då, men det som är sparat går fortfarande att återställa)
             if (seasonDlg != null && (seasonDlg.IsDisposed || seasonDlg.BuiltDark != Theme.Dark)) { seasonDlg.Dispose(); seasonDlg = null; }
             if (seasonDlg == null) seasonDlg = new SeasonDialog(this);
-            seasonDlg.Prepare(new SeasonOptions { Lang = lang, Mode = (SyncMode)modeCombo.SelectedIndex, DetectFramerate = fpsCheck.Checked, RemoveHi = hiCheck.Checked, StripFormatting = plainCheck.Checked, Meaning = meaningCheck.Checked }, paths);
+            seasonDlg.Prepare(new SeasonOptions { Lang = lang, Mode = (SyncMode)modeCombo.SelectedIndex, DetectFramerate = fpsCheck.Checked, RemoveHi = hiCheck.Checked, StripFormatting = plainCheck.Checked, Meaning = meaningCheck.Checked, AutoAccept = autoAccept }, paths);
             Log.Info("Öppnar Hel säsong" + (paths != null ? ": " + string.Join("; ", paths) : ""));
             var res = seasonDlg.ShowDialog(this);
             // "Öppna i huvudfönstret": läs in avsnittet och synka, så att raderna går att granska
@@ -1251,6 +1286,7 @@ namespace TextSync
                 "Tips: dra in båda filerna samtidigt. Rödmarkerade rader saknar engelsk text samtidigt – ofta helt i sin ordning (t.ex. utrop).\n" +
                 "Kryssa i \"Föreslå radindelning som referensen\" så föreslår programmet att dela eller slå ihop rader som de engelska (blå, \"Dela?\"/\"Ihop?\") – högerklicka för att godkänna. " +
                 "Under varje förslag står hur raden blir om du godkänner det (→ blir). " +
+                "Med \"Godkänn förslag om radindelning automatiskt\" i Inställningar görs ändringarna direkt efter synken, också i Hel säsong (Ctrl+Z ångrar). " +
                 "Visa ovanför listan döljer grå rader eller visar bara röda eller blå. Sök (Ctrl+F) letar i texten, Enter hoppar till nästa träff.\n\n" +
                 "Verktygen för synk mot ljudet (0,6–1,4 GB) och för betydelsejämförelsen (0,5 GB) ligger i mappen tools i " + Log.Dir + ". Mappen kan tas bort när Text Sync är stängt, och verktygen hämtas igen vid behov.\n\n" +
                 "Text Sync " + Program.Version + " · MIT-licens\n" +

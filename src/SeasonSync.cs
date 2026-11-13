@@ -19,7 +19,8 @@ namespace TextSync
         public bool MakeMkv;     // lägg också in undertexten i en kopia av filmen: "Filmnamn (Text Sync).mkv" bredvid filmen
         public SeasonRefMode Ref = SeasonRefMode.Auto;
         public bool Meaning;     // jämför också vad raderna betyder (Inställningar), när referensen är en text och verktygen finns
-        public bool WhisperOk;   // Whisper finns på datorn och ett NVIDIA-kort är valt (då används A+B i Auto när filmen saknar text)
+        public bool AutoAccept;  // godkänn förslag om radindelning automatiskt (Inställningar), när referensen är en text
+        public bool WhisperOk;  // Whisper finns på datorn och ett NVIDIA-kort är valt (då används A+B i Auto när filmen saknar text)
     }
 
     // Done = redan synkad av en tidigare säsongssynk (filen bredvid filmen är den som programmet sparade då)
@@ -154,11 +155,18 @@ namespace TextSync
                 }
             }
             var output = r.Output;
+            // inställningen Godkänn förslag om radindelning automatiskt: samma förslag som i huvudfönstret, godkända före sparandet
+            string lineWork = null;
+            if (o.AutoAccept && refIsText)
+            {
+                output = LineAligner.AcceptAll(output, refc, r.Meaning != null ? r.Meaning.Moves : null, out lineWork);
+                if (lineWork != null) notes.Add("Radindelning som referensen: " + lineWork + " gjordes automatiskt (Inställningar).");
+            }
             int stripped;
             if (o.StripFormatting) output = Markup.StripAll(output, out stripped);
             var q = Quality.Assess(refc, output, r, refIsText);
             notes.AddRange(r.Notes);
-            Log.Info("Säsong " + it.Title + ": ref=" + it.RefPath + " (" + how + "), mål=" + it.TargetPath + ", " + r.Method + ", " + q.LogText() + (r.Meaning != null ? ", betydelse: " + r.Meaning.LogText() : ""));
+            Log.Info("Säsong " + it.Title + ": ref=" + it.RefPath + " (" + how + "), mål=" + it.TargetPath + ", " + r.Method + ", " + q.LogText() + (r.Meaning != null ? ", betydelse: " + r.Meaning.LogText() : "") + (lineWork != null ? ", radindelning: " + lineWork : ""));
 
             var res = new EpisodeOutcome();
             var detail = new List<string>();

@@ -46,7 +46,7 @@ Från 2.4.10 paras också replikerna: enskilda rader läggs på referensradens t
 - **Rader som skulle bli för korta flyttas inte** ("Planet är klart för start."). Förslag: flytta också nästa rad när den hör till nästa referensrad.
 - **Två meningar i samma replik delas inte**, bara repliker med replikstreck.
 - **Tiden utan cache är inte mätt** med replikerna. Mät och skriv in den i Inställningar.
-- **Hel säsong visar inga förslag.** De enskilda flyttarna görs, förslagen syns först när avsnittet öppnas i huvudfönstret och synkas om.
+- **Hel säsong visar inga förslag.** De enskilda flyttarna görs, förslagen syns först när avsnittet öppnas i huvudfönstret och synkas om. Från 2.4.11 godkänns de i kön med inställningen "Godkänn förslag om radindelning automatiskt".
 - **Rena delningar och sammanslagningar** använder fortfarande bara tider (Dela? och Ihop?). Replikparningen kunde göra dem säkrare.
 
 Det som inte är gjort:
@@ -67,6 +67,13 @@ Det som inte är gjort:
 - **Mot ljud:** Whispers text kunde paras med den svenska på samma sätt (Ljud B och A+B).
 - **Cachen rensas aldrig.** Varje text tar några MB i `%LOCALAPPDATA%\TextSync\cache`.
 - **Övriga idéer från samma samtal:** mäta på fler filmer, rätta den fasta avvikelsen på cirka 0,24 s mot ljud, Silero-taldetektering i Ljud A, flera referenser som röstar, scenklipp med ffmpeg, exakt ordtid mot ljudet (wav2vec2).
+
+## Kvar efter "Godkänn förslag om radindelning automatiskt" 2.4.11 (2026-11-13)
+- **Bara ett avsnitt provat** (Blacklist S04E01: 154 delningar och 1 flytt, 367 rader blev 522). Delningarna är inte genomlästa rad för rad.
+- **9 av de 522 raderna går fortare än 20 tecken per sekund** efter delningarna (ingen före). Hör ihop med önskemål 8, Läsbarhet.
+- **Förslagen görs i en omgång.** Uppstår nya förslag efter den står de kvar som blå förslag i huvudfönstret. I Hel säsong syns de inte.
+- **Inte provat med klick** i dialogen Inställningar (slå på och av medan en text visas), och inte i fönstret Hel säsong med en riktig säsong.
+- **Hel säsong säger inte i listan** hur många ändringar som gjordes, bara i tipsrutan.
 
 ## Beslutat 2026-11-10, inte byggt än
 - **Rekommendera Ljud A utan NVIDIA-grafikkort:** en kort förklaring bredvid valet när datorn saknar NVIDIA-kort.

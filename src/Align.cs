@@ -122,6 +122,82 @@ namespace TextSync
             return res;
         }
 
+        // Förslagen från betydelsejämförelsen (Flytta?) som förslag i listan. Raderna känns igen på tid före synk och text,
+        // så ett förslag vars rader har ändrats sedan dess följer inte med. plain = formateringen är borttagen ur det som visas.
+        public static List<AlignProposal> MoveProposals(IList<Cue> synced, IList<MeaningMove> moves, bool plain, double extraMs)
+        {
+            var res = new List<AlignProposal>();
+            if (synced == null || moves == null) return res;
+            foreach (var mv in moves)
+            {
+                int first = -1;
+                for (int i = 0; i + mv.Texts.Length <= synced.Count && first < 0; i++)
+                {
+                    bool same = true;
+                    for (int k = 0; k < mv.Texts.Length && same; k++)
+                        same = synced[i + k].OrigStart == mv.OrigStarts[k] && (synced[i + k].Text == mv.Texts[k] || (plain && synced[i + k].Text == Markup.Strip(mv.Texts[k])));
+                    if (same) first = i;
+                }
+                if (first < 0) continue;
+                res.Add(new AlignProposal
+                {
+                    IsMove = true, First = first, Count = mv.Texts.Length, Refs = mv.Refs, Key = "V|" + mv.OrigStarts[0] + "|" + string.Join("|", mv.Texts),
+                    NewCues = mv.NewCues.Select(c => new Cue(c.Start + extraMs, c.End + extraMs, c.Text) { OrigStart = c.OrigStart }).ToList()
+                });
+            }
+            return res;
+        }
+
+        // Förslagen om flytt går före förslag som bara bygger på tider och berör samma rader
+        public static List<AlignProposal> WithMoves(List<AlignProposal> props, IEnumerable<AlignProposal> moves)
+        {
+            foreach (var mp in moves)
+            {
+                int f = mp.First, cnt = mp.Count;
+                props.RemoveAll(p => p.First < f + cnt && f < p.First + p.Count);
+                props.Add(mp);
+            }
+            return props.OrderBy(p => p.First).ToList();
+        }
+
+        // Gör som förslagen säger: raderna First..First+Count-1 byts mot NewCues. added = de nya raderna.
+        // extraMs = extra justering som visas men inte ligger i texten (dras ifrån igen).
+        public static List<Cue> Apply(IList<Cue> cues, IList<AlignProposal> ps, double extraMs, out List<Cue> added)
+        {
+            var replaced = new HashSet<int>(); added = new List<Cue>();
+            foreach (var p in ps)
+            {
+                for (int k = 0; k < p.Count; k++) replaced.Add(p.First + k);
+                // en delad rad kan få halva taggar ("<i>Rad ett." och "Rad två.</i>"): de lagas
+                foreach (var c in p.NewCues) added.Add(new Cue(c.Start - extraMs, c.End - extraMs, Markup.Fix(c.Text)) { OrigStart = c.OrigStart });
+            }
+            return cues.Where((c, i) => !replaced.Contains(i)).Concat(added).OrderBy(c => c.Start).ToList();
+        }
+
+        // "1 flytt av repliker och 2 sammanslagningar"
+        public static string CountText(IList<AlignProposal> ps)
+        {
+            int moves = ps.Count(p => p.IsMove), merged = ps.Count(p => p.IsMerge && !p.IsMove), splits = ps.Count - merged - moves;
+            var parts = new List<string>();
+            if (moves > 0) parts.Add(moves == 1 ? "1 flytt av repliker" : moves + " flyttar av repliker");
+            if (merged > 0) parts.Add(merged == 1 ? "1 sammanslagning" : merged + " sammanslagningar");
+            if (splits > 0) parts.Add(splits == 1 ? "1 delning" : splits + " delningar");
+            return string.Join(" och ", parts);
+        }
+
+        // Inställningen "Godkänn förslag om radindelning automatiskt", utan fönster (Hel säsong): alla förslag godkänns på en gång.
+        // what = vad som gjordes ("2 sammanslagningar och 1 delning"), null = inga förslag och texten är orörd.
+        public static List<Cue> AcceptAll(List<Cue> cues, IList<Cue> refc, IList<MeaningMove> moves, out string what)
+        {
+            what = null;
+            var ps = Propose(cues, refc);
+            if (moves != null && moves.Count > 0) ps = WithMoves(ps, MoveProposals(cues, moves, false, 0));
+            if (ps.Count == 0) return cues;
+            what = CountText(ps);
+            List<Cue> added;
+            return Apply(cues, ps, 0, out added);
+        }
+
         static AlignProposal MakeMerge(IList<Cue> tgt, int first, Cue r)
         {
             string text = MergeText(tgt[first].Text, tgt[first + 1].Text, r.Text);

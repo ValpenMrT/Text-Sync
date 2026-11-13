@@ -68,6 +68,14 @@ Ja. Kryssa i **Föreslå radindelning som referensen** ovanför listan. Rutan ä
 
 De nya raderna får den engelska radens tider. Direkt under varje förslag står hur raden blir om du godkänner det: en eller två kursiva rader märkta **→ blir**, med de nya tiderna och texten. De raderna är bara en förhandsvisning och sparas inte. Högerklicka (eller tryck **Skift+F10**) för att **godkänna** eller **avvisa** det, eller klicka **Godkänn alla förslag** ovanför listan. Förslag som du inte godkänner påverkar inte filen du sparar. **Ctrl+Z** ångrar, även om du godkände alla på en gång.
 
+**Kan programmet godkänna förslagen åt mig?**
+Ja. Kryssa i **Godkänn förslag om radindelning automatiskt** i **Inställningar**. Då delas rader, slås ihop och får repliker flyttade (Dela?, Ihop? och Flytta?) direkt efter synken, utan att du godkänner varje förslag. Det gäller både en enskild fil och **Hel säsong**, när referensen är en text (inte ljud).
+- **I huvudfönstret** står det i statusraden hur många ändringar som gjordes. **Ctrl+Z** ångrar alla på en gång, och då står de kvar som blå förslag som du kan godkänna ett i taget.
+- **I Hel säsong** sparas avsnittet med ändringarna. Hur många som gjordes står i tipsrutan för avsnittet. **Återställ…** ångrar.
+- Rutan **Föreslå radindelning som referensen** ovanför listan är ikryssad och grå så länge inställningen är på.
+
+Antalet rader kan ändras mycket. I ett provat avsnitt blev 367 svenska rader 522, eftersom de engelska raderna var kortare. Delningar och sammanslagningar jämför bara tider och längd, så en delning kan ibland hamna fel. Titta därför på några rader efteråt.
+
 Programmet föreslår bara det som går att göra säkert:
 - En rad delas bara vid en radbrytning eller efter . ? !. Mitt i en mening delas den bara om den engelska raden också slutar mitt i en mening.
 - Två rader slås inte ihop om texten då blir längre än två rader à 42 tecken.

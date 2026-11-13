@@ -434,6 +434,19 @@ namespace TextSync
                     lay != null && lay.Split('\n').Length == 2 && lay.Split('\n').All(l => l.Length <= LineAligner.MaxChars));
                 Check("Matchning: sammanslagning som blir längre än två rader à 42 tecken föreslås inte",
                     LineAligner.MergeText("Det här är en rad som är ganska så lång,\noch här kommer en till som är lång", "och sedan en tredje rad som inte får plats.", "x") == null);
+
+                // inställningen Godkänn förslag om radindelning automatiskt
+                string did;
+                var auto = LineAligner.AcceptAll(sv, er, null, out did);
+                Console.WriteLine("Matchning, automatiskt: " + did);
+                Check("Matchning: alla förslag godkänns på en gång (8 rader blir 7, med referensens tider)",
+                    did == "2 sammanslagningar och 1 delning" && auto.Count == 7 && sv.Count == 8 &&
+                    auto.Any(c => c.Text == "Var var du?" && c.Start == 10000) && auto.Any(c => c.Text == "På kontoret." && c.Start == 12200) &&
+                    auto.Any(c => c.Text == "- Var är du?\n- Hemma." && c.Start == 40000 && c.End == 42000) &&
+                    auto.Zip(auto.Skip(1), (a, b) => a.Start <= b.Start).All(x => x));
+                string none;
+                var same = LineAligner.AcceptAll(auto, er, null, out none);
+                Check("Matchning: utan förslag lämnas texten orörd", none == null && same == auto);
             }
 
             // ---- grafikkort, ljudspår, Whisper-kontroll, sökvägar (product-check 2026-11-09)
@@ -995,6 +1008,18 @@ namespace TextSync
                     var it4 = new SeasonItem { RefPath = plan[1].RefPath, RefIsVideo = true, TargetPath = t4, Include = true };
                     var r4 = SeasonSync.SyncOne(it4, new SeasonOptions { Lang = "sv", StripFormatting = true }, () => run, (a, b) => { }, System.Threading.CancellationToken.None);
                     Check("Hel säsong: Ta bort formatering gäller det som sparas", r4.Saved && !File.ReadAllText(out2).Contains("<i>") && inSync(out2));
+
+                    // inställningen Godkänn förslag om radindelning automatiskt gäller också det som sparas i kön
+                    SeasonSync.SyncOne(plan[1], opt, () => run, (a, b) => { }, System.Threading.CancellationToken.None);
+                    int rowsPlain = Srt.Load(out2).Count;
+                    var rA = SeasonSync.SyncOne(plan[1], new SeasonOptions { Lang = "sv", AutoAccept = true }, () => run, (a, b) => { }, System.Threading.CancellationToken.None);
+                    // en sammanslagen rad har två rader text ("T|a" och "T|b"): den första är radens sanna starttid
+                    var autoCues = Srt.Load(out2).Where(x => x.Text.StartsWith("T|")).ToList();
+                    bool autoInSync = autoCues.Count > 100 && autoCues.Count(x => Math.Abs(x.Start - double.Parse(x.Text.Split('\n')[0].Substring(2))) < 300) > 0.97 * autoCues.Count;
+                    int rowsAuto = Srt.Load(out2).Count;
+                    Console.WriteLine("Hel säsong, radindelning: {0} rader utan inställningen, {1} med", rowsPlain, rowsAuto);
+                    Check("Hel säsong: förslag om radindelning godkänns automatiskt när inställningen är på, och beskedet säger det",
+                        rA.Saved && rowsAuto < rowsPlain && rA.Detail.Contains("Radindelning som referensen:") && rA.Detail.Contains("sammanslag") && autoInSync);
 
                     // avbrott: inget sparas för avsnittet som pågick
                     var cts = new System.Threading.CancellationTokenSource(); cts.Cancel();

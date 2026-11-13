@@ -9,7 +9,8 @@ namespace TextSync
     public class SettingsDialog : Form
     {
         readonly ComboBox themeCombo;
-        readonly CheckBox fpsCheck, hiCheck, plainCheck, meaningCheck;
+        readonly CheckBox fpsCheck, hiCheck, plainCheck, meaningCheck, autoCheck;
+        public bool AutoAccept { get { return autoCheck.Checked; } }
         public bool CompareMeaning { get { return meaningCheck.Checked; } }
 
         public int ThemeIndex { get { return themeCombo.SelectedIndex; } }   // 0 = som Windows, 1 = ljust, 2 = mörkt
@@ -26,7 +27,7 @@ namespace TextSync
             "Mycket gamla spelare – Windows-teckentabell efter språket" };
 
         // showTheme = false i högkontrastläge, där Windows färger alltid används
-        public SettingsDialog(int themeIndex, bool showTheme, bool detectFps, bool removeHi, bool stripFormatting, int srtFormat, bool compareMeaning)
+        public SettingsDialog(int themeIndex, bool showTheme, bool detectFps, bool removeHi, bool stripFormatting, int srtFormat, bool compareMeaning, bool autoAccept)
         {
             SuspendLayout();
             AutoScaleDimensions = new SizeF(96F, 96F);
@@ -66,6 +67,12 @@ namespace TextSync
             t.Controls.Add(note("Efter den vanliga synken paras raderna ihop efter betydelse, och rader som ligger fel flyttas. " +
                 (Tools.MeaningReady() ? "Verktygen finns redan på datorn." : "Första gången frågar programmet om det får hämta gratisverktyg (cirka " + mb + " MB).") +
                 " Det tar längre tid första gången en text synkas. Det är nytt och bara utprovat på en film, så kontrollera resultatet."));
+
+            autoCheck = new CheckBox { Text = "&Godkänn förslag om radindelning automatiskt (när referensen är en text)", AutoSize = true, Checked = autoAccept, Margin = new Padding(0, 2, 0, 0) };
+            t.Controls.Add(autoCheck);
+            t.Controls.Add(note("Rader delas, slås ihop och får repliker flyttade så att de följer referensens rader och tider (Dela?, Ihop? och Flytta?), utan att du godkänner varje förslag. " +
+                "Gäller både en enskild fil och Hel säsong. I huvudfönstret ångrar Ctrl+Z, i Hel säsong Återställ…. " +
+                "Delningar och sammanslagningar jämför bara tider och längd, så en delning kan ibland hamna fel."));
 
             t.Controls.Add(head("Texten"));
             hiCheck = new CheckBox { Text = "Ta bort text för &hörselskadade ([MUSIK], (skrattar), talarnamn)", AutoSize = true, Checked = removeHi, Margin = new Padding(0, 2, 0, 0) };
