@@ -2,6 +2,15 @@
 
 Nyast först.
 
+## 2026-11-14 – 2.4.24: Testerna går igenom också när arbetsmappen har en kort sökväg, som hos GitHub
+- **Område:** test / drift
+- **Vad som hände:** första körningen hos GitHub (2.4.23) föll med "3 av 268 kontroller MISSLYCKADES", så ingen release skapades. På datorn gick alla 274 igenom.
+- **Orsak:** hos GitHub är `%TEMP%` en kort sökväg (`C:\Users\RUNNER~1\AppData\Local\Temp`). Programmet gör om sökvägar med `Path.GetFullPath` (`Season.cs`), som skriver ut det långa namnet (`runneradmin`). Tre kontroller i Hel säsong och Återställning jämför programmets sökvägar med testets egna, och då skilde de sig fast de pekar på samma fil. Felet låg i testet, inte i programmet: en användare ser ingen skillnad.
+- **Beslut:** `Tests.Main` gör om arbetsmappen med `Path.GetFullPath` innan den används.
+- **Provat och uteslutet på vägen:** engelsk kultur (en-US), tom inställningsmapp och inga nedladdade verktyg. Alla kontroller gick igenom i de fallen.
+- **Test:** felet återskapades på datorn med en kort sökväg som arbetsmapp (samma tre kontroller föll) och är borta efter ändringen. 274 av 274 kontroller med `build.ps1 -Test`.
+- **Product-check:** Claude granskade själv (bara testet ändrat). Inget blockerande.
+
 ## 2026-11-14 – 2.4.23: Projektet pushas till GitHub, och varje push släpper exe-filen som en release
 - **Område:** drift
 - **Önskemål (ägaren):** "kan du pusha detta projekt vid varje commit till https://github.com/ValpenMrT/Text-Sync.git, se även till att en exe byggs och släpps som en release (Tag), behåll versionsnummer i filnamnet, github action". Sedan: "sätt mitt namn och epost som anonym för git global och fixa tidigare commit".

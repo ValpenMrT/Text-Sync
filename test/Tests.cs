@@ -155,7 +155,10 @@ namespace TextSync
         static int Main(string[] args)
         {
             Console.OutputEncoding = Encoding.UTF8;
-            string dir = args.Length > 0 ? args[0] : ".";
+            // Arbetsmappen görs om till sin fulla, långa sökväg. Hos GitHub är TEMP en kort sökväg (C:\Users\RUNNER~1\…),
+            // och programmet gör om sökvägar med Path.GetFullPath, som skriver ut det långa namnet. Annars skiljer sig
+            // sökvägarna som testerna jämför, fast de pekar på samma fil.
+            string dir = Path.GetFullPath(args.Length > 0 ? args[0] : ".");
             var refc = MakeRef(100);
             var other = MakeOther(refc);
             Console.WriteLine("ref cues {0}, target cues {1}", refc.Count, other.Count);
