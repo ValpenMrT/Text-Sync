@@ -105,6 +105,32 @@ namespace TextSync
             }
         }
 
+        // Dela den markerade raden i två, där användaren ställer markören i texten (Dela rad… i menyn, Ctrl+D)
+        void SplitSelected()
+        {
+            if (busy || result == null) return;
+            if (list.SelectedIndices.Count != 1) { SetStatus("Markera en rad för att dela den.", false); return; }
+            int row = list.SelectedIndices[0];
+            if (rowCue == null || row >= rowCue.Length) return;
+            if (rowProp != null && row < rowProp.Length && rowProp[row] >= 0)
+            {
+                SetStatus("Raden visar hur förslaget blir. Högerklicka för att godkänna eller avvisa det.", false);
+                return;
+            }
+            if (rowCue[row] < 0) { SetStatus("Grå rader kommer från referensen och sparas inte – de kan inte delas.", false); return; }
+            int i = rowCue[row];
+            var shown = synced[i];
+            if (LineAligner.DefaultSplit(shown.Text) < 0) { SetStatus("Raden har bara ett ord och kan inte delas.", false); return; }
+            double extra = (double)extraNum.Value;
+            using (var d = new SplitDialog("Dela rad " + (i + 1), shown.Start, shown.End, shown.Text))
+            {
+                if (d.ShowDialog(this) != DialogResult.OK) return;
+                Cue first;
+                var list2 = LineAligner.SplitManually(result.Output, i, d.PartA, d.PartB, d.MidMs - extra, out first);
+                Changed(list2, first, "Rad " + (i + 1) + " delad i två. Ctrl+Z ångrar.", "Delade rad " + (i + 1) + " för hand vid " + Srt.FormatTime(d.MidMs));
+            }
+        }
+
         void AddRow() { AddRow(null); }
 
         // at = grå referensrad att ta tiden från, annars hamnar raden efter den markerade

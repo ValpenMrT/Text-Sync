@@ -10,7 +10,7 @@ src/
   Program.cs       Start, globala felhanterare (visar svenskt felmeddelande och skriver loggen)
   MainForm.cs      Gränssnittet (partial class, delad på flera filer): fält, fönstrets uppbyggnad, tema, dra-och-släpp, knappar, hjälp
   MainForm.Load.cs   Inläsning av referens (film eller SRT), originaltext och undertexten som ska synkas
-  MainForm.Edit.cs   Redigera rader med ångra, förslag om radindelning, hoppa till nästa röda rad
+  MainForm.Edit.cs   Redigera rader med ångra, dela en rad för hand, förslag om radindelning, hoppa till nästa röda rad
   MainForm.Audio.cs  Listorna Ljudspår och Grafikkort, nedladdning av verktyg, spara igenkänd text
   MainForm.Sync.cs   Synken (DoSync), resultatrutan och förhandsvisningen i listan
   MainForm.Save.cs   Spara SRT med säkerhetskopia, lägga in i MKV
@@ -21,6 +21,7 @@ src/
   Timeline.cs      Tidslinjen under listan (TimelinePanel)
   SettingsDialog.cs Dialogen Inställningar: utseende, bildfrekvensfel, betydelsejämförelse, godkänn förslag automatiskt, text för hörselskadade, formatering
   CueDialog.cs     Dialog för att ändra eller lägga till en rad (start, slut, text)
+  SplitDialog.cs   Dialog för att dela en rad i två för hand: markören i texten visar var (Dela rad…, Ctrl+D). Reglerna ligger i Align.cs (SnapSplit, SplitAt, SplitTime)
   Align.cs         Förslag om att slå ihop (2↔1) eller dela (1↔2) rader efter referensens radindelning (dynamisk programmering på tider).
                    Också det som gör som förslagen säger (Apply), och AcceptAll för inställningen "Godkänn förslag om radindelning automatiskt"
   Theme.cs         Ljust/mörkt läge: paletter, färgbyte på kontrollerna, mörka Windows-delar (rullister, rubriker, titelrad)
@@ -44,7 +45,7 @@ src/
 test/
   Tests.cs         Tester: synk i 7 scenarier × 3 metoder (G = korta klipp), tid före synk, SRT/teckenkodningar, dra-och-släpp-fördelning,
                    spara med säkerhetskopia, MKV-läsning (egen MKV-skrivare, avkortade filer), mkvmerge-inbäddning,
-                   matchning av rader (dela, slå ihop, radlängd, mitt i mening, gles referens),
+                   matchning av rader (dela, slå ihop, radlängd, mitt i mening, gles referens), dela en rad för hand,
                    text för hörselskadade, kodade tecken och taggar, text ur ljudet (ord → undertexter),
                    hel säsong: parning av filmer och undertexter, återställning, kön från början till slut
   Diag.cs          Felsökning mot riktiga filer: skriver ut avsnitt, träffsäkerhet och rader utan referens

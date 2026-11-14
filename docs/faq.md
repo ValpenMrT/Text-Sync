@@ -135,7 +135,7 @@ Raden rättades när filen lästes in: kodade tecken gjordes om till riktiga tec
 **Min TV visar &lt;i&gt; och &lt;/i&gt; som text.**
 Det är taggar för kursiv stil. De flesta spelare på datorn (VLC, Plex, Kodi) visar texten kursiv, men en del TV-apparater visar taggarna som de står. Klicka **Inställningar…** längst upp till höger och kryssa i **Ta bort kursiv och annan formatering**. Då tas kursiv, fetstil, understruken och genomstruken text, färger och typsnitt bort, liksom koder som `{\an8}` (text överst i bilden). Själva texten står kvar.
 - Rutan gäller det som visas i listan, spelas upp och sparas. Kryssar du ur den kommer formateringen tillbaka, så du kan prova utan risk.
-- Ändrar du texten på en rad för hand, eller slår ihop eller delar rader via ett förslag, medan rutan är ikryssad får de raderna inte tillbaka formateringen när du kryssar ur den. Ändrar du bara tiden behålls den.
+- Ändrar du texten på en rad för hand, eller slår ihop eller delar rader (via ett förslag eller med Dela rad…), medan rutan är ikryssad får de raderna inte tillbaka formateringen när du kryssar ur den. Ändrar du bara tiden behålls den.
 - Är rutan inte ikryssad behålls formateringen. Trasig formatering lagas alltid vid inläsningen, till exempel en kursiv som aldrig avslutas. Raden under filnamnet i ruta 2 säger hur många rader som lagades.
 - Vanlig text inom vinkelparenteser, till exempel "\<I morgon åker vi.\>", är inte formatering och står alltid kvar.
 - Valet gäller tills du kryssar ur rutan, även nästa gång du startar programmet.
@@ -143,11 +143,21 @@ Det är taggar för kursiv stil. De flesta spelare på datorn (VLC, Plex, Kodi) 
 **Kan jag ändra, lägga till eller ta bort rader?**
 Ja, i listan:
 - **Dubbelklick** eller **Enter** ändrar text och tid.
+- **Ctrl+D** delar raden i två, se nästa fråga.
 - **Insert** lägger till en rad.
 - **Delete** tar bort de markerade raderna.
 - **Ctrl+Z** ångrar, i flera steg.
 
 Allt finns också i högerklicksmenyn. Ingenting ändras i filen förrän du sparar.
+
+**Kan jag själv dela en rad i två, och välja var?**
+Ja. Markera raden, högerklicka och välj **Dela rad…** (eller tryck **Ctrl+D**). Texten visas i en ruta. Klicka i texten där raden ska delas, eller flytta markören med piltangenterna. Från början står markören vid radbrytningen, om raden har en.
+- Under texten står hur de två raderna blir, med tider. Ett ord delas aldrig: står markören mitt i ett ord delas raden före eller efter ordet.
+- **Rad 2 börjar** är tiden då den första raden slutar och den andra börjar. Programmet uppskattar den efter hur lång text delarna har. Den vet inte när repliken sägs i filmen, så ändra tiden om den inte stämmer. Spela upp raderna med **▶** efteråt för att kontrollera.
+- Ett ensamt replikstreck tas bort: "- Vart då? / - Hem." blir "Vart då?" och "Hem.".
+- Klicka **Dela** eller tryck **Enter**. **Ctrl+Z** ångrar.
+
+Texten går inte att ändra i den rutan. Använd dubbelklick på raden för det. Grå rader och förslagens rader (**→ blir**) går inte att dela.
 
 **Min film har ingen textundertext alls.**
 Synka mot filmens **ljud** i stället. Välj i listan **Referens** under filnamnet i ruta 1:

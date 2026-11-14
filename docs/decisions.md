@@ -2,6 +2,23 @@
 
 Nyast först.
 
+## 2026-11-14 – 2.4.19: Dela en rad för hand, där man själv väljer
+- **Område:** GUI
+- **Önskemål (ägaren):** "kan du lägga till att man manuellt kan markera en rad och välja var den ska delas."
+- **Beslut:**
+  - **Dela rad…** i högerklicksmenyn, och **Ctrl+D** i listan. Gäller en markerad egen rad med minst två ord. Grå rader och raderna "→ blir" går inte att dela, och statusraden säger varför.
+  - **Dialogen** (`SplitDialog.cs`) visar radens text skrivskyddad. Man klickar i texten eller flyttar markören med piltangenterna. Under texten står hur rad 1 och rad 2 blir, med tider. Enter = Dela.
+  - **Markören står från början** vid radbrytningen, annars efter . ? ! … närmast mitten, annars vid ordgränsen närmast mitten (`LineAligner.DefaultSplit`).
+  - **Ett ord delas aldrig:** markören mitt i ett ord ger närmaste ordgräns (`SnapSplit`). Står den före första ordet eller efter sista är knappen Dela grå.
+  - **Texten:** radbrytningarna behålls, och ett ensamt replikstreck tas bort, som för förslagen (`SplitAt`). Halva taggar lagas (`Markup.Fix`).
+  - **Tiden:** rad 1 slutar och rad 2 börjar vid samma tid. Den uppskattas efter antalet bokstäver i delarna, med minst en halv sekund per del när raden är lång nog (`SplitTime`), och går att ändra i fältet "Rad 2 börjar". En tid som är skriven för hand följer inte längre markören.
+  - **Ångra:** ett steg med Ctrl+Z, som andra ändringar. Märkena ✎ och ⇄ försvinner från de två delarna.
+- **Claudes val (ägaren angav inte):** kortkommandot Ctrl+D, att texten inte går att ändra i dialogen (det görs med Ändra rad…), att ord inte kan delas, och att tiden uppskattas efter textens längd i stället för att frågas efter.
+- **Provat:** dialogen körd inifrån PowerShell-processen (utan klick): delarna och tiderna följer markören, markören mitt i "orkar" delar före ordet, markören först i texten gör Dela grå, en tid utanför raden ger felmeddelande, och en giltig tid ger rätt delar. Dialogen ritad till en bild i ljust läge.
+- **Test:** 264 av 264 kontroller (6 nya: markörens startläge, ordgräns, kanterna, tiden, delningen med taggar, mycket kort rad).
+- **Ej provat:** riktiga klick och piltangenter i dialogen, att markören syns tydligt i den skrivskyddade rutan, mörkt läge, menyvalet och Ctrl+D i huvudfönstret, och delning med extra justering inställd.
+- **Product-check:** Claude granskade själv (liten ändring). Inget blockerande. Kan vänta (docs/next.md): slå ihop rader för hand finns inte, och tiden är en uppskattning.
+
 ## 2026-11-14 – 2.4.18: Programmet säger till när den gamla filen ligger kvar, och visar den i mappen
 - **Område:** GUI
 - **Ägarens svar:** "ja fixa det", på frågan om programmet ska säga till efter sparandet att den gamla filen ligger kvar, med en länk som visar den i mappen.

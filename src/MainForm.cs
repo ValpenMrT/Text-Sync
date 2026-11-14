@@ -439,7 +439,7 @@ namespace TextSync
                 FitLabelHeight(detailBody[i]);
                 detailsPanel.Controls.Add(detailHead[i], i, 0); detailsPanel.Controls.Add(detailBody[i], i, 1);
             }
-            detailBody[2].Text = "Dubbelklicka – ändra text och tid\nInsert – lägg till en rad\nDelete – ta bort raden\nCtrl+Z – ångra";
+            detailBody[2].Text = "Dubbelklicka – ändra text och tid\nCtrl+D – dela raden i två\nInsert – lägg till en rad\nDelete – ta bort raden\nCtrl+Z – ångra";
 
             resBox = new TableLayoutPanel { AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, Dock = DockStyle.Top, ColumnCount = 1, RowCount = 5, Margin = new Padding(0, 2, 0, 6), BackColor = Card, Visible = false };
             resBox.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
@@ -556,7 +556,7 @@ namespace TextSync
                     timeline.Center = (c.Start + c.End) / 2; timeline.Highlight = ci >= 0 ? c : null; timeline.Invalidate();
                 }
             };
-            // redigera rader: dubbelklick/Enter = ändra, Insert = lägg till, Delete = ta bort, F3 = nästa röda rad, Ctrl+Z = ångra
+            // redigera rader: dubbelklick/Enter = ändra, Ctrl+D = dela, Insert = lägg till, Delete = ta bort, F3 = nästa röda rad, Ctrl+Z = ångra
             list.MultiSelect = true;
             list.ShowItemToolTips = true;
             list.DoubleClick += (s, e) => { if (OnPlayCell(list.PointToClient(Cursor.Position)) == null) EditSelected(); };   // inte vid dubbelklick på play-knappen
@@ -571,12 +571,14 @@ namespace TextSync
                 if (e.KeyCode == Keys.Delete) { DeleteSelected(); e.Handled = true; }
                 else if (e.KeyCode == Keys.Return) { EditSelected(); e.Handled = true; }
                 else if (e.KeyCode == Keys.Insert) { AddRow(); e.Handled = true; }
+                else if (e.Control && e.KeyCode == Keys.D) { SplitSelected(); e.Handled = true; e.SuppressKeyPress = true; }
                 else if (e.KeyCode == Keys.P && !e.Control && !e.Alt) { PlaySelected(); e.Handled = true; e.SuppressKeyPress = true; }
                 else if (e.Control && e.KeyCode == Keys.A) { foreach (ListViewItem it in list.Items) it.Selected = true; e.Handled = true; }
             };
             var menu = new ContextMenuStrip();
             var miEdit = new ToolStripMenuItem("Ändra rad…", null, (s, e) => EditSelected()) { ShortcutKeyDisplayString = "Enter" };
             var miPlay = new ToolStripMenuItem("Spela upp i filmen", null, (s, e) => PlaySelected()) { ShortcutKeyDisplayString = "P" };
+            var miSplit = new ToolStripMenuItem("Dela rad…", null, (s, e) => SplitSelected()) { ShortcutKeyDisplayString = "Ctrl+D" };
             var miAdd = new ToolStripMenuItem("Lägg till rad…", null, (s, e) => AddRow()) { ShortcutKeyDisplayString = "Insert" };
             var miDel = new ToolStripMenuItem("Ta bort markerade rader", null, (s, e) => DeleteSelected()) { ShortcutKeyDisplayString = "Delete" };
             var miNext = new ToolStripMenuItem("Gå till nästa röda rad", null, (s, e) => NextUnmatched()) { ShortcutKeyDisplayString = "F3" };
@@ -585,7 +587,7 @@ namespace TextSync
             var miReject = new ToolStripMenuItem("Avvisa förslaget", null, (s, e) => RejectProposals(SelectedProposals()));
             var miAcceptAll = new ToolStripMenuItem("Godkänn alla förslag", null, (s, e) => AcceptProposals(proposals));
             var propSep = new ToolStripSeparator();
-            menu.Items.AddRange(new ToolStripItem[] { miPlay, new ToolStripSeparator(), miEdit, miAdd, miDel, new ToolStripSeparator(), miNext, miUndo, propSep, miAccept, miReject, miAcceptAll });
+            menu.Items.AddRange(new ToolStripItem[] { miPlay, new ToolStripSeparator(), miEdit, miSplit, miAdd, miDel, new ToolStripSeparator(), miNext, miUndo, propSep, miAccept, miReject, miAcceptAll });
             menu.Opening += (s, e) =>
             {
                 if (synced == null || busy) { e.Cancel = true; return; }
@@ -593,6 +595,8 @@ namespace TextSync
                 bool refOnly = list.SelectedIndices.Count == 1 && rowCue != null && rowCue[list.SelectedIndices[0]] < 0 && !(rowProp != null && rowProp[list.SelectedIndices[0]] >= 0);
                 miEdit.Text = refOnly ? "Lägg till rad här…" : "Ändra rad…";
                 miEdit.Enabled = (n == 1 && list.SelectedIndices.Count == 1) || refOnly;
+                // dela: en egen rad (inte grå, inte "→ blir") med minst två ord
+                miSplit.Enabled = n == 1 && list.SelectedIndices.Count == 1 && LineAligner.DefaultSplit(synced[SelectedCues()[0]].Text) >= 0;
                 miPlay.Enabled = list.SelectedIndices.Count == 1;
                 miDel.Enabled = n > 0;
                 miDel.Text = n > 1 ? "Ta bort " + n + " markerade rader" : "Ta bort markerad rad";
@@ -1346,6 +1350,7 @@ namespace TextSync
                 "Kryssa i \"Föreslå radindelning som referensen\" så föreslår programmet att dela eller slå ihop rader som de engelska (blå, \"Dela?\"/\"Ihop?\") – högerklicka för att godkänna. " +
                 "Under varje förslag står hur raden blir om du godkänner det (→ blir). " +
                 "Med \"Godkänn förslag om radindelning automatiskt\" i Inställningar görs ändringarna direkt efter synken, också i Hel säsong (Ctrl+Z ångrar). " +
+                "Vill du dela en rad själv: högerklicka på den och välj Dela rad… (Ctrl+D), och klicka i texten där den ska delas. " +
                 "Visa ovanför listan döljer grå rader eller visar bara röda eller blå. Sök (Ctrl+F) letar i texten, Enter hoppar till nästa träff.\n\n" +
                 "Verktygen för synk mot ljudet (0,6–1,4 GB) och för betydelsejämförelsen (0,5 GB) ligger i mappen tools i " + Log.Dir + ". Mappen kan tas bort när Text Sync är stängt, och verktygen hämtas igen vid behov.\n\n" +
                 "Text Sync " + Program.Version + " · MIT-licens\n" +

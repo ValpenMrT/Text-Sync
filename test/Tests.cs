@@ -447,6 +447,31 @@ namespace TextSync
                 string none;
                 var same = LineAligner.AcceptAll(auto, er, null, out none);
                 Check("Matchning: utan förslag lämnas texten orörd", none == null && same == auto);
+
+                // Dela rad…: användaren ställer markören i texten (textrutan har \r\n som radbrytning)
+                string two = "- Var var du?\r\n- På kontoret.";
+                var byHand = LineAligner.SplitAt(two, LineAligner.SnapSplit(two, LineAligner.DefaultSplit(two)));
+                Check("Dela för hand: markören står från början vid radbrytningen, och ensamma replikstreck tas bort",
+                    LineAligner.DefaultSplit(two) == 13 && byHand != null && byHand[0] == "Var var du?" && byHand[1] == "På kontoret.");
+                string one = "Jag sa att jag skulle bli sen, så vänta inte uppe.";
+                var inWord = LineAligner.SplitAt(one, LineAligner.SnapSplit(one, one.IndexOf("vänta") + 1));
+                Check("Dela för hand: markören mitt i ett ord delar vid närmaste ordgräns, aldrig i ordet",
+                    inWord != null && inWord[0] == "Jag sa att jag skulle bli sen, så" && inWord[1] == "vänta inte uppe.");
+                Check("Dela för hand: markören före första ordet eller efter sista ger ingen delning, och ett ensamt ord kan inte delas",
+                    LineAligner.SnapSplit(one, 0) < 0 && LineAligner.SnapSplit(one, one.Length) < 0 && LineAligner.SnapSplit(one, 1) == 3 &&
+                    LineAligner.DefaultSplit("Hallå?") < 0 && LineAligner.SnapSplit("Hallå?", 3) < 0);
+                Check("Dela för hand: utan radbrytning står markören från början efter meningsslutet närmast mitten, annars vid ordgränsen närmast mitten",
+                    LineAligner.DefaultSplit("Nej. Det går inte alls, sa hon. Okej.") == 31 && LineAligner.DefaultSplit(one) == one.IndexOf(" sen,"));
+                double midT = LineAligner.SplitTime(10000, 14000, "Var var du?", "På kontoret.");
+                Cue firstPart;
+                var cut = LineAligner.SplitManually(sv, 1, "<i>Var var du?", "På kontoret.</i>", midT, out firstPart);
+                Console.WriteLine("Dela för hand: " + Srt.FormatTime(cut[1].Start) + "–" + Srt.FormatTime(cut[1].End) + " " + cut[1].Text + "  |  " + Srt.FormatTime(cut[2].Start) + "–" + Srt.FormatTime(cut[2].End) + " " + cut[2].Text);
+                Check("Dela för hand: tiden fördelas efter textens längd, raderna möts vid den, och halva taggar lagas",
+                    midT > 11000 && midT < 13000 && cut.Count == sv.Count + 1 && sv[1].Text == "- Var var du?\n- På kontoret." &&
+                    cut[1] == firstPart && cut[1].Start == 10100 && cut[1].End == midT && cut[2].Start == midT && cut[2].End == 14000 &&
+                    cut[1].Text == "<i>Var var du?</i>" && cut[2].Text == "<i>På kontoret.</i>" && cut[3] == sv[2]);
+                Check("Dela för hand: en mycket kort rad får två delar som båda har tid",
+                    LineAligner.SplitTime(0, 600, "Ja.", "Nej, det tror jag verkligen inte alls.") == 200);
             }
 
             // Text ur ljudet: Whispers ord (ett ord per rad med egen tid) blir undertexter

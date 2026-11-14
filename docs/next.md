@@ -69,6 +69,12 @@ Det som inte är gjort:
 - **Cachen rensas aldrig.** Varje text tar några MB i `%LOCALAPPDATA%\TextSync\cache`.
 - **Övriga idéer från samma samtal:** mäta på fler filmer, rätta den fasta avvikelsen på cirka 0,24 s mot ljud, Silero-taldetektering i Ljud A, flera referenser som röstar, scenklipp med ffmpeg, exakt ordtid mot ljudet (wav2vec2).
 
+## Kvar efter "Dela rad…" 2.4.19 (2026-11-14)
+- **Slå ihop två rader för hand** finns inte. Det går bara via ett förslag (Ihop?). Fråga ägaren om det behövs.
+- **Tiden för rad 2 är en uppskattning** efter textens längd. Finns en text ur ljudet eller ordtider från Whisper kunde tiden tas därifrån. En knapp som spelar upp raden inifrån dialogen skulle också hjälpa.
+- **Formateringen försvinner** ur de två delarna när raden delas medan "Ta bort kursiv och annan formatering" är ikryssad (samma som för förslagen).
+- **Ej provat:** dialogen med riktiga klick och i mörkt läge, se beslutsloggen.
+
 ## Kvar efter "skriver aldrig över" 2.4.17 (2026-11-14)
 - **Två texter i spelaren:** den gamla `Film.sv.srt` ligger kvar bredvid `Film.synkad.sv.srt`. Från 2.4.18 säger programmet det och visar filen i mappen. Programmet tar aldrig bort den själv. Kvar: efter en omstart står avsnittet som Redan synkad utan knappen Visa gamla filen.
 - **Flera synkar ger flera filer** (`.synkad2`, `.synkad3`). Förslag: fråga om den förra synkade filen (programmets egen, oförändrad) ska ersättas. Kräver ägarens ja, eftersom det är en överskrivning.

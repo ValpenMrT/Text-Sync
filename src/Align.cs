@@ -232,6 +232,78 @@ namespace TextSync
             };
         }
 
+        // ---------------------------------------------------------------- dela en rad för hand (Dela rad… i listan)
+        // Stället mellan två ord som ligger närmast tecknet pos (markören), så att ett ord aldrig delas.
+        // -1 = det finns bara text på ena sidan (markören står före första ordet eller efter sista).
+        public static int SnapSplit(string text, int pos)
+        {
+            string s = text ?? "";
+            pos = Math.Max(0, Math.Min(s.Length, pos));
+            int a = pos, b = pos;
+            while (InWord(s, a)) a--;   // ordets början
+            while (InWord(s, b)) b++;   // ordets slut
+            bool okA = HasText(s, 0, a) && HasText(s, a, s.Length), okB = HasText(s, 0, b) && HasText(s, b, s.Length);
+            if (okA && okB) return pos - a <= b - pos ? a : b;
+            return okA ? a : okB ? b : -1;
+        }
+
+        static bool InWord(string s, int p) { return p > 0 && p < s.Length && !char.IsWhiteSpace(s[p - 1]) && !char.IsWhiteSpace(s[p]); }
+        static bool HasText(string s, int from, int to) { for (int i = from; i < to; i++) if (!char.IsWhiteSpace(s[i])) return true; return false; }
+
+        // Där markören står från början: helst vid en radbrytning, annars efter . ? ! …, annars mellan två ord.
+        // Av flera lika bra ställen väljs det närmast mitten. -1 = texten är ett enda ord.
+        public static int DefaultSplit(string text)
+        {
+            string s = text ?? "";
+            int best = -1, bestRank = int.MaxValue; double bestDist = double.MaxValue;
+            for (int p = 1; p < s.Length; p++)
+            {
+                if (!char.IsWhiteSpace(s[p]) || char.IsWhiteSpace(s[p - 1]) || !HasText(s, p, s.Length)) continue;
+                int rank = s[p] == '\n' || s[p] == '\r' ? 0 : ".?!…".IndexOf(s[p - 1]) >= 0 ? 1 : 2;
+                double dist = Math.Abs(p - s.Length / 2.0);
+                if (rank < bestRank || (rank == bestRank && dist < bestDist)) { best = p; bestRank = rank; bestDist = dist; }
+            }
+            return best;
+        }
+
+        // Texten före och efter tecknet pos. Radbrytningarna behålls, och ett ensamt replikstreck tas bort
+        // ("- Hem." blir "Hem."), som när ett förslag delar raden. null = en av delarna blir tom.
+        public static string[] SplitAt(string text, int pos)
+        {
+            string s = text ?? "";
+            if (pos <= 0 || pos >= s.Length) return null;
+            string a = ManualPart(s.Substring(0, pos)), b = ManualPart(s.Substring(pos));
+            return a == null || b == null ? null : new[] { a, b };
+        }
+
+        static string ManualPart(string part)
+        {
+            var lines = Lines(part);
+            if (lines.Count == 1) lines[0] = StripDash(lines[0]);
+            return lines.Count == 0 || lines[0].Length == 0 ? null : string.Join("\n", lines);
+        }
+
+        // Tiden då andra delen börjar: radens tid fördelas efter hur många bokstäver delarna har.
+        // Ingen del blir kortare än en halv sekund, om raden är lång nog för det.
+        public static double SplitTime(double start, double end, string a, string b)
+        {
+            int la = Letters(Markup.Strip(a)), lb = Letters(Markup.Strip(b));
+            double dur = end - start, share = la + lb == 0 ? 0.5 : (double)la / (la + lb);
+            double min = Math.Min(MinDurMs, dur / 3);
+            return Math.Round(Math.Max(start + min, Math.Min(end - min, start + dur * share)));
+        }
+
+        // Rad i blir två: första delen slutar och andra börjar vid tiden mid. Halva taggar lagas, som för förslagen.
+        public static List<Cue> SplitManually(IList<Cue> cues, int i, string a, string b, double mid, out Cue first)
+        {
+            var o = cues[i];
+            first = new Cue(o.Start, mid, Markup.Fix(a)) { OrigStart = o.OrigStart };
+            var second = new Cue(mid, o.End, Markup.Fix(b)) { OrigStart = double.IsNaN(o.OrigStart) ? double.NaN : o.OrigStart + (mid - o.Start) };
+            var res = new List<Cue>(cues);
+            res[i] = first; res.Insert(i + 1, second);
+            return res;
+        }
+
         // Tiderna tas från referensen, men får inte gå in i raderna före och efter i den synkade texten
         static bool Clamp(IList<Cue> tgt, int first, int count, double s, double e, out double cs, out double ce)
         {
