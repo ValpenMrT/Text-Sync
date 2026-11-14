@@ -312,7 +312,7 @@ namespace TextSync
             string redWhy = speech ? "Röda rader ligger inte på tal i ljudet." : "Röda rader har ingen referenstext samtidigt.";
             chipRed.Visible = red > 0;
             chipRed.Text = red == 1 ? "1 röd rad" : red + " röda rader";
-            tips.SetToolTip(chipRed, redWhy + " F3 hoppar till nästa.");
+            tips.SetToolTip(chipRed, redWhy + " F3 hoppar till nästa." + ChipTip);
             chipProp.Visible = proposals.Count > 0;
             chipProp.Text = proposals.Count + " förslag";
             chipGrey.Visible = refOnlyTotal > 0;
@@ -377,7 +377,7 @@ namespace TextSync
             if (red > 0 || !good) d.Append("Röd – " + (speech ? "ligger inte på tal i ljudet" : "ingen referenstext samtidigt") + ". " +
                 (good ? "F3 hoppar till nästa." : "Under 95 % av raderna " + (speech ? "ligger på tal" : "har referenstext samtidigt") + ", så granska de röda raderna. F3 hoppar till nästa.") + "\n");
             if (proposals.Count > 0) d.Append("Blå – förslag om att slå ihop eller dela rader, eller flytta repliker mellan rader (Flytta?), så att de följer referensens radindelning och tider. Under förslaget står hur raden blir (→ blir). Högerklicka för att godkänna eller avvisa.\n");
-            if (refOnlyTotal > 0) d.Append("Grå – finns bara i referensen och sparas inte" + (viewCombo.SelectedIndex == ViewAll ? "" : viewCombo.SelectedIndex == ViewProposals ? " (de flesta dolda just nu, se Visa ovanför listan)" : " (dolda just nu, se Visa ovanför listan)") + ".\n");
+            if (refOnlyTotal > 0) d.Append("Grå – finns bara i referensen och sparas inte" + (viewCombo.SelectedIndex == ViewAll || viewCombo.SelectedIndex == ViewOnlyGrey ? "" : viewCombo.SelectedIndex == ViewProposals ? " (de flesta dolda just nu, se Visa ovanför listan)" : " (dolda just nu, se Visa ovanför listan)") + ".\n");
             if (fixedRows > 0) d.Append("✎ – rättades vid inläsningen. Håll muspekaren över raden för att se vad som stod i filen, eller välj Bara rättade rader i Visa.\n");
             if (nMoved > 0) d.Append("⇄ – raden ligger olika i den vanliga synken och med betydelsejämförelsen. Håll muspekaren över raden för att se den andra tiden.\n");
             if (weak && !sparse) d.Append("⚠ – svagt ställe: få rader " + (refIsText ? "börjar samtidigt som referensen" : "ligger på tal i ljudet") + ".\n");
@@ -485,7 +485,7 @@ namespace TextSync
                 {
                     var r = extraRef[ei++];
                     // i "Bara förslag" visas de grå rader som ingår i ett förslag, så att man ser båda referensraderna
-                    if (view != ViewAll && !(view == ViewProposals && propRefs.Contains(r))) continue;
+                    if (view != ViewAll && view != ViewOnlyGrey && !(view == ViewProposals && propRefs.Contains(r))) continue;
                     var it = new ListViewItem(new[] { HC ? "▶" : "Spela referensraden", "", "", "", "", "", "",
                         Srt.FormatTime(r.Start), r.Text.Replace("\n", " / ") });
                     it.ForeColor = RefOnlyRow;
@@ -497,7 +497,9 @@ namespace TextSync
                 {
                     int i = si++;
                     var c = synced[i]; var bc = best[i];
-                    if (view == ViewOnlyRed && bc != null) continue;
+                    if (view == ViewOnlyGrey) continue;
+                    // en röd rad med förslag visas blå och räknas som förslag, inte som röd (som i rutan "2 röda rader")
+                    if (view == ViewOnlyRed && (bc != null || cueProp[i] >= 0)) continue;
                     if (view == ViewProposals && cueProp[i] < 0) continue;
                     if (view == ViewFixed && c.Raw == null) continue;
                     bool alt = !double.IsNaN(c.MeaningAlt);
@@ -557,6 +559,7 @@ namespace TextSync
             // tom lista: säg varför, så att det inte ser ut som att synken misslyckades
             else if (view == ViewOnlyRed) viewInfo.Text = "Inga röda rader. Välj Alla rader i Visa för att se listan.";
             else if (view == ViewProposals && !proposeCheck.Checked && !autoAccept) viewInfo.Text = "Förslag är avstängda. Kryssa i rutan bredvid, eller välj Alla rader.";
+            else if (view == ViewOnlyGrey) viewInfo.Text = "Inga rader finns bara i referensen. Välj Alla rader i Visa för att se listan.";
             else if (view == ViewFixed) viewInfo.Text = "Inga rader rättades vid inläsningen. Välj Alla rader i Visa för att se listan.";
             else if (view == ViewMoved) viewInfo.Text = (meaningCheck.Checked ? "Betydelsejämförelsen flyttade inga rader." : "Betydelsejämförelsen är avstängd i Inställningar.") + " Välj Alla rader i Visa för att se listan.";
             else if (view == ViewProposals) viewInfo.Text = "Inga förslag" + (refIsText ? "" : " (görs bara mot text, inte mot ljud)") + ". Välj Alla rader i Visa.";

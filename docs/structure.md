@@ -10,7 +10,7 @@ src/
   Program.cs       Start, globala felhanterare (visar svenskt felmeddelande och skriver loggen)
   MainForm.cs      Gränssnittet (partial class, delad på flera filer): fält, fönstrets uppbyggnad, tema, dra-och-släpp, knappar, hjälp
   MainForm.Load.cs   Inläsning av referens (film eller SRT), originaltext och undertexten som ska synkas
-  MainForm.Edit.cs   Redigera rader med ångra, dela en rad för hand, förslag om radindelning, hoppa till nästa röda rad
+  MainForm.Edit.cs   Redigera rader med ångra, dela en rad för hand, synka om markerade rader, förslag om radindelning, hoppa till nästa röda rad
   MainForm.Audio.cs  Listorna Ljudspår och Grafikkort, nedladdning av verktyg, spara igenkänd text
   MainForm.Sync.cs   Synken (DoSync), resultatrutan och förhandsvisningen i listan
   MainForm.Save.cs   Spara SRT med säkerhetskopia, lägga in i MKV
@@ -23,7 +23,8 @@ src/
   CueDialog.cs     Dialog för att ändra eller lägga till en rad (start, slut, text)
   SplitDialog.cs   Dialog för att dela en rad i två för hand: markören i texten visar var (Dela rad…, Ctrl+D). Reglerna ligger i Align.cs (SnapSplit, SplitAt, SplitTime)
   Align.cs         Förslag om att slå ihop (2↔1) eller dela (1↔2) rader efter referensens radindelning (dynamisk programmering på tider).
-                   Också det som gör som förslagen säger (Apply), och AcceptAll för inställningen "Godkänn förslag om radindelning automatiskt"
+                   Också det som gör som förslagen säger (Apply), AcceptAll för inställningen "Godkänn förslag om radindelning automatiskt",
+                   och Resync/LocalShift för "Synka om markerade rader" (ett stycke rader flyttas så att det passar referensen, sedan radindelning)
   Theme.cs         Ljust/mörkt läge: paletter, färgbyte på kontrollerna, mörka Windows-delar (rullister, rubriker, titelrad)
   Audio.cs         Ljudreferens: ffmpeg → 16 kHz mono WAV (mittkanal), taldetektering (A), Whisper (B), kombination (A+B), cache.
                    Också orden till text ur ljudet: Whisper (GetTextWords) eller Parakeet via sherpa-onnx (GetParakeetWords: ljudet i bitar om högst 20 s)
@@ -45,7 +46,7 @@ src/
 test/
   Tests.cs         Tester: synk i 7 scenarier × 3 metoder (G = korta klipp), tid före synk, SRT/teckenkodningar, dra-och-släpp-fördelning,
                    spara med säkerhetskopia, MKV-läsning (egen MKV-skrivare, avkortade filer), mkvmerge-inbäddning,
-                   matchning av rader (dela, slå ihop, radlängd, mitt i mening, gles referens), dela en rad för hand,
+                   matchning av rader (dela, slå ihop, radlängd, mitt i mening, gles referens), dela en rad för hand, synka om markerade rader,
                    text för hörselskadade, kodade tecken och taggar, text ur ljudet (ord → undertexter),
                    hel säsong: parning av filmer och undertexter, återställning, kön från början till slut
   Diag.cs          Felsökning mot riktiga filer: skriver ut avsnitt, träffsäkerhet och rader utan referens

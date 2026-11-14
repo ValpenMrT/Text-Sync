@@ -472,6 +472,30 @@ namespace TextSync
                     cut[1].Text == "<i>Var var du?</i>" && cut[2].Text == "<i>På kontoret.</i>" && cut[3] == sv[2]);
                 Check("Dela för hand: en mycket kort rad får två delar som båda har tid",
                     LineAligner.SplitTime(0, 600, "Ja.", "Nej, det tror jag verkligen inte alls.") == 200);
+
+                // Synka om markerade rader: rad 2–4 ligger 1,5 s för sent, resten ligger rätt
+                var late = sv.Select((c, i) => i >= 1 && i <= 3 ? new Cue(c.Start + 1500, c.End + 1500, c.Text) { OrigStart = c.Start } : c).ToList();
+                List<double> shifts; string reWhat; Cue reFirst;
+                var re = LineAligner.Resync(late, new[] { 1, 2, 3 }, er, true, null, out shifts, out reWhat, out reFirst);
+                Console.WriteLine("Synka om markerade: förskjutning " + string.Join(", ", shifts) + " ms, radindelning: " + (reWhat ?? "(ingen)") + ", markerar \"" + reFirst.Text + "\"");
+                Check("Synka om markerade: stycket flyttas tillbaka 1,5 s och delas och slås ihop som referensen",
+                    shifts.Count == 1 && shifts[0] == -1500 && reWhat == "1 sammanslagning och 1 delning" && re.Count == 8 &&
+                    re[1].Text == "Var var du?" && re[1].Start == 10000 && re[2].Text == "På kontoret." && re[2].Start == 12200 &&
+                    re[3].Text == "Jag sa att jag skulle bli sen,\nså vänta inte uppe." && re[3].Start == 20000 && re[3].End == 24000 && reFirst == re[1]);
+                Check("Synka om markerade: raderna utanför markeringen rörs inte, inte heller de som har ett eget förslag",
+                    re[0] == sv[0] && re[4] == sv[4] && re[5] == sv[5] && re[6] == sv[6] && re[7] == sv[7] && late[1].Start == 11600);
+                var reTimes = LineAligner.Resync(late, new[] { 1, 2, 3 }, er, false, null, out shifts, out reWhat, out reFirst);
+                Check("Synka om markerade: mot ljud flyttas bara tiderna, och tiden före synk följer med",
+                    shifts[0] == -1500 && reWhat == null && reTimes.Count == 8 && reTimes[1].Start == 10100 && reTimes[1].Text == sv[1].Text && reTimes[1].OrigStart == 10100 && reTimes[3].End == 24000);
+                var reSame = LineAligner.Resync(sv, new[] { 7 }, er, true, null, out shifts, out reWhat, out reFirst);
+                Check("Synka om markerade: en rad som redan ligger rätt ändras inte",
+                    shifts.Count == 1 && shifts[0] == 0 && reWhat == null && reSame.SequenceEqual(sv));
+                var tight = new List<Cue> { new Cue(18000, 20500, "Före."), new Cue(21500, 23500, "Jag sa att jag skulle bli sen."), new Cue(23600, 25000, "Efter.") };
+                LineAligner.Resync(tight, new[] { 1 }, er, false, null, out shifts, out reWhat, out reFirst);
+                Console.WriteLine("Synka om markerade, trångt: förskjutning " + shifts[0] + " ms (referensraden börjar 1,5 s tidigare, raden före slutar 1 s tidigare)");
+                Check("Synka om markerade: stycket går aldrig in i raden före", shifts[0] >= -1000 && shifts[0] <= 0);
+                var twoRuns = LineAligner.Resync(late, new[] { 1, 7 }, er, false, null, out shifts, out reWhat, out reFirst);
+                Check("Synka om markerade: rader som inte står i följd flyttas var för sig", shifts.Count == 2 && shifts[0] != 0 && shifts[1] == 0 && twoRuns[7] == sv[7]);
             }
 
             // Text ur ljudet: Whispers ord (ett ord per rad med egen tid) blir undertexter

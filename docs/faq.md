@@ -58,7 +58,7 @@ Röda rader har ingen engelsk text samtidigt. Det är ofta helt rätt, till exem
 Listan visar alla rader i både den svenska och den engelska texten. En grå rad är en engelsk rad som inte står bredvid någon svensk rad, till exempel när en svensk rad täcker två engelska. Grå rader sparas aldrig. Dubbelklicka på en grå rad om du vill lägga till en svensk rad på samma tid.
 
 **Kan jag dölja de grå raderna, eller bara se de röda?**
-Ja, välj i **Visa** ovanför listan: **Alla rader**, **Dölj grå rader**, **Bara röda rader** eller **Bara förslag**. Bredvid står hur många rader som visas, eller varför listan är tom. Valet sparas till nästa gång. Det påverkar bara listan, inte filen du sparar. Trycker du **F3** när de röda raderna är dolda, byter listan till **Alla rader**.
+Ja, välj i **Visa** ovanför listan: **Alla rader**, **Dölj grå rader**, **Bara röda rader**, **Bara förslag** eller **Bara grå rader**. Du kan också klicka på en färgad ruta i resultatet, till exempel **2 röda rader**, **155 förslag** eller **215 bara i referensen**. Då visar listan bara de raderna, och ett klick till på samma ruta visar alla rader igen. Bredvid Visa står hur många rader som visas, eller varför listan är tom. Valet sparas till nästa gång. Det påverkar bara listan, inte filen du sparar. Trycker du **F3** när de röda raderna är dolda, byter listan till **Alla rader**.
 
 **Kan programmet dela eller slå ihop svenska rader så att de blir som de engelska?**
 Ja. Kryssa i **Föreslå radindelning som referensen** ovanför listan. Rutan är avstängd från början, och valet sparas till nästa gång. Programmet föreslår då ändringar, men ändrar ingenting förrän du godkänner. Förslagsraderna har blå text, och i kolumnen **#** står **Dela?** eller **Ihop?**:
@@ -144,6 +144,7 @@ Det är taggar för kursiv stil. De flesta spelare på datorn (VLC, Plex, Kodi) 
 Ja, i listan:
 - **Dubbelklick** eller **Enter** ändrar text och tid.
 - **Ctrl+D** delar raden i två, se nästa fråga.
+- **Ctrl+R** synkar om de markerade raderna, se frågan efter den.
 - **Insert** lägger till en rad.
 - **Delete** tar bort de markerade raderna.
 - **Ctrl+Z** ångrar, i flera steg.
@@ -243,3 +244,11 @@ Installera gratisprogrammet MKVToolNix. Det behövs bara för den knappen. Det r
 
 **Något gick fel.**
 Klicka **Hjälp** och öppna loggmappen. Skicka `log.txt` till den som gav dig programmet.
+
+**Några rader ligger fel fast resten stämmer. Kan jag synka om bara dem?**
+Ja. Markera raderna i listan (klicka på den första och Skift+klicka på den sista), högerklicka och välj **Synka om markerade rader** (eller tryck **Ctrl+R**).
+- Raderna flyttas tillsammans, lika mycket, till det läge där de passar referensen bäst. De kan flyttas högst 20 sekunder och går aldrig in i raderna före och efter. Raderna du inte har markerat rörs inte.
+- När referensen är en text delas och slås de markerade raderna sedan ihop som referensens rader, på samma sätt som när du godkänner förslag. Det görs även när rutan **Föreslå radindelning som referensen** inte är ikryssad. Mot ljud flyttas bara tiderna.
+- Markerar du rader på flera ställen flyttas varje ställe för sig.
+- Statusraden säger hur mycket raderna flyttades och hur många som delades eller slogs ihop. Ligger de redan rätt ändras ingenting. **Ctrl+Z** ångrar allt i ett steg.
+- Spela upp en av raderna med **▶** efteråt för att kontrollera.

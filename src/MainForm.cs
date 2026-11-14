@@ -45,7 +45,7 @@ namespace TextSync
         int[] cueRow;                  // index i synced -> listrad
         Cue[] rowRef;                  // listrad -> referensraden som visas (eller null)
         // vilka rader listan visar: 0 = alla, 1 = dölj grå rader, 2 = bara röda rader (sparas mellan körningar)
-        const int ViewAll = 0, ViewNoGray = 1, ViewOnlyRed = 2, ViewProposals = 3, ViewFixed = 4, ViewMoved = 5;
+        const int ViewAll = 0, ViewNoGray = 1, ViewOnlyRed = 2, ViewProposals = 3, ViewFixed = 4, ViewMoved = 5, ViewOnlyGrey = 6;
         ComboBox viewCombo; Label viewInfo; LinkLabel acceptAllLink, meaningLink; CheckBox proposeCheck;
         int refOnlyTotal;              // antal grå referensrader, även de som är dolda
         // förslag på att slå ihop eller dela rader så att de följer referensens radindelning (blå rader)
@@ -418,9 +418,11 @@ namespace TextSync
                 using (var fill = new SolidBrush(HC ? SystemColors.Highlight : pctGood ? OkColor : RedRow)) e.Graphics.FillRectangle(fill, 0, y, (int)Math.Round(bw * Math.Max(0, Math.Min(1, pctFrac))), bh);
                 using (var pen = new Pen(HC ? SystemColors.WindowText : Theme.BtnBorder)) e.Graphics.DrawRectangle(pen, 0, y, bw - 1, bh - 1);
             };
-            tips.SetToolTip(chipProp, "Blå rader är förslag om att slå ihop eller dela rader. Högerklicka på raden för att godkänna eller avvisa.");
-            tips.SetToolTip(chipGrey, "Grå rader finns bara i referensen och sparas inte.");
-            tips.SetToolTip(chipFixed, "Rader märkta ✎ rättades vid inläsningen. Håll muspekaren över raden för att se vad som stod i filen.");
+            tips.SetToolTip(chipProp, "Blå rader är förslag om att slå ihop eller dela rader. Högerklicka på raden för att godkänna eller avvisa." + ChipTip);
+            tips.SetToolTip(chipGrey, "Grå rader finns bara i referensen och sparas inte." + ChipTip);
+            tips.SetToolTip(chipFixed, "Rader märkta ✎ rättades vid inläsningen. Håll muspekaren över raden för att se vad som stod i filen." + ChipTip);
+            // ett klick på rutan visar bara de raderna i listan, som valet i Visa. Ett klick till visar alla rader igen.
+            ChipShows(chipRed, ViewOnlyRed); ChipShows(chipProp, ViewProposals); ChipShows(chipGrey, ViewOnlyGrey); ChipShows(chipFixed, ViewFixed);
             chips = new FlowLayoutPanel { AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, Dock = DockStyle.Top, WrapContents = true, Margin = new Padding(10, 6, 10, 6) };
             chips.Controls.AddRange(new Control[] { chipPct, chipRed, chipProp, chipGrey, chipFixed, chipSeg, chipHi, chipMeaning });
             FitFlowHeight(chips);
@@ -439,7 +441,7 @@ namespace TextSync
                 FitLabelHeight(detailBody[i]);
                 detailsPanel.Controls.Add(detailHead[i], i, 0); detailsPanel.Controls.Add(detailBody[i], i, 1);
             }
-            detailBody[2].Text = "Dubbelklicka – ändra text och tid\nCtrl+D – dela raden i två\nInsert – lägg till en rad\nDelete – ta bort raden\nCtrl+Z – ångra";
+            detailBody[2].Text = "Dubbelklicka – ändra text och tid\nCtrl+D – dela raden i två\nCtrl+R – synka om markerade rader\nInsert – lägg till en rad\nDelete – ta bort raden\nCtrl+Z – ångra";
 
             resBox = new TableLayoutPanel { AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, Dock = DockStyle.Top, ColumnCount = 1, RowCount = 5, Margin = new Padding(0, 2, 0, 6), BackColor = Card, Visible = false };
             resBox.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
@@ -572,6 +574,7 @@ namespace TextSync
                 else if (e.KeyCode == Keys.Return) { EditSelected(); e.Handled = true; }
                 else if (e.KeyCode == Keys.Insert) { AddRow(); e.Handled = true; }
                 else if (e.Control && e.KeyCode == Keys.D) { SplitSelected(); e.Handled = true; e.SuppressKeyPress = true; }
+                else if (e.Control && e.KeyCode == Keys.R) { ResyncSelected(); e.Handled = true; e.SuppressKeyPress = true; }
                 else if (e.KeyCode == Keys.P && !e.Control && !e.Alt) { PlaySelected(); e.Handled = true; e.SuppressKeyPress = true; }
                 else if (e.Control && e.KeyCode == Keys.A) { foreach (ListViewItem it in list.Items) it.Selected = true; e.Handled = true; }
             };
@@ -579,6 +582,7 @@ namespace TextSync
             var miEdit = new ToolStripMenuItem("Ändra rad…", null, (s, e) => EditSelected()) { ShortcutKeyDisplayString = "Enter" };
             var miPlay = new ToolStripMenuItem("Spela upp i filmen", null, (s, e) => PlaySelected()) { ShortcutKeyDisplayString = "P" };
             var miSplit = new ToolStripMenuItem("Dela rad…", null, (s, e) => SplitSelected()) { ShortcutKeyDisplayString = "Ctrl+D" };
+            var miResync = new ToolStripMenuItem("Synka om markerade rader", null, (s, e) => ResyncSelected()) { ShortcutKeyDisplayString = "Ctrl+R" };
             var miAdd = new ToolStripMenuItem("Lägg till rad…", null, (s, e) => AddRow()) { ShortcutKeyDisplayString = "Insert" };
             var miDel = new ToolStripMenuItem("Ta bort markerade rader", null, (s, e) => DeleteSelected()) { ShortcutKeyDisplayString = "Delete" };
             var miNext = new ToolStripMenuItem("Gå till nästa röda rad", null, (s, e) => NextUnmatched()) { ShortcutKeyDisplayString = "F3" };
@@ -587,7 +591,7 @@ namespace TextSync
             var miReject = new ToolStripMenuItem("Avvisa förslaget", null, (s, e) => RejectProposals(SelectedProposals()));
             var miAcceptAll = new ToolStripMenuItem("Godkänn alla förslag", null, (s, e) => AcceptProposals(proposals));
             var propSep = new ToolStripSeparator();
-            menu.Items.AddRange(new ToolStripItem[] { miPlay, new ToolStripSeparator(), miEdit, miSplit, miAdd, miDel, new ToolStripSeparator(), miNext, miUndo, propSep, miAccept, miReject, miAcceptAll });
+            menu.Items.AddRange(new ToolStripItem[] { miPlay, new ToolStripSeparator(), miEdit, miSplit, miAdd, miDel, miResync, new ToolStripSeparator(), miNext, miUndo, propSep, miAccept, miReject, miAcceptAll });
             menu.Opening += (s, e) =>
             {
                 if (synced == null || busy) { e.Cancel = true; return; }
@@ -600,6 +604,9 @@ namespace TextSync
                 miPlay.Enabled = list.SelectedIndices.Count == 1;
                 miDel.Enabled = n > 0;
                 miDel.Text = n > 1 ? "Ta bort " + n + " markerade rader" : "Ta bort markerad rad";
+                // synka om: mot en text följer radindelningen med, mot ljud flyttas bara tiderna
+                miResync.Enabled = n > 0;
+                miResync.Text = (n > 1 ? "Synka om " + n + " markerade rader" : "Synka om markerad rad") + (refIsText ? ", med radindelning som referensen" : "");
                 miNext.Enabled = rowMatched != null && rowMatched.Any(m => !m);
                 miUndo.Enabled = undo.Count > 0;
                 int np = SelectedProposals().Count;
@@ -621,7 +628,8 @@ namespace TextSync
                 "Bara röda rader (ingen referenstext samtidigt)",
                 "Bara förslag (blå rader att slå ihop eller dela)",
                 "Bara rättade rader (märkta ✎, ändrade vid inläsningen)",
-                "Bara rader som betydelsejämförelsen flyttar (märkta ⇄)" });
+                "Bara rader som betydelsejämförelsen flyttar (märkta ⇄)",
+                "Bara grå rader (finns bara i referensen)" });
             int view; if (!int.TryParse(Tools.GetSetting("view", "0"), out view) || view < 0 || view >= viewCombo.Items.Count) view = ViewAll;
             viewCombo.SelectedIndex = view;
             viewCombo.SelectedIndexChanged += (s, e) =>
@@ -1039,6 +1047,20 @@ namespace TextSync
             return l;
         }
 
+        const string ChipTip = "\nKlicka för att visa bara de raderna. Klicka igen för att visa alla.";
+
+        // Gör en siffra i resultatrutan klickbar: listan visar bara de raderna (samma som valet view i Visa), och ett klick till visar alla igen
+        void ChipShows(Label chip, int view)
+        {
+            chip.Cursor = Cursors.Hand;
+            chip.AccessibleRole = AccessibleRole.PushButton;
+            chip.Click += (s, e) =>
+            {
+                if (busy || result == null) return;
+                viewCombo.SelectedIndex = viewCombo.SelectedIndex == view ? ViewAll : view;   // listan ritas om av viewCombo.SelectedIndexChanged
+            };
+        }
+
         // Fäller ut eller ihop Detaljer i resultatrutan
         void SetDetails(bool open)
         {
@@ -1351,7 +1373,8 @@ namespace TextSync
                 "Under varje förslag står hur raden blir om du godkänner det (→ blir). " +
                 "Med \"Godkänn förslag om radindelning automatiskt\" i Inställningar görs ändringarna direkt efter synken, också i Hel säsong (Ctrl+Z ångrar). " +
                 "Vill du dela en rad själv: högerklicka på den och välj Dela rad… (Ctrl+D), och klicka i texten där den ska delas. " +
-                "Visa ovanför listan döljer grå rader eller visar bara röda eller blå. Sök (Ctrl+F) letar i texten, Enter hoppar till nästa träff.\n\n" +
+                "Ligger några rader fel: markera dem, högerklicka och välj Synka om markerade rader (Ctrl+R). De flyttas så att de passar referensen och delas som den. " +
+                "Visa ovanför listan döljer grå rader eller visar bara röda eller blå. Ett klick på en färgad ruta i resultatet (t.ex. \"2 röda rader\") gör samma sak. Sök (Ctrl+F) letar i texten, Enter hoppar till nästa träff.\n\n" +
                 "Verktygen för synk mot ljudet (0,6–1,4 GB) och för betydelsejämförelsen (0,5 GB) ligger i mappen tools i " + Log.Dir + ". Mappen kan tas bort när Text Sync är stängt, och verktygen hämtas igen vid behov.\n\n" +
                 "Text Sync " + Program.Version + " · MIT-licens\n" +
                 "Loggfil (för felsökning): " + Log.FilePath + "\n\n" +

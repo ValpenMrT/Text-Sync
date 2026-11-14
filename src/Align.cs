@@ -304,6 +304,97 @@ namespace TextSync
             return res;
         }
 
+        // ---------------------------------------------------------------- synka om markerade rader (Synka om markerade rader i listan, Ctrl+R)
+        public const double ResyncRangeMs = 20000;   // så långt får ett stycke flyttas, som synkens lokala sökning (SyncOptions.LocalRangeSec)
+        public const double ResyncMinGain = 0.02;    // så mycket bättre måste stycket passa för att flyttas
+        const double OnsetTolMs = 300;               // en radstart inom så här lång tid från en referensstart räknas som träff (som i Engine.cs)
+
+        // Hur mycket raderna first..last (ett stycke i följd) ska flyttas för att passa referensen bäst. Hela stycket får samma förskjutning.
+        // Måttet är som synkens: hälften andel av tiden som har referenstext samtidigt, hälften radstarter som ligger på en referensstart.
+        // Stycket får inte gå in i raderna före och efter, och flyttas bara om det passar tydligt bättre. 0 = ligger redan så bra det går.
+        public static double LocalShift(IList<Cue> cues, int first, int last, IList<Cue> refc)
+        {
+            double runS = cues[first].Start, runE = runS;
+            for (int i = first; i <= last; i++) runE = Math.Max(runE, cues[i].End);
+            double lo = Math.Max(-ResyncRangeMs, -runS), hi = ResyncRangeMs;
+            if (first > 0) lo = Math.Max(lo, cues[first - 1].End - runS);
+            if (last + 1 < cues.Count) hi = Math.Min(hi, cues[last + 1].Start - runE);
+            lo = Math.Min(lo, 0); hi = Math.Max(hi, 0);
+            if (hi - lo < 1) return 0;
+
+            var near = refc.Where(r => r.End > r.Start && r.End >= runS + lo - 1000 && r.Start <= runE + hi + 1000).ToList();
+            if (near.Count == 0) return 0;
+            Iv[] refIv = SyncEngine.Merge(near.Select(r => new Iv(r.Start, r.End)));
+            double[] refSt = near.Select(r => r.Start).OrderBy(x => x).ToArray();
+            Iv[] run = SyncEngine.Merge(Enumerable.Range(first, last - first + 1).Select(i => new Iv(cues[i].Start, cues[i].End)));
+            double total = run.Sum(x => x.E - x.S);
+            if (total <= 0) return 0;
+            var moved = new Iv[run.Length];
+            Func<double, double> fit = d =>
+            {
+                for (int i = 0; i < run.Length; i++) moved[i] = new Iv(run[i].S + d, run[i].E + d);
+                double on = 0;
+                for (int i = first; i <= last; i++)
+                {
+                    double t = cues[i].Start + d;
+                    int k = Array.BinarySearch(refSt, t);
+                    if (k < 0) k = ~k;
+                    double dist = Math.Min(k < refSt.Length ? refSt[k] - t : double.MaxValue, k > 0 ? t - refSt[k - 1] : double.MaxValue);
+                    if (dist < OnsetTolMs) on += 1 - dist / OnsetTolMs;
+                }
+                return 0.5 * SyncEngine.Overlap(moved, refIv) / total + 0.5 * on / (last - first + 1);
+            };
+            // grovt i steg om 10 ms, sedan 1 ms runt det bästa. Av lika bra förskjutningar väljs den minsta.
+            double f0 = fit(0), best = f0, bestD = 0;
+            for (double d = Math.Ceiling(lo / 10) * 10; d <= hi; d += 10)
+            {
+                double f = fit(d);
+                if (f > best + 1e-9 || (f > best - 1e-9 && Math.Abs(d) < Math.Abs(bestD))) { best = f; bestD = d; }
+            }
+            double c0 = bestD;
+            for (double d = Math.Max(lo, c0 - 10); d <= Math.Min(hi, c0 + 10); d += 1)
+            {
+                double f = fit(d);
+                if (f > best + 1e-9 || (f > best - 1e-9 && Math.Abs(d) < Math.Abs(bestD))) { best = f; bestD = d; }
+            }
+            return best >= f0 + ResyncMinGain ? Math.Round(bestD) : 0;
+        }
+
+        // Synkar om bara raderna sel (index i cues): varje stycke rader i följd flyttas för sig så att det passar referensen (LocalShift).
+        // lines = sedan delas raderna, slås ihop och får repliker flyttade som referensen, som om förslagen för just de raderna godkändes.
+        // shifts = förskjutningen för varje stycke (0 = orört), what = vad radindelningen gjorde (null = inget), first = raden att markera efteråt.
+        // Raderna utanför sel rörs inte. Inget ändrat alls = shifts bara nollor och what null.
+        public static List<Cue> Resync(IList<Cue> cues, IList<int> sel, IList<Cue> refc, bool lines, IList<MeaningMove> moves,
+            out List<double> shifts, out string what, out Cue first)
+        {
+            shifts = new List<double>(); what = null; first = null;
+            var res = new List<Cue>(cues);
+            var idx = sel.Where(i => i >= 0 && i < res.Count).Distinct().OrderBy(i => i).ToList();
+            if (idx.Count == 0 || refc == null) return res;
+            for (int a = 0; a < idx.Count;)
+            {
+                int b = a;
+                while (b + 1 < idx.Count && idx[b + 1] == idx[b] + 1) b++;
+                double d = LocalShift(res, idx[a], idx[b], refc);
+                shifts.Add(d);
+                // en rad som flyttas här räknas som ändrad för hand: märket ⇄ från betydelsejämförelsen följer inte med
+                if (d != 0) for (int i = idx[a]; i <= idx[b]; i++) res[i] = new Cue(res[i].Start + d, res[i].End + d, res[i].Text) { OrigStart = res[i].OrigStart, Raw = res[i].Raw };
+                a = b + 1;
+            }
+            first = res[idx[0]];
+            if (!lines) return res;
+            var set = new HashSet<int>(idx);
+            var ps = Propose(res, refc);
+            if (moves != null && moves.Count > 0) ps = WithMoves(ps, MoveProposals(res, moves, false, 0));
+            ps = ps.Where(p => Enumerable.Range(p.First, p.Count).All(set.Contains)).ToList();
+            if (ps.Count == 0) return res;
+            what = CountText(ps);
+            List<Cue> added;
+            var done = Apply(res, ps, 0, out added);
+            if (!done.Contains(first)) first = added.OrderBy(c => c.Start).First();
+            return done;
+        }
+
         // Tiderna tas från referensen, men får inte gå in i raderna före och efter i den synkade texten
         static bool Clamp(IList<Cue> tgt, int first, int count, double s, double e, out double cs, out double ce)
         {

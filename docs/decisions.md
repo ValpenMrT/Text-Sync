@@ -2,6 +2,25 @@
 
 Nyast först.
 
+## 2026-11-14 – 2.4.20: Klick på de färgade rutorna filtrerar listan, och markerade rader kan synkas om
+- **Område:** GUI / synk
+- **Önskemål (ägaren):** "kan du lägga till så man kan klicka på de färgade fyrkanterna för att visa endast de som det gäller utöver att man kan välja i listan. kan du även lägga till så man kan markera ett visst antal rader och välja att synka om bara de markerade med föreslagen radindelning."
+- **Ägarens svar:** på frågan vad "synka om" ska göra valde ägaren **Synka om + radindelning** (raderna flyttas på nytt mot referensen och delas sedan som den), inte bara radindelningen.
+- **Beslut, rutorna:**
+  - Ett klick på **röda rader**, **förslag**, **bara i referensen** eller **✎ rättade rader** i resultatet ställer om Visa till bara de raderna. Ett klick till på samma ruta visar alla rader. Muspekaren blir en hand och tipsrutan säger det (`MainForm.ChipShows`).
+  - **Nytt val i Visa:** "Bara grå rader (finns bara i referensen)", för rutan "bara i referensen".
+  - **Bara röda rader** visar inte längre röda rader som har ett förslag. De är blå i listan och räknas som förslag, så nu stämmer antalet med rutan.
+- **Beslut, synka om:**
+  - **Synka om markerade rader** i högerklicksmenyn, och **Ctrl+R** i listan (`MainForm.ResyncSelected`, `LineAligner.Resync`).
+  - **Tiderna:** varje stycke markerade rader i följd får en gemensam förskjutning, den som passar referensen bäst inom ±20 s (`LocalShift`). Måttet är synkmotorns: hälften tid med referenstext samtidigt, hälften radstarter på en referensstart. Stycket går aldrig in i raderna före och efter, och flyttas bara om det passar tydligt bättre (0,02).
+  - **Radindelningen:** mot en text räknas förslagen (Dela?, Ihop?, Flytta?) fram för de flyttade raderna, och de som bara berör markerade rader godkänns direkt. Det görs även när rutan Föreslå radindelning inte är ikryssad, och även för förslag som har avvisats. Mot ljud flyttas bara tiderna.
+  - **Ångra:** ett steg med Ctrl+Z. Ändras ingenting säger statusraden det, och inget ångra-steg skapas. Märket ⇄ försvinner från rader som flyttas.
+- **Claudes val (ägaren angav inte):** kortkommandot Ctrl+R, gränsen ±20 s, att stycket inte får gå in i grannraderna, att även ✎-rutan är klickbar, och att ett klick till visar alla rader.
+- **Provat:** i fönstret i samma process (utan klick eller tangenter) med testfilmen: klick på rutorna ger 2 röda, 155 förslag och 215 grå rader och tillbaka till alla. 12 rader som lades 1,5 s för sent flyttades tillbaka exakt (−1,500 s) och fick 6 delningar, Ctrl+Z ångrade, och en rad som låg rätt ändrades inte. Skärmbild granskad i mörkt läge.
+- **Test:** 270 av 270 kontroller (6 nya: flytt med radindelning, orörda rader utanför markeringen, bara tider, rad som ligger rätt, trång plats, rader som inte står i följd).
+- **Ej provat:** riktiga musklick på rutorna, högerklicksmenyn och Ctrl+R, synka om mot ljud i fönstret, och med extra justering inställd.
+- **Product-check:** Claude granskade själv. Inget blockerande. Kan vänta (docs/next.md): rutorna går inte att nå med tangentbordet (Visa gör samma sak), och det syns inte på rutan vilken som är vald.
+
 ## 2026-11-14 – 2.4.19: Dela en rad för hand, där man själv väljer
 - **Område:** GUI
 - **Önskemål (ägaren):** "kan du lägga till att man manuellt kan markera en rad och välja var den ska delas."

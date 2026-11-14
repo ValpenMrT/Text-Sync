@@ -69,6 +69,12 @@ Det som inte är gjort:
 - **Cachen rensas aldrig.** Varje text tar några MB i `%LOCALAPPDATA%\TextSync\cache`.
 - **Övriga idéer från samma samtal:** mäta på fler filmer, rätta den fasta avvikelsen på cirka 0,24 s mot ljud, Silero-taldetektering i Ljud A, flera referenser som röstar, scenklipp med ffmpeg, exakt ordtid mot ljudet (wav2vec2).
 
+## Kvar efter klickbara rutor och "Synka om markerade rader" 2.4.20 (2026-11-14)
+- **Rutorna går inte att nå med tangentbordet.** Valet i Visa gör samma sak. Det syns inte heller på rutan vilken som är vald (t.ex. understruken text).
+- **Synka om flyttar hela stycket lika mycket.** Ligger raderna i stycket olika fel får man markera dem i mindre delar. En finjustering per rad, som synkmotorns steg 5, kunde läggas till.
+- **Stycket går aldrig in i grannraderna.** Ligger en ensam rad fel mellan två täta rader händer därför ingenting, och statusraden säger bara att raden redan ligger så bra det går.
+- **Ej provat:** riktiga klick, högerklicksmenyn, Ctrl+R, mot ljud och med extra justering, se beslutsloggen.
+
 ## Kvar efter "Dela rad…" 2.4.19 (2026-11-14)
 - **Slå ihop två rader för hand** finns inte. Det går bara via ett förslag (Ihop?). Fråga ägaren om det behövs.
 - **Tiden för rad 2 är en uppskattning** efter textens längd. Finns en text ur ljudet eller ordtider från Whisper kunde tiden tas därifrån. En knapp som spelar upp raden inifrån dialogen skulle också hjälpa.

@@ -131,6 +131,39 @@ namespace TextSync
             }
         }
 
+        // Synka om bara de markerade raderna (menyn och Ctrl+R): varje stycke markerade rader i följd flyttas så att det passar referensen,
+        // och mot en text delas raderna sedan och slås ihop som referensen. Ett steg att ångra. Reglerna ligger i LineAligner.Resync.
+        void ResyncSelected()
+        {
+            if (busy || result == null) return;
+            var idx = SelectedCues();
+            if (idx.Count == 0)
+            {
+                SetStatus(list.SelectedIndices.Count == 0 ? "Markera raderna som ska synkas om." : "Grå rader kommer från referensen och kan inte synkas om. Markera egna rader.", false);
+                return;
+            }
+            var refc = refCuesUsed ?? new List<Cue>();
+            // den extra justeringen visas men ligger inte i texten: referensen flyttas åt andra hållet i stället
+            double extra = (double)extraNum.Value;
+            IList<Cue> rc = extra == 0 ? refc : refc.Select(r => new Cue(r.Start - extra, r.End - extra, r.Text)).ToList();
+            List<double> shifts; string what; Cue first;
+            var list2 = LineAligner.Resync(result.Output, idx, rc, refIsText, result.Meaning != null ? result.Meaning.Moves : null, out shifts, out what, out first);
+            string rows = idx.Count == 1 ? "1 rad" : idx.Count + " rader";
+            int movedRuns = shifts.Count(d => d != 0);
+            if (movedRuns == 0 && what == null)
+            {
+                SetStatus((idx.Count == 1 ? "Raden ligger" : "De " + idx.Count + " raderna ligger") + " redan så bra det går mot referensen" +
+                    (refIsText ? ", och radindelningen går inte att göra mer lik referensens" : "") + ". Inget ändrades.", false);
+                return;
+            }
+            double big = shifts.OrderByDescending(d => Math.Abs(d)).First();
+            string moved = movedRuns == 0 ? "tiderna låg redan rätt"
+                : shifts.Count == 1 ? "flyttade " + FmtOffset(big)
+                : movedRuns + " av " + shifts.Count + " stycken flyttade (som mest " + FmtOffset(big) + ")";
+            Changed(list2, first, "Synkade om " + rows + ": " + moved + (what != null ? ", och " + what + " som referensen" : "") + ". Ctrl+Z ångrar.",
+                "Synkade om " + idx.Count + " markerade rader: förskjutning per stycke " + string.Join(", ", shifts.Select(d => FmtOffset(d))) + (what != null ? ", radindelning: " + what : ""));
+        }
+
         void AddRow() { AddRow(null); }
 
         // at = grå referensrad att ta tiden från, annars hamnar raden efter den markerade
