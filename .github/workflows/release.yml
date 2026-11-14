@@ -1,0 +1,58 @@
+# Bygger Text Sync vid varje push till main och släpper exe-filen som en release.
+# Taggen heter v<version> (versionen ur Program.Version i src\Program.cs) och filen TextSync-<version>.exe.
+# Finns taggen redan släpps inget nytt: versionen ökar i varje commit, så det händer bara när ett jobb körs om.
+name: Bygg och släpp
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+# Ett jobb i taget, så att två pushar tätt efter varandra inte försöker skapa samma release.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Bygg och testa
+        shell: powershell
+        run: .\build.ps1 -Test
+
+      - name: Släpp exe-filen som release
+        shell: powershell
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $prog = [IO.File]::ReadAllText("$env:GITHUB_WORKSPACE\src\Program.cs")
+          $m = [regex]::Match($prog, 'const\s+string\s+Version\s*=\s*"([^"]+)"')
+          if (-not $m.Success) { throw "Hittade inte versionen i src\Program.cs." }
+          $version = $m.Groups[1].Value
+          $tag = "v$version"
+          $exe = "Build\TextSync-$version.exe"
+          if (-not (Test-Path $exe)) { throw "Bygget gav ingen $exe." }
+
+          if (git ls-remote --tags origin "refs/tags/$tag") {
+            Write-Host "Taggen $tag finns redan. Ingen ny release."
+            exit 0
+          }
+
+          # Texten i releasen: en fast rad om Windows-varningen och sedan commit-meddelandet.
+          # git skriver själv filen, så att å, ä och ö inte går sönder på vägen genom PowerShell.
+          git log -1 --format=%B --output=commit.txt
+          if ($LASTEXITCODE -ne 0) { throw "Kunde inte läsa commit-meddelandet." }
+          $utf8 = New-Object System.Text.UTF8Encoding $false
+          $intro = "Ladda ner **TextSync-$version.exe** här nedanför och starta den. Ingen installation behövs.`n`n" +
+                   "Står det *Windows skyddade datorn*: klicka **Mer information** och sedan **Kör ändå**. Programmet är osignerat.`n`n" +
+                   "## Ändrat i den här versionen`n`n"
+          [IO.File]::WriteAllText("notes.md", $intro + [IO.File]::ReadAllText("commit.txt", $utf8), $utf8)
+
+          gh release create $tag $exe --title "Text Sync $version" --notes-file notes.md --target $env:GITHUB_SHA
+          if ($LASTEXITCODE -ne 0) { throw "Kunde inte skapa releasen $tag." }
+          Write-Host "Släppt: $tag med TextSync-$version.exe"

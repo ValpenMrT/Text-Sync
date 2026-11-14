@@ -13,6 +13,8 @@
 ## Arbetssätt
 - Committa efter varje ändring, när bygget och testerna går igenom (`build.ps1 -Test`). Committa bara det du själv har ändrat: en annan session kan arbeta i samma filer samtidigt (stadga då bara dina delar, t.ex. med `git apply --cached`).
 - Kör skillen `product-check` före varje commit. Före push behövs den inte.
+- Pusha efter varje commit: `git push origin main` (https://github.com/ValpenMrT/Text-Sync). GitHub bygger då exe-filen, kör testerna och släpper `TextSync-<version>.exe` som release med taggen `v<version>` (`.github/workflows/release.yml`). Kontrollera att taggen kom upp: `git ls-remote --tags origin`.
+- Git-identiteten är `ValpenMrT` med GitHubs noreply-adress (global inställning). Ägarens namn och e-postadress ska inte stå i commits eller filer.
 - Beslut förs in i `docs/decisions.md`, nyast först.
 - Användarhjälpen finns i `docs/faq.md`, i snabbstarten i `README.md` och i `ShowHelp()` i `src/MainForm.cs`. Tabellen i `docs/structure.md` visar vad som ska stå var.
 - Python finns inte på datorn. Ändra filer med Edit eller PowerShell.

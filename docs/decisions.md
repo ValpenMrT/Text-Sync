@@ -2,6 +2,18 @@
 
 Nyast först.
 
+## 2026-11-14 – 2.4.23: Projektet pushas till GitHub, och varje push släpper exe-filen som en release
+- **Område:** drift
+- **Önskemål (ägaren):** "kan du pusha detta projekt vid varje commit till https://github.com/ValpenMrT/Text-Sync.git, se även till att en exe byggs och släpps som en release (Tag), behåll versionsnummer i filnamnet, github action". Sedan: "sätt mitt namn och epost som anonym för git global och fixa tidigare commit".
+- **Beslut 1, push:** `origin` är https://github.com/ValpenMrT/Text-Sync.git, och Claude pushar `main` efter varje commit (står i `CLAUDE.md`). Ingen git-krok: en krok checkas inte in och skulle pusha även för en annan session mitt i dess arbete.
+- **Beslut 2, release:** `.github/workflows/release.yml` kör `build.ps1 -Test` på `windows-latest` vid varje push till `main` och släpper `Build\TextSync-<version>.exe` med taggen `v<version>` och namnet "Text Sync <version>". Samma byggskript som på datorn, så filnamnet med versionen är detsamma. Misslyckas testerna släpps inget. Finns taggen redan släpps inget.
+- **Beslut 3, texten i releasen:** en fast rad om hur filen startas och om Windows-varningen (samma ord som snabbstarten), sedan commit-meddelandet. Den som laddar ner har ingen hjälpfil och når inte hjälpen i programmet förrän det har startat.
+- **Beslut 4, identitet:** alla commits har författaren `ValpenMrT` med GitHubs noreply-adress, också de 52 tidigare (historiken skrevs om före första pushen, alla commit-id:n är nya). Ägarens förnamn byttes i `LICENSE` (nu `ValpenMrT`) och i en sökväg i den här loggen (nu `%USERPROFILE%`), i alla versioner av filerna. Ägaren valde detta framför en helt anonym adress, så att commits visas på kontot.
+- **Följd för utdelningen:** en exe-fil från webben märks som hämtad från internet. SmartScreen-varningen visas då oftare än från USB, och Smart App Control kan blockera filen helt. USB-vägen finns kvar. Står i `docs/operations.md` och `README.md`.
+- **Ej gjort:** signering (oförändrat beslut). Ingen release för äldre versioner. Pushas flera commits på en gång släpps bara den senaste.
+- **Test:** 274 av 274 kontroller på datorn (inga nya: inget i programmet är ändrat utom versionen). Efter omskrivningen jämfördes varje commit med originalet: bara de två raderna skiljer, datum och meddelanden är lika, och varken namnet eller e-postadressen finns kvar i någon version av någon fil.
+- **Product-check:** Claude granskade själv (drift, inget ändrat i fönstret). Inget blockerande. Inga hemligheter eller e-postadresser i det som pushas, och jobbet har bara rätten `contents: write`. Går ett jobb fel mejlar GitHub kontots ägare. Kan vänta: en sida för nedladdning som alltid pekar på senaste versionen (GitHub har redan `/releases/latest`).
+
 ## 2026-11-14 – 2.4.22: Rader vid en gräns mellan två avsnitt hamnar inte längre på en påhittad nivå, och Whisper-kontrollen prövas mot talet
 - **Område:** synk
 - **Önskemål (ägaren):** skärmklipp från Blacklist S01E05 (film utan textspår, separat engelsk SRT + Whisper-kontroll som referens): raderna vid 25:13–25:20 matchade inte referensen. "Kan du kolla om du kan fixa en bättre synkning."

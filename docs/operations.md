@@ -44,6 +44,18 @@ Kopiera den senaste `Build\TextSync-<version>.exe` till USB. Har mottagaren en �
 - Från USB visas normalt ingen SmartScreen-varning.
 - Har mottagaren *Smart App Control* påslaget kan Windows blockera programmet helt. Då finns ingen gratis lösning.
 
+## Release på GitHub
+Projektet ligger på https://github.com/ValpenMrT/Text-Sync. Varje push till `main` startar `.github/workflows/release.yml` på en Windows-dator hos GitHub:
+1. `build.ps1 -Test` bygger programmet och kör testerna. Misslyckas en kontroll släpps inget.
+2. Versionen läses ur `Program.Version`. Finns taggen `v<version>` inte redan skapas den, och `TextSync-<version>.exe` läggs upp som en release med namnet "Text Sync <version>". Texten i releasen är en rad om Windows-varningen och sedan commit-meddelandet.
+
+Att tänka på:
+- Pushas flera commits på en gång släpps bara den senaste versionen.
+- Finns taggen redan släpps inget. Versionen ökar i varje commit, så det händer bara när ett jobb körs om.
+- Hur det gick syns under **Actions** på GitHub. Från datorn: `git ls-remote --tags origin` visar taggen när releasen är klar (ett par minuter).
+- Testet av "Lägg in i MKV" hoppas över hos GitHub, eftersom mkvmerge inte finns där.
+- En exe-fil som laddas ner från webben märks av Windows som hämtad från internet. Då visas "Windows skyddade datorn" (Mer information → Kör ändå) oftare än från USB, och Smart App Control kan blockera filen helt.
+
 ## Loggar och felsökning
 - Logg: `%LOCALAPPDATA%\TextSync\log.txt`, max ca 1 MB, och den äldre sparas som `log.txt.old`. Den innehåller filsökvägar, vald metod, resultat och fel. Den lämnar aldrig datorn.
 - Användaren hittar loggmappen via **Hjälp** → "Öppna mappen med loggfilen".

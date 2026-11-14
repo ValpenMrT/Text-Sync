@@ -50,6 +50,8 @@ Kommandot bygger testprogrammen i `Build\test\` och kör de syntetiska testerna.
 ### Dela ut
 Kopiera den senaste `TextSync-<version>.exe` från `Build\` till ett USB-minne. Versionen i filnamnet visar vilken version som ligger på minnet. Ingen hjälpfil följer med, så berätta om Windows-varningen (se snabbstarten ovan) när du lämnar över programmet. Varningen visas innan programmet har startat, och då går det inte att nå hjälpen i programmet.
 
+Varje push till GitHub bygger också programmet och släpper `TextSync-<version>.exe` som en release med taggen `v<version>` på https://github.com/ValpenMrT/Text-Sync/releases. En fil som laddas ner därifrån ger oftare Windows-varningen än en fil från USB. Mer om detta finns i [docs/operations.md](docs/operations.md).
+
 Programmet är inte signerat (se [docs/decisions.md](docs/decisions.md)). Versionen står i filnamnet och i fönstrets rubrik, och sätts bara i `Program.Version` i [src/Program.cs](src/Program.cs) (plus de två `Assembly…Version`-raderna, som bygget kontrollerar).
 
 ### Obesvarade frågor (tas upp vid nästa körning)

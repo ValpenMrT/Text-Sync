@@ -3,6 +3,8 @@
 ```
 build.ps1          Bygger Build/TextSync-<version>.exe (version ur Program.Version) med csc.exe från .NET Framework (finns i Windows). Skapar ikonen första gången.
                    -Test bygger också testprogrammen i Build/test/ och kör Tests (misslyckas om en kontroll gör det).
+.github/workflows/
+  release.yml      GitHub Action: vid varje push till main körs build.ps1 -Test, och TextSync-<version>.exe släpps som release med taggen v<version>
 README.md          Snabbstart, sedan bygga/testa/dela ut för utvecklare. Delas inte ut på USB.
 CLAUDE.md          Instruktioner för Claude: allt på svenska, var dokumentationen finns
 CLAUDE.local.md    Sökvägar som bara gäller den här datorn (testfilmen). Inte i git.
