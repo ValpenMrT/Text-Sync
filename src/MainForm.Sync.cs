@@ -88,7 +88,7 @@ namespace TextSync
                     refc = chk.Corrected;
                     origSynced = chk.Corrected; origUsed = oo;
                     audioInfo = "originaltexten synkad mot ljudet (" + coarse.Method.ToLowerInvariant() + ", " + FmtOffset(coarse.OffsetMs) + "). " + chk.Summary("originaltexten");
-                    Log.Info(audioInfo);
+                    Log.Info(audioInfo + (chk.Rejected > 0 ? " (" + chk.Rejected + " rättning(ar) togs tillbaka: raderna passade talet i ljudet sämre efteråt)" : ""));
                 }
                 else if (refc == null && trackCombo.SelectedItem is SpeechTextOption)
                 {

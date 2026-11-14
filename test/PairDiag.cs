@@ -1,5 +1,5 @@
 // Felsökning: visar hur betydelsejämförelsen parar ihop raderna i en riktig film, rad för rad.
-//   PairDiag <film.mkv> <undertext.srt> [sökord]
+//   PairDiag <film.mkv eller referens.srt> <undertext.srt> [sökord]
 // Skriver ut fördelningen av avvikelserna (radens start mot den parade referensradens start) och alla par som avviker
 // mer än 0,5 s. Med ett sökord visas också raderna runt varje rad som innehåller ordet.
 using System;
@@ -20,13 +20,17 @@ namespace TextSync
             if (args.Length < 2) { Console.WriteLine("Användning: PairDiag <film.mkv> <undertext.srt> [sökord]"); return 2; }
             if (!Tools.MeaningReady()) { Console.WriteLine("Verktygen för betydelsejämförelsen saknas."); return 2; }
             List<Cue> refc;
-            using (var f = new MkvFile(args[0]))
+            // referensen får också vara en undertext (SRT), som när filmen saknar textspår
+            if (args[0].EndsWith(".srt", StringComparison.OrdinalIgnoreCase)) refc = Markup.FixAll(Srt.Load(args[0]));
+            else using (var f = new MkvFile(args[0]))
             {
                 var text = f.Tracks.Where(t => t.IsSubtitle && t.IsText).ToList();
                 refc = Markup.FixAll(f.ReadSubtitles(text[MainForm.PickTextTrack(text)], p => { }, () => false));
             }
             var tgt = Markup.FixAll(Srt.Load(args[1]));
             var r = SyncEngine.Sync(refc, tgt, new SyncOptions(), null);
+            Console.WriteLine(r.Method);
+            foreach (var s in r.Segments) Console.WriteLine("  avsnitt från " + T(s.FromMs) + "  " + (s.OffsetMs / 1000).ToString("+0.00;-0.00") + " s");
             var plain = r.Output.Select(c => c.Clone()).ToList();
             var rep = Meaning.Apply(refc, r, (p, s) => { }, CancellationToken.None);
             Console.WriteLine(rep.Summary());

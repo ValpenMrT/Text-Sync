@@ -2,6 +2,25 @@
 
 Nyast först.
 
+## 2026-11-14 – 2.4.22: Rader vid en gräns mellan två avsnitt hamnar inte längre på en påhittad nivå, och Whisper-kontrollen prövas mot talet
+- **Område:** synk
+- **Önskemål (ägaren):** skärmklipp från Blacklist S01E05 (film utan textspår, separat engelsk SRT + Whisper-kontroll som referens): raderna vid 25:13–25:20 matchade inte referensen. "Kan du kolla om du kan fixa en bättre synkning."
+- **Vad som var fel:** den svenska texten låg rätt. Det var referensen som låg fel. Whispers ordtider visar att "Something important came up" sägs 25:12,8–14,8, där den svenska raden stod. Tre engelska rader hade lagts 2,15 s för sent, och betydelsejämförelsen drog sedan en svensk rad efter dem.
+- **Orsak 1, finjusteringen per rad (`SyncEngine.RefineCues`):** gränsen mellan två avsnitt (−5,5 s och −7,5 s) lades tre rader för tidigt, eftersom raderna låg i ett långt talblock och passade lika bra på båda sidor. Att lägga tillbaka dem kostade två byten, lika mycket som en tredje nivå, och en slumpträff mot en kort talbit vid 25:20,19 avgjorde.
+- **Beslut 1:** vid en gräns mellan två avsnitt (mer än 0,5 s skillnad, `SegmentGap`) får raden utan kostnad behålla förra radens hela förskjutning. Att flytta gränsen kostar då ett byte, en tredje nivå fortfarande två.
+- **Orsak 2, Whisper-kontrollen (`TextCheck.Check`):** Whisper klistrar ibland ihop ord över en paus. Vid 32:00–32:34 pekade ankarna därför 1,8 s fel, och fyra rader som låg rätt flyttades in i tystnad.
+- **Beslut 2:** när taldetekteringens avsnitt finns (separat SRT på originalspråket) behålls en rättning bara om raderna passar talet bättre efteråt (`SyncEngine.CueScore`, samma mått som synken). Annars tas den tillbaka (`TextCheckResult.Rejected`), och rapporten räknar inte med den.
+- **Provat och förkastat:**
+  - Att räkna byten på radens hela förskjutning överallt, inte bara vid gränser: då kostar det att följa en långsam drift, och nya falska småstycken uppstod (tre rader +4,2 s vid 10:24 i S04E01 med ett klipp vid 20:00).
+  - Att begränsa ett ords längd till 1 s i `TextCheck.Phrases` (Whisper låter sista ordet före en tystnad vara till nästa ord, t.ex. "Team," 25:19–25:43): rättade ett fall i S04E01 men gav 10 rader mer än 0,5 s fel i ett annat.
+- **Mätt, S01E05:** originaltexten mot ljudet 6 avsnitt (förut 7, med det falska på −3,3 s), Whisper-kontrollen rättar inget (förut 9 rader i 3 avsnitt). Den svenska texten 6 avsnitt (förut 9), 97,2 % av radstarterna inom 0,5 s från en referensrad (förut 96,0 %). De 14 rader som ligger längre från är mest skyltar och eftertexter som saknas i den engelska texten.
+- **Mätt, S04E01 (engelska spåret förstört på sex sätt, mot ljudet, facit = spåret):** rader mer än 0,5 s fel, förut → nu: orörd 0 → 0, bildfrekvens 0 → 0, klipp vid 20:00 2 → 0, 10–15 min +3 s 2 → 2, tre klipp 4 → 0, kort klipp på 40 s 10 → 10.
+- **Test:** 274 av 274 kontroller (4 nya: gräns i tystnad efter ett långt talblock med två nivåskillnader, rättning som passar talet behålls, rättning som passar talet sämre tas tillbaka). Det första testet faller i 2.4.21 med samma fel som i filmen (tre rader +2,15 s).
+- **Nytt felsökningsprogram:** `test/OrigRunDiag.cs` kör kedjan separat SRT → ljud → undertext mot riktiga filer. `PairDiag` tar också en SRT som referens.
+- **Ej gjort:** spärren gäller inte valet "Spår N + Whisper-kontroll" (filmens eget textspår), eftersom taldetekteringen inte körs där. Ett kort klipp på 40 s mot ljud hittas fortfarande inte (10 rader 2,8 s fel i S04E01, oförändrat).
+- **Ej provat:** i programmets fönster. Kedjan kördes med samma kod som fönstret anropar (`TextCheck.AlignToAudio`, `SyncEngine.Sync`, `Meaning.Apply`), men ägaren får bekräfta i listan.
+- **Product-check:** Claude granskade själv (rättning i motorn, inget ändrat i fönstret). Inget blockerande. Bör: en tillbakatagen rättning skrivs nu i loggen. Kan vänta: se `docs/next.md`.
+
 ## 2026-11-14 – 2.4.21: Handen över klickbara delar är Windows egen, inte den lilla
 - **Område:** GUI
 - **Önskemål (ägaren):** "när man håller med muspekaren över tex 2 röda rader blir markören väldigt liten. Kan du fixa det"

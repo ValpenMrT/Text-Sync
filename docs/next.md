@@ -69,6 +69,12 @@ Det som inte är gjort:
 - **Cachen rensas aldrig.** Varje text tar några MB i `%LOCALAPPDATA%\TextSync\cache`.
 - **Övriga idéer från samma samtal:** mäta på fler filmer, rätta den fasta avvikelsen på cirka 0,24 s mot ljud, Silero-taldetektering i Ljud A, flera referenser som röstar, scenklipp med ffmpeg, exakt ordtid mot ljudet (wav2vec2).
 
+## Kvar efter rättningen av gränser och Whisper-kontrollen 2.4.22 (2026-11-14)
+- **Spärren gäller inte "Spår N + Whisper-kontroll".** Där körs inte taldetekteringen, så en rättning prövas inte mot talet. Den kunde köras där också (tar några sekunder till).
+- **Whispers ordtider är opålitliga runt pauser.** Ord klistras ihop över tystnader, och sista ordet före en tystnad kan vara i 20 s. En gräns på 1 s per ord i `TextCheck.Phrases` provades och förkastades (se beslutsloggen). Ankarna i `TextCheck.Check` kunde i stället hoppa över ord som ligger intill en lång paus.
+- **Ett kort klipp på 40 s mot ljud hittas inte** (10 rader 2,8 s fel i S04E01 med ett klipp lagt med flit, oförändrat sedan förut).
+- **Mätt på bara två avsnitt** (Blacklist S01E05 och S04E01).
+
 ## Kvar efter klickbara rutor och "Synka om markerade rader" 2.4.20 (2026-11-14)
 - **Rutorna går inte att nå med tangentbordet.** Valet i Visa gör samma sak. Det syns inte heller på rutan vilken som är vald (t.ex. understruken text).
 - **Synka om flyttar hela stycket lika mycket.** Ligger raderna i stycket olika fel får man markera dem i mindre delar. En finjustering per rad, som synkmotorns steg 5, kunde läggas till.

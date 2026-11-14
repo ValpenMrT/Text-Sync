@@ -859,7 +859,7 @@ namespace TextSync
             int startIdx = 0;
             for (int ci = 1; ci <= tgt.Count; ci++)
             {
-                bool brk = ci == tgt.Count || Math.Abs(cueOff[ci] - cueOff[ci - 1]) > 500;
+                bool brk = ci == tgt.Count || Math.Abs(cueOff[ci] - cueOff[ci - 1]) > SegmentGap;
                 if (!brk) continue;
                 int a0 = startIdx, a1 = ci; // [a0, a1)
                 var part = tgt.GetRange(a0, a1 - a0);
@@ -896,8 +896,10 @@ namespace TextSync
         // Här får varje replik en egen förskjutning inom ±RefineRange runt den nuvarande. Byte kostar Jump,
         // så det krävs flera repliker i rad som är överens. Raderna får inte heller hamna i fel ordning.
         const double RefineRange = 6000, RefineStep = 50, RefineJump = 1.0, RefinePrior = 0.1;
+        const double SegmentGap = 500;   // större skillnad i förskjutning mellan två rader i följd = gräns mellan två avsnitt
 
-        static double CueScore(Iv[] refIv, double[] refSt, double s, double e)
+        // Hur väl en rad på tiden s–e passar referensen: hälften träff på en repliksstart, hälften överlapp. refIv ska vara sammanslagen (Merge).
+        public static double CueScore(Iv[] refIv, double[] refSt, double s, double e)
         {
             double on = OnsetKernel(refSt, s), ov = 0;
             if (e > s)
@@ -938,12 +940,20 @@ namespace TextSync
                 double slack = S[j] - E[j - 1] + origOverlap + 100; // dPrev ≤ dCur + slack
                 pre[0] = dp[0]; preArg[0] = 0;
                 for (int k = 1; k < K; k++) { if (dp[k] < pre[k - 1]) { pre[k] = dp[k]; preArg[k] = k; } else { pre[k] = pre[k - 1]; preArg[k] = preArg[k - 1]; } }
+                // Vid gränsen mellan två avsnitt (cueOff byter nivå) får raden utan kostnad också behålla förra radens hela förskjutning,
+                // alltså höra till avsnittet före. Då kostar det ett byte att flytta gränsen några rader. Utan detta kostar det två,
+                // lika mycket som en tredje, påhittad nivå, och en slumpträff mot ljudet avgör (Blacklist S01E05 vid 25:15: gränsen
+                // låg tre rader för tidigt, och raderna hamnade 2,15 s fel i stället för på avsnittet före).
+                double level = cueOff[ord[j]] - cueOff[ord[j - 1]];
+                int same = Math.Abs(level) > SegmentGap ? (int)Math.Round(level / RefineStep) : 0;
                 bool any = false;
                 for (int k = 0; k < K; k++)
                 {
                     int maxPrev = (int)Math.Floor((k * RefineStep + slack) / RefineStep + 1e-9);
                     double best = Inf; int arg = -1;
                     if (k <= maxPrev) { best = dp[k]; arg = k; }
+                    int ks = k + same;
+                    if (same != 0 && ks >= 0 && ks < K && ks <= maxPrev && dp[ks] < best) { best = dp[ks]; arg = ks; }
                     if (maxPrev >= 0)
                     {
                         int mp = Math.Min(K - 1, maxPrev);

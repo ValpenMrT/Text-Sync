@@ -33,6 +33,7 @@ namespace TextSync
         public List<Cue> Corrected;           // textspåret med rättade tider
         public int Lines, Anchored, Confirmed; // antal rader / rader med ankare / ankare som stämde (±0,4 s)
         public List<CheckedRegion> Regions = new List<CheckedRegion>();
+        public int Rejected;                  // rättningar som togs tillbaka, eftersom raderna passade talet i ljudet sämre efteråt
         public double MedianAbsMs;            // typisk avvikelse där det stämde
         public List<KeyValuePair<double, double>> Anchors = new List<KeyValuePair<double, double>>(); // (tid, avvikelse) för felsökning
         public string Summary() { return Summary("textspåret"); }
@@ -67,7 +68,10 @@ namespace TextSync
         const double Window = 60000;   // sök ±60 s runt textspårets tid
         const double Tol = 400;        // under detta räknas raden som i takt
 
-        public static TextCheckResult Check(List<Cue> track, List<Cue> whisperWords)
+        public static TextCheckResult Check(List<Cue> track, List<Cue> whisperWords) { return Check(track, whisperWords, null); }
+
+        // speech = taldetekteringens avsnitt (A) eller null: med dem prövas varje rättning mot talet i ljudet, se slutet av metoden
+        public static TextCheckResult Check(List<Cue> track, List<Cue> whisperWords, List<Iv> speech)
         {
             // Whispers ord i tidsordning
             var wTime = new List<double>(); var wWord = new List<string>();
@@ -144,6 +148,26 @@ namespace TextSync
             // ("N rader rättade i M avsnitt") alltid stämmer med det som faktiskt ändrades.
             foreach (var r in res.Regions.Where(r => r.Lines < 2)) res.Corrected[r.First] = cues[r.First].Clone();
             res.Regions = res.Regions.Where(r => r.Lines >= 2).ToList();
+            // Whisper klistrar ibland ihop ord över en paus, och då pekar ankarna fel (Blacklist S01E05 vid 32:00: fyra rader
+            // flyttades 1,8 s in i tystnad). Med taldetekteringen som facit behålls en rättning bara om raderna passar talet bättre efteråt.
+            if (speech != null && speech.Count > 0)
+            {
+                var sIv = SyncEngine.Merge(speech);
+                var sSt = speech.Select(x => x.S).OrderBy(x => x).ToArray();
+                foreach (var r in res.Regions.ToList())
+                {
+                    double before = 0, after = 0;
+                    for (int i = r.First; i < r.First + r.Lines; i++)
+                    {
+                        before += SyncEngine.CueScore(sIv, sSt, cues[i].Start, cues[i].End);
+                        after += SyncEngine.CueScore(sIv, sSt, res.Corrected[i].Start, res.Corrected[i].End);
+                    }
+                    if (after > before) continue;
+                    for (int i = r.First; i < r.First + r.Lines; i++) res.Corrected[i] = cues[i].Clone();
+                    res.Regions.Remove(r);
+                    res.Rejected++;
+                }
+            }
             return res;
         }
 
@@ -173,7 +197,7 @@ namespace TextSync
             var refc = speech != null ? Audio.Combine(speech, phrases) : phrases;
             if (refc.Count < 20) refc = phrases;
             coarse = SyncEngine.Sync(refc, srt, opt, (p, s) => progress(p, "Synkar originaltexten mot ljudet… " + p + " %"));
-            var res = Check(coarse.Output, words);
+            var res = Check(coarse.Output, words, speech);
             res.Corrected = res.Corrected.OrderBy(c => c.Start).ToList();   // rättade avsnitt kan hamna i fel ordning
             if (res.Anchored < 10)
                 throw new UserMessageException("Undertexten på originalspråket och det Whisper hörde har nästan inga ord gemensamt (" + res.Anchored + " rader). " +

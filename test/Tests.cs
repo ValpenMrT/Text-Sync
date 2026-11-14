@@ -181,6 +181,22 @@ namespace TextSync
                 Console.WriteLine("OrigStart: count={0} allSet={1} same={2} textMatch={3}", got.Count, !got.Any(double.IsNaN), want.SequenceEqual(got), sameText);
                 Check("OrigStart: varje rad ska behålla sin tid före synk", !got.Any(double.IsNaN) && want.SequenceEqual(got) && sameText);
             }
+            // Gränsen mellan två avsnitt ligger i en tystnad, och raderna före den ligger i ett långt talblock utan pauser (som
+            // taldetekteringen ger i tät dialog). De ska höra till avsnittet före, inte få en egen nivå av en slumpträff mot en kort
+            // talbit strax efter blocket (Blacklist S01E05 vid 25:15: tre rader hamnade 2,15 s fel).
+            foreach (double level in new[] { 2000.0, 1700.0 })
+            {
+                var rb = new List<Cue>(); var tb = new List<Cue>(); var wantB = new List<double>();
+                for (int i = 0; i < 60; i++) { double s = 10000 + 4000 * i + (i * 37 % 11) * 90; rb.Add(new Cue(s, s + 2500, "r")); tb.Add(new Cue(s + 5000, s + 7500, "a" + i)); wantB.Add(s); }
+                rb.Add(new Cue(250000, 261000, "block")); rb.Add(new Cue(261550, 262270, "bit"));
+                foreach (var b in new[] { new[] { 250250.0, 251700 }, new[] { 251700.0, 254700 }, new[] { 254900.0, 256900 }, new[] { 257050.0, 259200 }, new[] { 259400.0, 264170 } })
+                { tb.Add(new Cue(b[0] + 5000, b[1] + 5000, "b" + b[0])); wantB.Add(b[0]); }
+                for (int i = 0; i < 60; i++) { double s = 285000 + 4000 * i + (i * 53 % 13) * 80; rb.Add(new Cue(s, s + 2500, "r")); tb.Add(new Cue(s + 5000 + level, s + 7500 + level, "c" + i)); wantB.Add(s); }
+                var rB = SyncEngine.Sync(rb, tb, new SyncOptions(), null);
+                int wrong = rB.Output.Where((c, i) => Math.Abs(c.Start - wantB[i]) > 300).Count();
+                Console.WriteLine("Gräns i tystnad efter ett långt talblock ({0} ms): {1}, rader fel {2}", level, rB.Method, wrong);
+                Check("Gräns i tystnad efter ett långt talblock: raderna före gränsen ska höra till avsnittet före (2 avsnitt, inga rader fel)", wrong == 0 && rB.Segments.Count == 2);
+            }
 
             int n = 0;
             Srt.Save(Path.Combine(dir, "Film.sv.srt"), Distort(other, t => t * 23.976 / 25 + 2000 + (t > 2400000 ? 8000 : 0)).Select(c => new Cue(c.Start, c.End, "Svensk rad " + (++n))).ToList());
@@ -659,6 +675,30 @@ namespace TextSync
                         scen++;
                     }
                 Check("Whisper-kontroll: rapporten visar alla rader som rättades", reportOk);
+
+                // Whisper-kontrollen prövas mot taldetekteringen: Whisper hör 20 rader 3 s senare än textspåret.
+                // Ligger talet där Whisper hörde orden rättas raderna. Ligger talet där textspåret står har Whisper fel
+                // (ord som klistrats ihop över en paus, Blacklist S01E05 vid 32:00), och textspåret lämnas orört.
+                {
+                    var track = new List<Cue>(); var heard = new List<Cue>();
+                    for (int i = 0; i < 120; i++)
+                    {
+                        double t = 5000 + i * 4000;
+                        string txt = "ordet" + i + " andra" + i + " tredje" + i;
+                        track.Add(new Cue(t, t + 2000, txt));
+                        double d = i >= 40 && i < 60 ? 3000 : 0;
+                        heard.Add(new Cue(t + d, t + d + 2000, txt));
+                    }
+                    var right = TextCheck.Check(track, heard, heard.Select(c => new Iv(c.Start, c.End)).ToList());
+                    var wrongW = TextCheck.Check(track, heard, track.Select(c => new Iv(c.Start, c.End)).ToList());
+                    int moved = right.Corrected.Where((c, i) => Math.Abs(c.Start - track[i].Start) > 0.5).Count();
+                    int movedW = wrongW.Corrected.Where((c, i) => Math.Abs(c.Start - track[i].Start) > 0.5).Count();
+                    Console.WriteLine("Whisper-kontroll mot talet: talet där Whisper hörde orden: {0} rader rättade, {1} tillbakatagna. Talet där textspåret står: {2} rader rättade, {3} tillbakatagna",
+                        moved, right.Rejected, movedW, wrongW.Rejected);
+                    Check("Whisper-kontroll: en rättning som passar talet i ljudet behålls", moved >= 18 && right.Rejected == 0 && right.Regions.Sum(r => r.Lines) == moved);
+                    Check("Whisper-kontroll: en rättning som passar talet sämre tas tillbaka, och rapporten säger att texten går i takt",
+                        movedW == 0 && wrongW.Rejected == 1 && wrongW.Regions.Count == 0);
+                }
 
                 string uni = Path.Combine(dir, "Жора 测试");
                 Directory.CreateDirectory(uni);
