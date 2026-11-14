@@ -2,6 +2,14 @@
 
 Nyast först.
 
+## 2026-11-14 – 2.4.25: Release-steget hos GitHub körs i PowerShell 7
+- **Område:** drift
+- **Vad som hände:** i 2.4.24 gick testerna igenom hos GitHub, men steget som skapar releasen föll med ett tolkningsfel ("Unexpected token 'ndrat'").
+- **Orsak:** GitHub sparar stegets skript som UTF-8 utan BOM, och Windows PowerShell 5.1 läser då å, ä och ö fel. Andra byten i ett Ä blir ett citattecken, som avslutade strängen mitt i.
+- **Beslut:** release-steget körs med `shell: pwsh` (PowerShell 7), som läser UTF-8. Byggsteget är kvar i Windows PowerShell, samma som på datorn.
+- **Test:** 274 av 274 kontroller på datorn. Release-steget går bara att prova hos GitHub.
+- **Product-check:** Claude granskade själv (bara workflow-filen ändrad). Inget blockerande.
+
 ## 2026-11-14 – 2.4.24: Testerna går igenom också när arbetsmappen har en kort sökväg, som hos GitHub
 - **Område:** test / drift
 - **Vad som hände:** första körningen hos GitHub (2.4.23) föll med "3 av 268 kontroller MISSLYCKADES", så ingen release skapades. På datorn gick alla 274 igenom.
