@@ -217,7 +217,13 @@ De ligger i mappen `tools` i `%LOCALAPPDATA%\TextSync` och tar cirka 0,6–1,4 G
 Bäst på hela filmer och avsnitt. På korta klipp, som 10 minuter, kan synken hamna fel, eftersom det pratas nästan hela tiden. Kontrollera resultatet i listan.
 
 **Skickas filmens ljud någonstans?**
-Nej. Allt körs på din egen dator. Internet behövs bara första gången, för att hämta verktygen.
+Nej. Allt körs på din egen dator. Internet behövs bara första gången, för att hämta verktygen. Vid start frågar programmet också GitHub om det finns en nyare version (se nästa fråga). Då skickas ingenting om dina filer, bara vilken version av Text Sync du har.
+
+**Det står att det finns en ny version. Vad gör jag?**
+Varje gång programmet startas kontrollerar det om en nyare version finns på GitHub. Finns det en visas en rad under rutorna för filerna. Klicka **Ladda ner**, så öppnas webbläsaren och hämtar den nya filen (`TextSync-<version>.exe`). Stäng sedan Text Sync, starta den nya filen och ta bort den gamla. Inställningarna följer med.
+- Varnar Windows för den nya filen: klicka **Mer information** och sedan **Kör ändå**, som första gången.
+- **Inte nu** döljer raden tills programmet startas nästa gång.
+- Utan internet händer ingenting. Programmet fungerar som vanligt.
 
 **Min film har bara bildbaserade undertexter (PGS/VobSub).**
 De kan inte läsas, men ljudsynken ovan fungerar. Du kan också använda en engelsk SRT-fil för samma version av filmen som referens.

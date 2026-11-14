@@ -643,6 +643,24 @@ namespace TextSync
                     dangling.Count == 2 && dangling[0].Text == "He's gone." && dangling[1].Text == "As you know." && dangling[1].Start > 7000);
             }
 
+            // ---- ny version på GitHub (bannern i huvudfönstret)
+            {
+                string gh = "{\"url\":\"https://api.github.com/repos/ValpenMrT/Text-Sync/releases/1\",\"tag_name\":\"v2.4.30\",\"name\":\"Text Sync 2.4.30\",\"assets\":[{\"name\":\"TextSync-2.4.30.exe\"," +
+                    "\"browser_download_url\":\"https://github.com/ValpenMrT/Text-Sync/releases/download/v2.4.30/TextSync-2.4.30.exe\"}],\"body\":\"text\"}";
+                var rel = UpdateCheck.Parse(gh);
+                Check("Ny version: versionen och exe-filens adress läses ur GitHubs svar",
+                    rel != null && rel.Version == "2.4.30" && rel.Url == "https://github.com/ValpenMrT/Text-Sync/releases/download/v2.4.30/TextSync-2.4.30.exe");
+                var relNoExe = UpdateCheck.Parse("{\"tag_name\":\"v2.5\",\"assets\":[]}");
+                var relOther = UpdateCheck.Parse("{\"tag_name\":\"v2.5\",\"assets\":[{\"browser_download_url\":\"https://example.com/elak.exe\"}]}");
+                Check("Ny version: saknas exe-filen, eller ligger den någon annanstans än bland projektets releaser, öppnas sidan med releaserna",
+                    relNoExe != null && relNoExe.Url == UpdateCheck.ReleasesUrl + "/latest" && relOther != null && relOther.Url == UpdateCheck.ReleasesUrl + "/latest");
+                Check("Ny version: ett svar som inte går att tolka ger ingen banner", UpdateCheck.Parse("") == null && UpdateCheck.Parse(null) == null && UpdateCheck.Parse("{\"message\":\"Not Found\"}") == null && UpdateCheck.Parse("{\"tag_name\":\"senaste\"}") == null);
+                Check("Ny version: bara en högre version räknas som nyare (2.4.10 är nyare än 2.4.9, 2.5 är samma som 2.5.0)",
+                    UpdateCheck.IsNewer("2.4.26", "2.4.25") && UpdateCheck.IsNewer("2.4.10", "2.4.9") && UpdateCheck.IsNewer("2.5", "2.4.99") && UpdateCheck.IsNewer("v3.0", "2.9.9") &&
+                    !UpdateCheck.IsNewer("2.4.25", "2.4.25") && !UpdateCheck.IsNewer("2.4.24", "2.4.25") && !UpdateCheck.IsNewer("2.5", "2.5.0") && !UpdateCheck.IsNewer("2.5.0", "2.5") &&
+                    !UpdateCheck.IsNewer("abc", "2.4") && !UpdateCheck.IsNewer("", "2.4") && !UpdateCheck.IsNewer(null, "2.4") && !UpdateCheck.IsNewer("2.4.1.1.1", "2.4"));
+            }
+
             // ---- grafikkort, ljudspår, Whisper-kontroll, sökvägar (product-check 2026-11-09)
             {
                 var g = Tools.ParseNvidiaSmi("0, NVIDIA RTX A2000 Laptop GPU, 8.6, 560.94\r\n1, NVIDIA GeForce GTX 680, 3.0, 470.10\r\n2, Quadro M2000, 5.2, 470.05\r\nField \"compute_cap\" is not a valid field to query.\r\n");

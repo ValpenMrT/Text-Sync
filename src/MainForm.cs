@@ -281,7 +281,35 @@ namespace TextSync
             cards.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             refCard.Margin = new Padding(0, 0, 4, 8); tgtCard.Margin = new Padding(4, 0, 0, 8);
             cards.Controls.Add(refCard, 0, 0); cards.Controls.Add(tgtCard, 1, 0);
-            root.Controls.Add(cards, 0, 1);   // rad 2 i root är tom sedan rutorna hamnade bredvid varandra
+            root.Controls.Add(cards, 0, 1);   // rad 2 i root var tom sedan rutorna hamnade bredvid varandra: där ligger bannern om ny version
+
+            // --- banner: en nyare version finns på GitHub (visas bara då, se UpdateCheck.CheckNewer)
+            var updateBar = new FlowLayoutPanel { AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, Dock = DockStyle.Top, WrapContents = true, Visible = false, BackColor = Theme.Card, Padding = new Padding(10, 6, 10, 6), Margin = new Padding(0, 0, 0, 8) };
+            var updateText = new Label { AutoSize = true, Margin = new Padding(0, 3, 10, 0), Font = new Font(Font, FontStyle.Bold) };
+            var updateGet = new HandLink { Text = "Ladda ner", AutoSize = true, Margin = new Padding(0, 3, 14, 0), LinkColor = Accent };
+            var updateHide = new HandLink { Text = "Inte nu", AutoSize = true, Margin = new Padding(0, 3, 0, 0), LinkColor = Accent };
+            string updateUrl = UpdateCheck.ReleasesUrl;
+            updateGet.LinkClicked += (s, e) => { try { Process.Start(updateUrl); } catch (Exception ex) { Log.Error("Kunde inte öppna " + updateUrl, ex); MessageBox.Show(this, "Webbläsaren gick inte att öppna. Den nya versionen finns på:\n" + UpdateCheck.ReleasesUrl, "Text Sync", MessageBoxButtons.OK, MessageBoxIcon.Information); } };
+            updateHide.LinkClicked += (s, e) => updateBar.Visible = false;
+            tips.SetToolTip(updateGet, "Öppnar webbläsaren, som laddar ner den nya filen. Stäng sedan Text Sync, starta den nya filen och ta bort den gamla.");
+            tips.SetToolTip(updateHide, "Döljer raden. Den visas igen nästa gång programmet startas.");
+            updateBar.Controls.Add(updateText); updateBar.Controls.Add(updateGet); updateBar.Controls.Add(updateHide);
+            root.Controls.Add(updateBar, 0, 2);
+            Shown += (s, e) => System.Threading.ThreadPool.QueueUserWorkItem(_ =>
+            {
+                var rel = UpdateCheck.CheckNewer();
+                if (rel == null) return;
+                try
+                {
+                    BeginInvoke(new Action(() =>
+                    {
+                        updateUrl = rel.Url;
+                        updateText.Text = "Det finns en ny version av Text Sync: " + rel.Version + ". Du har " + Program.Version + ".";
+                        updateBar.Visible = true;
+                    }));
+                }
+                catch { }   // fönstret hann stängas
+            });
             ShowFile(refName, null); ShowFile(tgtName, null);
 
             // --- 3. inställningar + synka

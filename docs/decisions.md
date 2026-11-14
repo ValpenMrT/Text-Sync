@@ -2,6 +2,19 @@
 
 Nyast först.
 
+## 2026-11-14 – 2.4.26: Programmet säger till när det finns en ny version på GitHub
+- **Område:** GUI / drift
+- **Önskemål (ägaren):** "varje gång man startar text sync så kontrollerar den om det finns en ny version på github … om det finns en ny version gör en banner som informerar om detta", och "att användaren kan klicka på den och ladda ner senaste".
+- **Beslut:** när fönstret har visats frågar programmet i bakgrunden GitHub efter den senaste releasen (`UpdateCheck.CheckNewer`, `api.github.com/repos/ValpenMrT/Text-Sync/releases/latest`, 10 s tidsgräns). Är den nyare än `Program.Version` visas en rad under rutorna för filerna: "Det finns en ny version av Text Sync: X. Du har Y." med länkarna **Ladda ner** och **Inte nu**.
+- **Ladda ner** öppnar exe-filen i releasen i webbläsaren, som laddar ner den. Programmet laddar inte ner och byter inte ut sig självt: filen är osignerad, och användaren ska se Windows-varningen och själv välja. Bara adresser under projektets egna releaser öppnas. Hittas ingen exe-fil öppnas sidan med den senaste releasen.
+- **Inte nu** döljer raden tills nästa start. Ingen inställning för att stänga av kontrollen (ägaren bad om kontroll vid varje start).
+- **Utan nät eller vid fel:** ingenting visas, och det står en rad i loggen. Programmet startar lika fort som förut.
+- **Vad som skickas:** en fråga till GitHub med `TextSync/<version>` som User-Agent. Inget om filerna. Står i `docs/faq.md`.
+- **Förutsättning:** repot är publikt (kontrollerat 2026-11-14). Görs det privat igen svarar GitHub 404, och då visas ingen banner.
+- **Provat:** en provbyggd version 2.4.1 kördes i samma process: bannern visades med "2.4.25. Du har 2.4.1." och båda länkarna, i mörkt läge. Klicket på Ladda ner provades inte (inga klick skickas i test).
+- **Test:** 278 av 278 kontroller (4 nya: svaret tolkas, adress utanför projektets releaser används inte, otolkbart svar ger ingen banner, versionsjämförelsen).
+- **Product-check:** Claude granskade själv. Inget blockerande. Bör: säg i överlämningen att den gamla filen ska tas bort (står i tipsrutan och FAQ). Kan vänta: visa vad som är nytt i versionen.
+
 ## 2026-11-14 – 2.4.25: Release-steget hos GitHub körs i PowerShell 7
 - **Område:** drift
 - **Vad som hände:** i 2.4.24 gick testerna igenom hos GitHub, men steget som skapar releasen föll med ett tolkningsfel ("Unexpected token 'ndrat'").
