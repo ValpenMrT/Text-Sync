@@ -150,6 +150,17 @@ namespace TextSync
             public override Color SeparatorLight { get { return Card; } }
         }
 
+        // ------------------------------------------------------------ muspekaren (handen)
+        // Cursors.Hand i .NET Framework är en egen liten bild (32 × 32) som inte följer skärmens skalning eller pekarstorleken i Windows.
+        // Windows egen hand gör det, så den används på knappar, klickbara rutor, play-knappen och länkar.
+        [DllImport("user32.dll")] static extern IntPtr LoadCursor(IntPtr inst, int id);
+        public static readonly Cursor Hand = SystemHand();
+        static Cursor SystemHand()
+        {
+            try { var h = LoadCursor(IntPtr.Zero, 32649); if (h != IntPtr.Zero) return new Cursor(h); } catch { }   // 32649 = IDC_HAND
+            return Cursors.Hand;
+        }
+
         // ------------------------------------------------------------ Windows-delar (rullister, rubriker, titelrad)
         [DllImport("uxtheme.dll", CharSet = CharSet.Unicode)] static extern int SetWindowTheme(IntPtr h, string app, string idList);
         [DllImport("dwmapi.dll")] static extern int DwmSetWindowAttribute(IntPtr h, int attr, ref int value, int size);
@@ -201,6 +212,20 @@ namespace TextSync
                 catch { }
             };
             if (f.IsHandleCreated) set(); else f.HandleCreated += (s, e) => set();
+        }
+    }
+}
+
+namespace TextSync
+{
+    // En länk som visar Windows egen hand i stället för den lilla handen i .NET Framework (se Theme.Hand)
+    public class HandLink : System.Windows.Forms.LinkLabel
+    {
+        protected override void WndProc(ref System.Windows.Forms.Message m)
+        {
+            base.WndProc(ref m);
+            // WM_SETCURSOR: LinkLabel har just satt sin lilla hand över länken, byt den mot Windows hand
+            if (m.Msg == 0x20 && System.Windows.Forms.Cursor.Current == System.Windows.Forms.Cursors.Hand) System.Windows.Forms.Cursor.Current = Theme.Hand;
         }
     }
 }

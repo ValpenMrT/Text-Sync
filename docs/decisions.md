@@ -2,6 +2,16 @@
 
 Nyast först.
 
+## 2026-11-14 – 2.4.21: Handen över klickbara delar är Windows egen, inte den lilla
+- **Område:** GUI
+- **Önskemål (ägaren):** "när man håller med muspekaren över tex 2 röda rader blir markören väldigt liten. Kan du fixa det"
+- **Orsak:** `Cursors.Hand` i .NET Framework är en egen bild på 32 × 32 punkter som inte följer skärmens skalning eller pekarstorleken i Windows.
+- **Beslut:** `Theme.Hand` laddar Windows egen hand (IDC_HAND) och används överallt där programmet visade handen: de klickbara rutorna, knapparna, play-knappen i listan och korten för filerna. Länkarna är nu `HandLink` (i `Theme.cs`), som byter LinkLabels lilla hand mot samma hand.
+- **Provat:** `Theme.Hand` laddas och är en annan pekare än `Cursors.Hand`, och huvudfönstret går att skapa.
+- **Test:** 270 av 270 kontroller (inga nya: pekarens utseende går inte att kontrollera i ett test).
+- **Ej provat:** hur pekaren ser ut på skärmen. Claude kan inte se muspekaren, så ägaren får bekräfta.
+- **Product-check:** Claude granskade själv (liten ändring). Inget blockerande.
+
 ## 2026-11-14 – 2.4.20: Klick på de färgade rutorna filtrerar listan, och markerade rader kan synkas om
 - **Område:** GUI / synk
 - **Önskemål (ägaren):** "kan du lägga till så man kan klicka på de färgade fyrkanterna för att visa endast de som det gäller utöver att man kan välja i listan. kan du även lägga till så man kan markera ett visst antal rader och välja att synka om bara de markerade med föreslagen radindelning."

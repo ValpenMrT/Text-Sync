@@ -231,7 +231,7 @@ namespace TextSync
                 Tools.SetSetting("gpu", dev < 0 ? "cpu" : dev.ToString());
             };
             // separat undertext på filmens originalspråk (t.ex. engelska), som synkas mot ljudet och kontrolleras av Whisper
-            origLink = new LinkLabel { Text = "Lägg till undertext på filmens originalspråk (SRT)…", AutoSize = true, Margin = new Padding(0, 6, 0, 0), Visible = false, LinkColor = Accent };
+            origLink = new HandLink { Text = "Lägg till undertext på filmens originalspråk (SRT)…", AutoSize = true, Margin = new Padding(0, 6, 0, 0), Visible = false, LinkColor = Accent };
             origLink.LinkClicked += (s, e) => BrowseOrig();
             audioLabel = new Label { Text = "Lj&udspår:", AutoSize = true, Margin = new Padding(0, 7, 6, 0), Visible = false };
             audioCombo = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Anchor = AnchorStyles.Left | AnchorStyles.Right, Margin = new Padding(0, 3, 0, 0), Visible = false, AccessibleName = "Ljudspår för synk mot ljudet" };
@@ -253,7 +253,7 @@ namespace TextSync
             rinfo.Controls.Add(audioLabel, 0, 2); rinfo.Controls.Add(audioCombo, 1, 2);
             rinfo.Controls.Add(origLink, 0, 3); rinfo.SetColumnSpan(origLink, 2);
             // film utan text: Whisper lyssnar ord för ord och orden blir en undertext som visas i listan och kan sparas
-            createLink = new LinkLabel { Text = "Skapa text ur ljudet (film utan text)…", AutoSize = true, Margin = new Padding(0, 6, 0, 0), Visible = false, LinkColor = Accent };
+            createLink = new HandLink { Text = "Skapa text ur ljudet (film utan text)…", AutoSize = true, Margin = new Padding(0, 6, 0, 0), Visible = false, LinkColor = Accent };
             createLink.LinkClicked += async (s, e) => await CreateTextFromAudio();
             tips.SetToolTip(createLink, "Programmet lyssnar på filmen och skriver en undertext på filmens språk (med Whisper eller Parakeet, se Inställningar). Texten visas i listan, där du kan rätta den och spara den bredvid filmen.");
             rinfo.Controls.Add(createLink, 0, 4); rinfo.SetColumnSpan(createLink, 2);
@@ -363,22 +363,22 @@ namespace TextSync
             opts.Controls.Add(progress);
             statusLabel = new Label { AutoSize = true, ForeColor = Muted, Margin = new Padding(0, 9, 6, 0) };
             opts.Controls.Add(statusLabel);
-            openLink = new LinkLabel { Text = "Visa i mappen", AutoSize = true, Margin = new Padding(0, 9, 0, 0), Visible = false, LinkColor = Accent };
+            openLink = new HandLink { Text = "Visa i mappen", AutoSize = true, Margin = new Padding(0, 9, 0, 0), Visible = false, LinkColor = Accent };
             openLink.LinkClicked += (s, e) => ShowInFolder(lastOutput);
             opts.Controls.Add(openLink);
             // efter Spara SRT…: den gamla filen som ligger kvar bredvid den nya (programmet skriver aldrig över). Följer "Visa i mappen".
-            oldLink = new LinkLabel { Text = "Visa den gamla filen", AutoSize = true, Margin = new Padding(10, 9, 0, 0), Visible = false, LinkColor = Accent };
+            oldLink = new HandLink { Text = "Visa den gamla filen", AutoSize = true, Margin = new Padding(10, 9, 0, 0), Visible = false, LinkColor = Accent };
             oldLink.LinkClicked += (s, e) => ShowInFolder(oldFile);
             tips.SetToolTip(oldLink, "Den gamla undertexten skrevs inte över och ligger kvar bredvid den nya. Ta bort den själv när du har sett att den nya är bra, så visar spelaren bara en text.");
             openLink.VisibleChanged += (s, e) => { if (!openLink.Visible) oldLink.Visible = false; };
             opts.Controls.Add(oldLink);
-            undoLink = new LinkLabel { Text = "Ångra", AutoSize = true, Margin = new Padding(0, 9, 0, 0), Visible = false, LinkColor = Accent };
+            undoLink = new HandLink { Text = "Ångra", AutoSize = true, Margin = new Padding(0, 9, 0, 0), Visible = false, LinkColor = Accent };
             undoLink.LinkClicked += (s, e) => UndoChange();
             opts.Controls.Add(undoLink);
             // på en egen rad under: inställningar som avviker från det vanliga, så att de inte glöms bort i dialogen
             optInfo = new Label { AutoSize = true, ForeColor = Muted, Margin = new Padding(0, 0, 0, 4), Visible = false };
             // efter synk mot ljudet: spara det Whisper hörde, eller originaltexten (t.ex. engelska) som synkades mot ljudet
-            saveTextBtn = new LinkLabel { Text = "Spara igenkänd text…", AutoSize = true, Margin = new Padding(12, 9, 0, 0), Visible = false, LinkColor = Accent };
+            saveTextBtn = new HandLink { Text = "Spara igenkänd text…", AutoSize = true, Margin = new Padding(12, 9, 0, 0), Visible = false, LinkColor = Accent };
             saveTextBtn.LinkClicked += (s, e) => { if (!busy) SaveTranscript(); };
             opts.Controls.Add(saveTextBtn);
             var optWrap = new TableLayoutPanel { AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, Dock = DockStyle.Top, ColumnCount = 1, RowCount = 2, Margin = new Padding(0) };
@@ -396,8 +396,8 @@ namespace TextSync
             verdictLabel = new Label { AutoSize = true, Font = new Font("Segoe UI Semibold", 11.5F), Margin = new Padding(0, 0, 14, 0) };
             summaryLabel = new Label { Anchor = AnchorStyles.Left | AnchorStyles.Right, UseMnemonic = false, Margin = new Padding(0, 4, 14, 0) };
             FitLabelHeight(summaryLabel);
-            prevWeakLink = new LinkLabel { Text = "◀ Föregående ställe", AutoSize = true, Margin = new Padding(0, 4, 14, 0), Visible = false, LinkColor = Accent };
-            nextWeakLink = new LinkLabel { Text = "Nästa ställe ▶", AutoSize = true, Margin = new Padding(0, 4, 14, 0), Visible = false, LinkColor = Accent };
+            prevWeakLink = new HandLink { Text = "◀ Föregående ställe", AutoSize = true, Margin = new Padding(0, 4, 14, 0), Visible = false, LinkColor = Accent };
+            nextWeakLink = new HandLink { Text = "Nästa ställe ▶", AutoSize = true, Margin = new Padding(0, 4, 14, 0), Visible = false, LinkColor = Accent };
             prevWeakLink.LinkClicked += (s, e) => JumpWeak(-1);
             nextWeakLink.LinkClicked += (s, e) => JumpWeak(1);
             tips.SetToolTip(prevWeakLink, "Skift+F4"); tips.SetToolTip(nextWeakLink, "F4");
@@ -464,7 +464,7 @@ namespace TextSync
             {
                 var it = list.GetItemAt(e.X, e.Y);
                 int i = it != null ? it.Index : -1;
-                list.Cursor = !busy && OnPlayCell(e.Location) != null ? Cursors.Hand : Cursors.Default;   // play-knappen
+                list.Cursor = !busy && OnPlayCell(e.Location) != null ? Theme.Hand : Cursors.Default;   // play-knappen
                 if (i == hotRow) return;
                 int old = hotRow; hotRow = i;
                 redrawRow(old); redrawRow(i);
@@ -650,11 +650,11 @@ namespace TextSync
             ShowAutoAccept();
             viewInfo = new Label { AutoSize = true, ForeColor = Muted, Margin = new Padding(0, 7, 12, 0) };
             vbar.Controls.Add(viewInfo);
-            acceptAllLink = new LinkLabel { AutoSize = true, Margin = new Padding(0, 7, 0, 0), Visible = false, LinkColor = Accent };
+            acceptAllLink = new HandLink { AutoSize = true, Margin = new Padding(0, 7, 0, 0), Visible = false, LinkColor = Accent };
             acceptAllLink.LinkClicked += (s, e) => AcceptProposals(proposals);
             vbar.Controls.Add(acceptAllLink);
             // växlar mellan den vanliga synken och synken med betydelsejämförelsen (syns bara när jämförelsen flyttade något)
-            meaningLink = new LinkLabel { AutoSize = true, Margin = new Padding(12, 7, 16, 0), Visible = false, LinkColor = Accent };
+            meaningLink = new HandLink { AutoSize = true, Margin = new Padding(12, 7, 16, 0), Visible = false, LinkColor = Accent };
             meaningLink.LinkClicked += (s, e) => SwitchMeaning();
             vbar.Controls.Add(meaningLink);
             // sök i texten (Ctrl+F): Enter = nästa träff, Skift+Enter = föregående, Esc = töm
@@ -669,8 +669,8 @@ namespace TextSync
                 else if (e.KeyCode == Keys.Escape && searchBox.TextLength > 0) { searchBox.Clear(); list.Focus(); e.Handled = true; e.SuppressKeyPress = true; }
             };
             srow.Controls.Add(searchBox);
-            searchPrev = new LinkLabel { Text = "Föregående", AutoSize = true, Margin = new Padding(0, 7, 8, 0), LinkColor = Accent };
-            searchNext = new LinkLabel { Text = "Nästa", AutoSize = true, Margin = new Padding(0, 7, 8, 0), LinkColor = Accent };
+            searchPrev = new HandLink { Text = "Föregående", AutoSize = true, Margin = new Padding(0, 7, 8, 0), LinkColor = Accent };
+            searchNext = new HandLink { Text = "Nästa", AutoSize = true, Margin = new Padding(0, 7, 8, 0), LinkColor = Accent };
             searchPrev.LinkClicked += (s, e) => Find(-1);
             searchNext.LinkClicked += (s, e) => Find(1);
             srow.Controls.Add(searchPrev); srow.Controls.Add(searchNext);
@@ -719,7 +719,7 @@ namespace TextSync
             }
             brow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             brow.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-            helpLink = new LinkLabel { Text = "Hjälp", AutoSize = true, Anchor = AnchorStyles.Right, LinkColor = Accent };
+            helpLink = new HandLink { Text = "Hjälp", AutoSize = true, Anchor = AnchorStyles.Right, LinkColor = Accent };
             helpLink.LinkClicked += (s, e) => ShowHelp();
             brow.Controls.Add(helpLink, ctrls.Count + 1, 0);
             root.Controls.Add(brow, 0, 6);
@@ -936,7 +936,7 @@ namespace TextSync
             EventHandler leave = (s, e) => { if (!zone.ClientRectangle.Contains(zone.PointToClient(Cursor.Position))) hot(false); };
             foreach (var c in parts)
             {
-                c.Cursor = Cursors.Hand;
+                c.Cursor = Theme.Hand;
                 // bara vänsterklick (Click kommer för alla musknappar). Markeringen släcks efteråt: pekaren står kvar över rutan när dialogen stängs.
                 c.MouseClick += (s, e) => { if (e.Button != MouseButtons.Left || busy) return; browse(); hot(false); };
                 c.MouseEnter += (s, e) => hot(!busy);
@@ -1052,7 +1052,7 @@ namespace TextSync
         // Gör en siffra i resultatrutan klickbar: listan visar bara de raderna (samma som valet view i Visa), och ett klick till visar alla igen
         void ChipShows(Label chip, int view)
         {
-            chip.Cursor = Cursors.Hand;
+            chip.Cursor = Theme.Hand;
             chip.AccessibleRole = AccessibleRole.PushButton;
             chip.Click += (s, e) =>
             {
@@ -1093,7 +1093,7 @@ namespace TextSync
 
         internal Button MakeButton(string text, bool primary)
         {
-            var b = new Button { Text = text, AutoSize = false, Width = 100, Height = 30, FlatStyle = FlatStyle.Flat, Cursor = Cursors.Hand };
+            var b = new Button { Text = text, AutoSize = false, Width = 100, Height = 30, FlatStyle = FlatStyle.Flat, Cursor = Theme.Hand };
             if (HC) { b.FlatStyle = FlatStyle.System; b.UseVisualStyleBackColor = true; return b; }
             b.FlatAppearance.BorderSize = 1;
             b.Tag = primary ? "primary" : "secondary";   // Theme.Apply färgar knappen efter detta
