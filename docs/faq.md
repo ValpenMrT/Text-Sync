@@ -114,6 +114,9 @@ Spara sedan filen igen med **Spara SRT…**. Valen går inte att blanda, efterso
 **Kommer programmet ihåg fönstrets storlek?**
 Ja. Storlek, plats och om fönstret var maximerat sparas när du stänger programmet.
 
+**Fönstret är litet och jag ser inte tidslinjen.**
+När fönstret är lågt, till exempel på en bärbar dator, göms tidslinjen under listan så att listan får plats. Gör fönstret högre så kommer den tillbaka. Är fönstret ännu lägre får du en rullist till höger, och raden med **Spara SRT…** ligger alltid kvar längst ner.
+
 **Kan jag söka i texten?**
 Ja. Skriv i rutan **Sök** ovanför listan, eller tryck **Ctrl+F**. Programmet letar i både den synkade texten och referensen och markerar första träffen. **Enter** hoppar till nästa träff och **Skift+Enter** till föregående. Det går också att klicka **Föregående** och **Nästa**. **Esc** tömmer rutan. Sökningen gäller raderna som listan visar, så välj Alla rader i Visa om du saknar en träff.
 

@@ -199,7 +199,7 @@ Alla punkter är åtgärdade i 2.1 (se beslutsloggen 2026-11-09, "Rättningar fr
 - **Ordningen på ljudspåren** i MKV antas vara samma som ffmpegs `0:a:n`. Det stämmer enligt Matroska och ffmpeg, men är inte provat på en riktig film med flera ljudspår.
 
 ## Kvar från ombyggnaden av gränssnittet 2026-11-10 (kan vänta)
-- **Litet fönster:** i det minsta fönstret (940 × 600 vid 100 %, till exempel hela skärmen på en bärbar dator med 1920 × 1200 och 200 % skalning) syns nästan ingenting av listan efter en synk. Förslag: göm tidslinjen när höjden inte räcker, eller låt hela fönstret rulla.
+- ~~**Litet fönster:** i det minsta fönstret syns nästan ingenting av listan efter en synk.~~ **Klart i 2.4.29:** tidslinjen göms, listan får minst åtta rader och innehållet rullar när det behövs. Kvar: med Detaljer öppet i det minsta fönstret får man rulla för att se listan, och rutorna för filerna tar fortfarande 160 punkter.
 - **Skalning:** 125 % och 150 % är inte provade efter ombyggnaden.
 - **Frågor till ägaren från granskningen:** (1) Ska programmet fråga innan en ny fil eller en ny synk kastar ändringar som är gjorda för hand? Klickytan för att välja fil är stor nu. (2) Ska Detaljer vara öppet första gången?
 - **Tomt läge:** Synka är grå utan förklaring när en fil saknas. Förslag: "Välj en referens och en undertext först." i statusraden.

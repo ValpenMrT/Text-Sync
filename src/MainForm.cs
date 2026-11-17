@@ -117,6 +117,9 @@ namespace TextSync
         TimelinePanel timeline;
         NumericUpDown extraNum;
         TableLayoutPanel root;
+        Panel scroller;            // rutan som root ligger i: rullar när fönstret är för lågt för listan
+        Action fitList;            // sätter roots storlek och gömmer tidslinjen när det är trångt (FitList i konstruktorn)
+        bool fitting;
 
         string mkvPath;                // referens-MKV (filen hålls inte öppen)
         List<Cue> refSrtCues;          // om referensen är en SRT
@@ -146,16 +149,19 @@ namespace TextSync
             DragEnter += OnDragEnter;
             DragDrop += (s, e) => { var f = e.Data.GetData(DataFormats.FileDrop) as string[]; if (f != null) RouteFiles(f, false); };
 
-            root = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 7, Padding = new Padding(16, 12, 16, 18) };
+            // Allt utom raden med Spara ligger i root, som ligger i en ruta som rullar (scroller) när fönstret är för lågt
+            // för att listan ska få plats (se FitList längre ned). Raden med Spara (foot) ligger under och syns alltid.
+            root = new TableLayoutPanel { Location = new Point(0, 0), ColumnCount = 1, RowCount = 6, Padding = new Padding(16, 12, 16, 0) };
             root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             root.RowStyles.Add(new RowStyle(SizeType.AutoSize));     // rubrik
-            root.RowStyles.Add(new RowStyle(SizeType.AutoSize));     // referens
-            root.RowStyles.Add(new RowStyle(SizeType.AutoSize));     // mål
+            root.RowStyles.Add(new RowStyle(SizeType.AutoSize));     // referens och mål
+            root.RowStyles.Add(new RowStyle(SizeType.AutoSize));     // banner om ny version
             root.RowStyles.Add(new RowStyle(SizeType.AutoSize));     // inställningar
             root.RowStyles.Add(new RowStyle(SizeType.AutoSize));     // resultat
             root.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); // förhandsvisning
-            root.RowStyles.Add(new RowStyle(SizeType.AutoSize));     // spara
-            Controls.Add(root);
+            scroller = new Panel { Dock = DockStyle.Fill, AutoScroll = true };
+            scroller.Controls.Add(root);
+            Controls.Add(scroller);
 
             // --- rubrik
             var head = new Panel { Dock = DockStyle.Top, Height = 56, Margin = new Padding(0, 0, 0, 6) };
@@ -258,7 +264,7 @@ namespace TextSync
             tips.SetToolTip(createLink, "Programmet lyssnar på filmen och skriver en undertext på filmens språk (med Whisper eller Parakeet, se Inställningar). Texten visas i listan, där du kan rätta den och spara den bredvid filmen.");
             rinfo.Controls.Add(createLink, 0, 4); rinfo.SetColumnSpan(createLink, 2);
             Tools.GpuScan();   // letar efter NVIDIA-kort i bakgrunden redan nu, så att listan Grafikkort är klar när den behövs
-            var refCard = MakeCard("1.  Referens – undertext i takt med filmen (textspår i MKV eller en undertextfil) eller filmens ljud", refName, refBtn, refInfo, rinfo, BrowseRef, LoadReference);
+            var refCard = MakeCard("1.  Referens – undertext i takt med filmen (textspår eller fil) eller filmens ljud", refName, refBtn, refInfo, rinfo, BrowseRef, LoadReference);
 
             // --- 2. mål
             tgtBtn = MakeButton("Bläddra…", false);
@@ -572,7 +578,7 @@ namespace TextSync
             {
                 int fixedW = 0;
                 foreach (ColumnHeader ch in list.Columns) if (ch.Index != 6 && ch.Index != 8) fixedW += ch.Width;
-                int w = Math.Max((int)(150 * k), (list.ClientSize.Width - fixedW - 2) / 2);
+                int w = Math.Max((int)(120 * k), (list.ClientSize.Width - fixedW - 2) / 2);   // 120: i det minsta fönstret (940 brett) ryms kolumnerna utan vågrät rullist
                 list.Columns[6].Width = w; list.Columns[8].Width = w;
             };
             list.SelectedIndexChanged += (s, e) =>
@@ -710,10 +716,53 @@ namespace TextSync
             split.Panel2.Controls.Add(timeline);
             split.FixedPanel = FixedPanel.Panel2;
             root.Controls.Add(split, 0, 5);
+            // Litet fönster (t.ex. en bärbar dator med 200 % skalning): listan ska alltid synas.
+            // 1. Räcker höjden inte till både listan och tidslinjen göms tidslinjen.
+            // 2. Räcker den inte ens till listan (rubrik och ungefär åtta rader) blir root högre än fönstret, och då rullar scroller.
+            // Bredden följer alltid fönstret. Raden med Spara ligger utanför och syns alltid.
+            fitList = () =>
+            {
+                if (fitting || IsDisposed || WindowState == FormWindowState.Minimized) return;
+                fitting = true;
+                try
+                {
+                    float kk = DeviceDpi / 96f;
+                    int tl = (int)(TimelineHeight * kk);
+                    // två varv: visas rullisten blir rutan smalare, och då kan texter brytas om och rader bli högre
+                    for (int pass = 0; pass < 2; pass++)
+                    {
+                        int w = scroller.ClientSize.Width, viewH = scroller.ClientSize.Height;
+                        if (w <= 0 || viewH <= 0) return;
+                        if (root.Width != w) root.Width = w;
+                        int[] rh = root.GetRowHeights();
+                        int others = root.Padding.Vertical;
+                        for (int i = 0; i < rh.Length - 1; i++) others += rh[i];
+                        bool hideTl;
+                        int h = FitHeight(viewH, others, vbar.Height, kk, out hideTl);
+                        if (root.Height != h) root.Height = h;
+                        if (split.Panel2Collapsed != hideTl)
+                        {
+                            split.Panel2Collapsed = hideTl;
+                            if (!hideTl) try { split.SplitterDistance = Math.Max(80, split.Height - tl); } catch { }
+                        }
+                    }
+                }
+                finally { fitting = false; }
+            };
+            scroller.Resize += (s, e) => fitList();
+            // Layout-händelsen kommer före själva placeringen, så radernas nya höjder läses strax efteråt
+            bool fitPending = false;
+            root.Layout += (s, e) =>
+            {
+                if (fitting || fitPending || !IsHandleCreated) return;
+                fitPending = true;
+                BeginInvoke(new Action(() => { fitPending = false; fitList(); }));
+            };
             Shown += (s, e) => BeginInvoke(new Action(() =>
             {
                 RelayoutAll(root);   // höjder som sattes medan fönstret skalades (t.ex. 200 %) ska gälla innan listan får sin plats
                 try { split.SplitterDistance = Math.Max(80, split.Height - (int)(105 * k)); } catch { }
+                fitList();
             }));
 
             // --- spara
@@ -738,7 +787,7 @@ namespace TextSync
             };
             ctrls.Add(muxBtn);
             // tabell (FlowLayoutPanel placerar NumericUpDown fel vid hög DPI)
-            var brow = new TableLayoutPanel { AutoSize = true, Dock = DockStyle.Top, ColumnCount = ctrls.Count + 2, RowCount = 1, Margin = new Padding(0, 8, 0, 0) };
+            var brow = new TableLayoutPanel { AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, Dock = DockStyle.Top, ColumnCount = ctrls.Count + 2, RowCount = 1, Margin = new Padding(0) };
             for (int i = 0; i < ctrls.Count; i++)
             {
                 brow.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
@@ -750,7 +799,10 @@ namespace TextSync
             helpLink = new HandLink { Text = "Hjälp", AutoSize = true, Anchor = AnchorStyles.Right, LinkColor = Accent };
             helpLink.LinkClicked += (s, e) => ShowHelp();
             brow.Controls.Add(helpLink, ctrls.Count + 1, 0);
-            root.Controls.Add(brow, 0, 6);
+            // raden med Spara ligger under rutan som rullar, så att den alltid syns
+            var foot = new Panel { Dock = DockStyle.Bottom, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, Padding = new Padding(16, 8, 16, 18) };
+            foot.Controls.Add(brow);
+            Controls.Add(foot);
 
             UpdateOptInfo();
             Theme.Apply(this, null);
@@ -762,6 +814,19 @@ namespace TextSync
             AutoScaleDimensions = new SizeF(96F, 96F);
             AutoScaleMode = AutoScaleMode.Dpi;
             ResumeLayout(true);
+        }
+
+        const int TimelineHeight = 105, MinListHeight = 190;   // vid 100 %: tidslinjen, och listans rubrik med ungefär åtta rader
+
+        // Höjden på det som rullar (root) i ett fönster där viewH punkter syns, others är höjden på allt utom listan och tidslinjen,
+        // och barH är raden Visa/Sök ovanför listan. Listan får alltid minst MinListHeight: räcker fönstret inte blir höjden större
+        // än viewH, och då rullar innehållet. hideTimeline = tidslinjen göms, eftersom den inte får plats tillsammans med listan.
+        internal static int FitHeight(int viewH, int others, int barH, float scale, out bool hideTimeline)
+        {
+            int minSplit = barH + (int)(MinListHeight * scale);
+            int h = Math.Max(viewH, others + minSplit);
+            hideTimeline = h - others < minSplit + (int)(TimelineHeight * scale);
+            return h;
         }
 
         // Raden vars play-knapp (första kolumnen) ligger under punkten, annars null. HitTest tar hänsyn till rullning.

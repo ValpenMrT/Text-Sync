@@ -2,6 +2,22 @@
 
 Nyast först.
 
+## 2026-11-17 – 2.4.29: Listan syns också i ett litet fönster
+- **Område:** GUI
+- **Önskemål (ägaren):** punkt 2 i Claudes lista: i det minsta fönstret (940 × 600 vid 100 %, till exempel en bärbar dator med 1920 × 1200 och 200 % skalning) syntes ingenting av listan efter en synk.
+- **Mätt före:** listan fick höjden 0. Rubrik, rutorna för filerna, raden med Synka och resultatet tog 418 av 561 punkter, och tidslinjen resten.
+- **Beslut:**
+  - **Tidslinjen göms** när höjden inte räcker till både den och listan. Den kommer tillbaka när fönstret görs större.
+  - **Listan får alltid minst ungefär åtta rader.** Räcker fönstret inte ens till det blir innehållet högre än fönstret, och då rullar det (en rullist till höger). När resultatet visas första gången rullas det fram, så att beskedet och listan syns.
+  - **Raden med Spara SRT…, Lägg in i MKV…, Extra justering, Språkkod och Hjälp** ligger utanför det som rullar och syns alltid.
+  - **Textkolumnerna i listan** får vara 120 punkter smala (förut 150), så att listan inte får en vågrät rullist i det minsta fönstret.
+- **Teknik:** `root` ligger i en `Panel` med `AutoScroll` (`scroller`), och raden med Spara i en egen panel under (`foot`). `fitList` i `MainForm.cs` sätter roots storlek efter fönstret, med regeln i `MainForm.FitHeight`.
+- **Claudes val:** att göra rutorna för filerna mindre i ett litet fönster hade krävt en egen, tätare uppställning. Rullningen ändrar ingenting i ett fönster som är stort nog.
+- **Provat:** fönstret kört i samma process (utan klick) med en synkad text. 940 × 600: 8 rader i listan, tidslinjen gömd, Spara synlig. Med Detaljer öppet: Detaljer syns, listan nås med rullisten. 1080 × 1000: 20 rader och tidslinjen, som förut. Skärmbilder granskade i mörkt läge.
+- **Test:** 292 av 292 kontroller (1 ny: regeln för när tidslinjen göms och när innehållet rullar, också vid 200 %).
+- **Ej provat:** en riktig skärm med 200 % skalning, 125 % och 150 %, mushjulet över det som rullar, och ljust läge.
+- **Product-check:** Claude granskade själv. Inget blockerande: allt går att nå, och Spara syns alltid. Kan vänta: med Detaljer öppet i det minsta fönstret får man rulla för att se listan.
+
 ## 2026-11-17 – 2.4.28: Dialogen Inställningar får plats på en liten skärm
 - **Område:** GUI
 - **Önskemål (ägaren):** punkt 1 i Claudes lista: dialogen var cirka 980 bildpunkter hög vid 100 %, så på en bärbar dator nådde man inte OK.

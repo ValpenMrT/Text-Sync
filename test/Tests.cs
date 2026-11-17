@@ -699,6 +699,23 @@ namespace TextSync
                     dangling.Count == 2 && dangling[0].Text == "He's gone." && dangling[1].Text == "As you know." && dangling[1].Start > 7000);
             }
 
+            // ---- litet huvudfönster: listan får alltid plats, tidslinjen göms först, sedan rullar innehållet
+            {
+                bool hide;
+                // mätt i det minsta fönstret (940 × 600 vid 100 %): 513 punkter syns, allt utom listan tar 382, raden Visa/Sök 62
+                int hSmall = MainForm.FitHeight(513, 382, 62, 1f, out hide);
+                bool small = hSmall == 382 + 62 + 190 && hSmall > 513 && hide;
+                int hMid = MainForm.FitHeight(700, 382, 62, 1f, out hide);
+                bool mid = hMid == 700 && hide;                       // listan ryms, men inte tidslinjen
+                int hBig = MainForm.FitHeight(913, 382, 37, 1f, out hide);
+                bool big = hBig == 913 && !hide;                      // förvald storlek: ingenting rullar och tidslinjen syns
+                int h200 = MainForm.FitHeight(1026, 764, 124, 2f, out hide);
+                bool scaled = h200 == 764 + 124 + 380 && hide;        // samma fönster vid 200 % skalning
+                Console.WriteLine("Litet fönster: {0} {1} {2} {3}", hSmall, hMid, hBig, h200);
+                Check("Litet fönster: listan får alltid minst åtta rader, tidslinjen göms när den inte ryms, och innehållet rullar först när inte ens listan ryms",
+                    small && mid && big && scaled);
+            }
+
             // ---- dialogen Inställningar får plats på en liten skärm, och OK syns alltid
             {
                 using (var d = new SettingsDialog(0, true, true, false, false, 0, false, false, true))

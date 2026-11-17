@@ -386,8 +386,16 @@ namespace TextSync
             for (int i = 0; i < 3; i++) { detailHead[i].ForeColor = Theme.Fg; detailBody[i].ForeColor = Theme.Fg; }
             detailsSep.BackColor = HC ? SystemColors.WindowText : Theme.BtnBorder;
 
+            bool first = !resBox.Visible;
             resBox.Visible = true;
             LayoutResult();
+            // Litet fönster där innehållet rullar: när resultatet visas första gången rullas det fram, så att beskedet och listan syns
+            if (first && IsHandleCreated) BeginInvoke(new Action(() =>
+            {
+                if (IsDisposed) return;
+                fitList();
+                if (root.Height > scroller.ClientSize.Height) scroller.AutoScrollPosition = new Point(0, root.Height);
+            }));
         }
 
         void RefreshPreview()
