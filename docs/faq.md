@@ -230,10 +230,15 @@ Bäst på hela filmer och avsnitt. På korta klipp, som 10 minuter, kan synken h
 Nej. Allt körs på din egen dator. Internet behövs bara första gången, för att hämta verktygen. Vid start frågar programmet också GitHub om det finns en nyare version (se nästa fråga). Då skickas ingenting om dina filer, bara vilken version av Text Sync du har.
 
 **Det står att det finns en ny version. Vad gör jag?**
-Varje gång programmet startas kontrollerar det om en nyare version finns på GitHub. Finns det en visas en rad under rutorna för filerna. Klicka **Ladda ner**, så öppnas webbläsaren och hämtar den nya filen (`TextSync-<version>.exe`). Stäng sedan Text Sync, starta den nya filen och ta bort den gamla. Inställningarna följer med.
+Varje gång programmet startas kontrollerar det om en nyare version finns på GitHub. Finns det en visas en rad under rutorna för filerna, och under den står kort vad som är nytt i den senaste versionen. Klicka **Vad är nytt?** för att se allt som har ändrats sedan din version. Klicka **Ladda ner**, så öppnas webbläsaren och hämtar den nya filen (`TextSync-<version>.exe`). Stäng sedan Text Sync, starta den nya filen och ta bort den gamla. Inställningarna följer med.
 - Varnar Windows för den nya filen: klicka **Mer information** och sedan **Kör ändå**, som första gången.
 - **Inte nu** döljer raden tills programmet startas nästa gång.
 - Utan internet händer ingenting. Programmet fungerar som vanligt.
+
+**Var ser jag vad som är nytt i programmet?**
+Klicka **Nyheter** längst ner till höger, bredvid Hjälp. Fönstret visar vad som är ändrat i varje version, den nyaste först. Versioner som är nyare än din är märkta **(ny)**, och din egen **(den du har)**. Finns en nyare version har fönstret knappen **Ladda ner**.
+- Texten hämtas från GitHub, så internet behövs. Går det inte säger programmet det.
+- Finns en ny version står det också kort vad som är nytt i raden under rutorna för filerna, med länken **Vad är nytt?**.
 
 **Min film har bara bildbaserade undertexter (PGS/VobSub).**
 De kan inte läsas, men ljudsynken ovan fungerar. Du kan också använda en engelsk SRT-fil för samma version av filmen som referens.

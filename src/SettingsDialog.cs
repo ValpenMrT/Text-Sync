@@ -157,6 +157,8 @@ namespace TextSync
             }
         }
         internal bool Scrolls { get { return table.Height > body.ClientSize.Height; } }
+        // Höjden dialogen behöver för att visa allt utan att rulla, med ram och titelrad
+        internal int WantedHeight { get { return table.PreferredSize.Height + bar.Height + (Height - ClientSize.Height); } }
 
         // Sätter dialogens storlek så att den får plats inom wa (skärmens arbetsyta): hela innehållet om det ryms,
         // annars så hög som skärmen tillåter, och då rullar inställningarna. Knapparna syns alltid.

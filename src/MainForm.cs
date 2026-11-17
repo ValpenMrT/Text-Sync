@@ -292,25 +292,38 @@ namespace TextSync
             // --- banner: en nyare version finns på GitHub (visas bara då, se UpdateCheck.CheckNewer)
             var updateBar = new FlowLayoutPanel { AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, Dock = DockStyle.Top, WrapContents = true, Visible = false, BackColor = Theme.Card, Padding = new Padding(10, 6, 10, 6), Margin = new Padding(0, 0, 0, 8) };
             var updateText = new Label { AutoSize = true, Margin = new Padding(0, 3, 10, 0), Font = new Font(Font, FontStyle.Bold) };
+            var updateNews = new HandLink { Text = "Vad är nytt?", AutoSize = true, Margin = new Padding(0, 3, 14, 0), LinkColor = Accent };
             var updateGet = new HandLink { Text = "Ladda ner", AutoSize = true, Margin = new Padding(0, 3, 14, 0), LinkColor = Accent };
             var updateHide = new HandLink { Text = "Inte nu", AutoSize = true, Margin = new Padding(0, 3, 0, 0), LinkColor = Accent };
-            string updateUrl = UpdateCheck.ReleasesUrl;
-            updateGet.LinkClicked += (s, e) => { try { Process.Start(updateUrl); } catch (Exception ex) { Log.Error("Kunde inte öppna " + updateUrl, ex); MessageBox.Show(this, "Webbläsaren gick inte att öppna. Den nya versionen finns på:\n" + UpdateCheck.ReleasesUrl, "Text Sync", MessageBoxButtons.OK, MessageBoxIcon.Information); } };
+            // på en egen rad under: första raden av det som är ändrat i den nya versionen
+            var updateWhat = new Label { AutoSize = true, Margin = new Padding(0, 4, 0, 0), ForeColor = Muted, UseMnemonic = false, Visible = false };
+            updateNews.LinkClicked += (s, e) => ShowNews();
+            updateGet.LinkClicked += (s, e) => DownloadUpdate();
             updateHide.LinkClicked += (s, e) => updateBar.Visible = false;
+            tips.SetToolTip(updateNews, "Visar vad som är ändrat i varje version sedan den du har.");
             tips.SetToolTip(updateGet, "Öppnar webbläsaren, som laddar ner den nya filen. Stäng sedan Text Sync, starta den nya filen och ta bort den gamla.");
             tips.SetToolTip(updateHide, "Döljer raden. Den visas igen nästa gång programmet startas.");
-            updateBar.Controls.Add(updateText); updateBar.Controls.Add(updateGet); updateBar.Controls.Add(updateHide);
+            updateBar.Controls.Add(updateText); updateBar.Controls.Add(updateNews); updateBar.Controls.Add(updateGet); updateBar.Controls.Add(updateHide);
+            updateBar.SetFlowBreak(updateHide, true);
+            updateBar.Controls.Add(updateWhat);
             root.Controls.Add(updateBar, 0, 2);
             Shown += (s, e) => System.Threading.ThreadPool.QueueUserWorkItem(_ =>
             {
-                var rel = UpdateCheck.CheckNewer();
-                if (rel == null) return;
+                var all = UpdateCheck.Fetch();
+                if (all == null) return;
                 try
                 {
                     BeginInvoke(new Action(() =>
                     {
-                        updateUrl = rel.Url;
-                        updateText.Text = "Det finns en ny version av Text Sync: " + rel.Version + ". Du har " + Program.Version + ".";
+                        releases = all;
+                        if (!UpdateCheck.IsNewer(all[0].Version, Program.Version)) return;
+                        int n = UpdateCheck.NewerCount(all, Program.Version);
+                        updateText.Text = "Det finns en ny version av Text Sync: " + all[0].Version + ". Du har " + Program.Version + ".";
+                        string what = UpdateCheck.FirstLine(all[0], 160);
+                        if (what.Length > 0 && ".!?…".IndexOf(what[what.Length - 1]) < 0) what += ".";
+                        updateWhat.Text = (what.Length > 0 ? "Nytt i " + all[0].Version + ": " + what : "") +
+                            (n > 1 ? (what.Length > 0 ? "  " : "") + "Du har hoppat över " + (n - 1) + (n == 2 ? " version" : " versioner") + " – klicka Vad är nytt? för att se allt." : "");
+                        updateWhat.Visible = updateWhat.Text.Length > 0;
                         updateBar.Visible = true;
                     }));
                 }
@@ -787,7 +800,7 @@ namespace TextSync
             };
             ctrls.Add(muxBtn);
             // tabell (FlowLayoutPanel placerar NumericUpDown fel vid hög DPI)
-            var brow = new TableLayoutPanel { AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, Dock = DockStyle.Top, ColumnCount = ctrls.Count + 2, RowCount = 1, Margin = new Padding(0) };
+            var brow = new TableLayoutPanel { AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, Dock = DockStyle.Top, ColumnCount = ctrls.Count + 3, RowCount = 1, Margin = new Padding(0) };
             for (int i = 0; i < ctrls.Count; i++)
             {
                 brow.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
@@ -796,9 +809,15 @@ namespace TextSync
             }
             brow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             brow.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+            brow.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+            // Nyheter: vad som är ändrat i varje version (fönstret NewsDialog). Finns alltid, också när ingen ny version finns.
+            var newsLink = new HandLink { Text = "Nyheter", AutoSize = true, Anchor = AnchorStyles.Right, LinkColor = Accent, Margin = new Padding(3, 0, 14, 0) };
+            newsLink.LinkClicked += (s, e) => ShowNews();
+            tips.SetToolTip(newsLink, "Visar vad som är nytt i den här versionen och i de senaste versionerna.");
+            brow.Controls.Add(newsLink, ctrls.Count + 1, 0);
             helpLink = new HandLink { Text = "Hjälp", AutoSize = true, Anchor = AnchorStyles.Right, LinkColor = Accent };
             helpLink.LinkClicked += (s, e) => ShowHelp();
-            brow.Controls.Add(helpLink, ctrls.Count + 1, 0);
+            brow.Controls.Add(helpLink, ctrls.Count + 2, 0);
             // raden med Spara ligger under rutan som rullar, så att den alltid syns
             var foot = new Panel { Dock = DockStyle.Bottom, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, Padding = new Padding(16, 8, 16, 18) };
             foot.Controls.Add(brow);
@@ -1442,6 +1461,59 @@ namespace TextSync
             if (p != null) { try { if (!p.HasExited) p.Kill(); } catch { } }
         }
 
+        // ------------------------------------------------------------ nyheter och ny version
+        List<UpdateCheck.Release> releases;   // releaserna på GitHub, den nyaste först. null tills de har hämtats (vid start, eller när Nyheter öppnas)
+        bool newsBusy;
+
+        // Öppnar den nyaste versionens exe-fil i webbläsaren, som laddar ner den. Programmet byter inte ut sig självt.
+        void DownloadUpdate()
+        {
+            string url = releases != null && releases.Count > 0 ? releases[0].Url : UpdateCheck.ReleasesUrl;
+            try { Process.Start(url); }
+            catch (Exception ex)
+            {
+                Log.Error("Kunde inte öppna " + url, ex);
+                MessageBox.Show(this, "Webbläsaren gick inte att öppna. Den nya versionen finns på:\n" + UpdateCheck.ReleasesUrl, Caption, MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+        }
+
+        // Fönstret Nyheter: vad som är ändrat i varje version. Listan hämtades vid start. Gick det inte då (inget nät) görs ett nytt försök här.
+        void ShowNews()
+        {
+            if (newsBusy) return;
+            if (releases != null) { OpenNews(); return; }
+            newsBusy = true;
+            string before = statusLabel.Text; Color beforeColor = statusLabel.ForeColor;
+            if (!busy) SetStatus("Hämtar nyheterna från GitHub…", false);
+            System.Threading.ThreadPool.QueueUserWorkItem(_ =>
+            {
+                var all = UpdateCheck.Fetch();
+                try
+                {
+                    BeginInvoke(new Action(() =>
+                    {
+                        newsBusy = false;
+                        if (!busy && statusLabel.Text == "Hämtar nyheterna från GitHub…") { statusLabel.Text = before; statusLabel.ForeColor = beforeColor; }
+                        if (all == null)
+                        {
+                            MessageBox.Show(this, "Nyheterna gick inte att hämta. Kontrollera att datorn har internet och försök igen.\n\nDe finns också på:\n" + UpdateCheck.ReleasesUrl,
+                                Caption, MessageBoxButtons.OK, MessageBoxIcon.Information);
+                            return;
+                        }
+                        releases = all;
+                        OpenNews();
+                    }));
+                }
+                catch { }   // fönstret hann stängas
+            });
+        }
+
+        void OpenNews()
+        {
+            using (var d = new NewsDialog(releases, Program.Version))
+                if (d.ShowDialog(this) == DialogResult.Yes) DownloadUpdate();
+        }
+
         void ShowHelp()
         {
             var a = MessageBox.Show(this,
@@ -1469,6 +1541,7 @@ namespace TextSync
                 "Ligger några rader fel: markera dem, högerklicka och välj Synka om markerade rader (Ctrl+R). De flyttas så att de passar referensen och delas som den. " +
                 "Visa ovanför listan döljer grå rader eller visar bara röda eller blå. Ett klick på en färgad ruta i resultatet (t.ex. \"2 röda rader\") gör samma sak. Sök (Ctrl+F) letar i texten, Enter hoppar till nästa träff.\n\n" +
                 "Verktygen för synk mot ljudet (0,6–1,4 GB) och för betydelsejämförelsen (0,5 GB) ligger i mappen tools i " + Log.Dir + ". Mappen kan tas bort när Text Sync är stängt, och verktygen hämtas igen vid behov.\n\n" +
+                "Nyheter (bredvid Hjälp) visar vad som är nytt i varje version.\n\n" +
                 "Text Sync " + Program.Version + " · MIT-licens\n" +
                 "Loggfil (för felsökning): " + Log.FilePath + "\n\n" +
                 "Vill du öppna mappen med loggfilen?",

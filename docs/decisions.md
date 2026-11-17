@@ -2,6 +2,22 @@
 
 Nyast först.
 
+## 2026-11-17 – 2.4.30: Programmet visar vad som är nytt, och 2.4.28 och 2.4.29 släpptes aldrig
+- **Område:** GUI / drift
+- **Önskemål (ägaren):** punkt 11 i Claudes lista, och: "Det är ett måste att se vad som är nytt i senaste versionen".
+- **Beslut:**
+  - **Bannern om ny version** har en rad till: "Nytt i X:" och första raden av det som är ändrat i den senaste versionen. Har man hoppat över flera versioner står det också. Länken **Vad är nytt?** öppnar fönstret Nyheter. Ladda ner och Inte nu är som förut.
+  - **Fönstret Nyheter** (`NewsDialog.cs`) visar vad som är ändrat i varje version, den nyaste först, för de 30 senaste releaserna. Nyare versioner än den egna är märkta "(ny)", den egna "(den du har)". Finns en nyare version har fönstret knappen **Ladda ner X**. Texten går att kopiera.
+  - **Länken Nyheter** längst ner till höger, bredvid Hjälp, öppnar samma fönster när som helst, också när man har den senaste versionen (Claudes val: då går det att se vad som var nytt i versionen man just hämtade).
+  - **Texten** är releasens text hos GitHub, alltså commit-meddelandet, utan den fasta inledningen, versionsnumret och raden Co-Authored-By (`UpdateCheck.CleanNotes`). Därför står det nu i `CLAUDE.md` och `docs/operations.md` att commit-meddelandet ska skrivas för användarna.
+  - **Hämtningen:** vid start hämtas listan över releaser (`api.github.com/repos/ValpenMrT/Text-Sync/releases?per_page=30`) i stället för bara den senaste. Samma uppgifter skickas som förut (`TextSync/<version>` som User-Agent, inget om filerna). Gick det inte vid start görs ett nytt försök när Nyheter öppnas, och går det inte då heller säger programmet det och visar adressen.
+  - **Ladda ner** öppnar som förut bara en exe-fil bland projektets egna releaser.
+- **2.4.28 och 2.4.29 släpptes aldrig hos GitHub.** Testerna föll där i steget "Bygg och testa". Orsak (Claudes slutsats, loggen går inte att läsa utan inloggning): testet för Inställningar från 2.4.28 förutsatte att dialogen (986 punkter hög) ryms på skärmen, och GitHubs maskiner har 1024 × 768. Windows låter inte ett fönster bli större än skärmen. Felet låg i testet: det tar nu hänsyn till skärmens storlek. Ändringarna i 2.4.28 och 2.4.29 följer med i 2.4.30.
+- **Provat:** ett provbygge som version 2.4.20 kördes i samma process mot de riktiga releaserna: bannern visade "Det finns en ny version av Text Sync: 2.4.27. Du har 2.4.20.", raden "Nytt i 2.4.27: Undertexter i formaten ASS, SSA och VTT går att läsa in" och att två versioner var överhoppade. Fönstret Nyheter visade 2.4.27, 2.4.26 och 2.4.25 med text och knappen Ladda ner 2.4.27. Skärmbilder granskade i mörkt läge.
+- **Test:** 297 av 297 kontroller (5 nya: listan över releaser, adressen som laddas ner, texten, märkningen av versioner, första raden och otolkbara svar).
+- **Ej provat:** klick på länkarna och knappen, utan nät, ljust läge.
+- **Product-check:** Claude granskade själv. Inget blockerande: inget nytt skickas, texten visas som vanlig text, och utan nät fungerar programmet som förut. Kan vänta: äldre versioners texter är skrivna för utvecklare ("Release-steget hos GitHub körs i PowerShell 7").
+
 ## 2026-11-17 – 2.4.29: Listan syns också i ett litet fönster
 - **Område:** GUI
 - **Önskemål (ägaren):** punkt 2 i Claudes lista: i det minsta fönstret (940 × 600 vid 100 %, till exempel en bärbar dator med 1920 × 1200 och 200 % skalning) syntes ingenting av listan efter en synk.

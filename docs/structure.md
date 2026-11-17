@@ -44,7 +44,9 @@ src/
   Quality.cs       Besked om hur säker synken är (Bra / Kontrollera / Osäkert, svaga ställen) och avsnittsnummer i filnamn (varning för fel avsnitt)
   ConfirmDialog.cs Varningsruta med egna knapptexter ("Synka ändå" / "Avbryt")
   Mkv.cs           Minimal Matroska-läsare: spårlista och textundertexter (SRT/ASS/WebVTT, även zlib-komprimerade)
-  UpdateCheck.cs   Kontrollerar vid start om en nyare version finns bland releaserna på GitHub (bannern under rutorna för filerna i huvudfönstret). Laddar inte ner något själv
+  UpdateCheck.cs   Hämtar vid start listan över releaser på GitHub: finns en nyare version visas bannern under rutorna för filerna i huvudfönstret,
+                   med första raden av det som är nytt. Gör också texten till fönstret Nyheter (CleanNotes, NewsText). Laddar inte ner något själv
+  NewsDialog.cs    Fönstret Nyheter: vad som är ändrat i varje version, den nyaste först (länken Nyheter bredvid Hjälp, och Vad är nytt? i bannern)
   Log.cs           Loggfil i %LOCALAPPDATA%\TextSync\log.txt
   TextSync.ico     Programikon
 test/

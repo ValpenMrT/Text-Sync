@@ -721,11 +721,14 @@ namespace TextSync
                 using (var d = new SettingsDialog(0, true, true, false, false, 0, false, false, true))
                 {
                     d.FitTo(new System.Drawing.Rectangle(0, 0, 3000, 3000));
-                    int fullH = d.Height;
-                    bool big = !d.Scrolls && d.OkVisible;
+                    int fullH = d.WantedHeight;
+                    // Windows låter inte ett fönster bli större än skärmen. På en maskin med liten skärm (GitHubs har 1024 × 768)
+                    // ryms dialogen därför inte ens när arbetsytan sägs vara stor, och då ska den rulla där också.
+                    bool screenFits = System.Windows.Forms.SystemInformation.MaxWindowTrackSize.Height >= fullH;
+                    bool big = d.OkVisible && d.Scrolls == !screenFits;
                     // en bärbar dator med 1920 × 1200 och 200 % skalning: arbetsytan är ungefär 960 × 560 punkter vid 100 %
                     d.FitTo(new System.Drawing.Rectangle(0, 0, 960, 560));
-                    Console.WriteLine("Inställningar: hela dialogen {0} hög, på liten skärm {1} × {2}, rullar {3}, OK syns {4}", fullH, d.Width, d.Height, d.Scrolls, d.OkVisible);
+                    Console.WriteLine("Inställningar: hela dialogen {0} hög (skärmen rymmer den: {5}), på liten skärm {1} × {2}, rullar {3}, OK syns {4}", fullH, d.Width, d.Height, d.Scrolls, d.OkVisible, screenFits);
                     Check("Inställningar: på en stor skärm visas allt utan att rulla, med OK synlig", big);
                     Check("Inställningar: på en liten skärm är dialogen inte högre eller bredare än skärmen, inställningarna rullar och OK syns",
                         fullH > 560 && d.Height <= 560 && d.Width <= 960 && d.Scrolls && d.OkVisible);
@@ -748,6 +751,32 @@ namespace TextSync
                     UpdateCheck.IsNewer("2.4.26", "2.4.25") && UpdateCheck.IsNewer("2.4.10", "2.4.9") && UpdateCheck.IsNewer("2.5", "2.4.99") && UpdateCheck.IsNewer("v3.0", "2.9.9") &&
                     !UpdateCheck.IsNewer("2.4.25", "2.4.25") && !UpdateCheck.IsNewer("2.4.24", "2.4.25") && !UpdateCheck.IsNewer("2.5", "2.5.0") && !UpdateCheck.IsNewer("2.5.0", "2.5") &&
                     !UpdateCheck.IsNewer("abc", "2.4") && !UpdateCheck.IsNewer("", "2.4") && !UpdateCheck.IsNewer(null, "2.4") && !UpdateCheck.IsNewer("2.4.1.1.1", "2.4"));
+
+                // nyheter: listan över releaser, och texten om vad som är ändrat i varje version
+                string intro = "Ladda ner **TextSync-X.exe** här nedanför och starta den.\\n\\nStår det *Windows skyddade datorn*: klicka **Mer information**.\\n\\n## Ändrat i den här versionen\\n\\n";
+                string list = "[" +
+                    "{\"tag_name\":\"v2.4.29\",\"draft\":false,\"prerelease\":false,\"assets\":[{\"browser_download_url\":\"https://github.com/ValpenMrT/Text-Sync/releases/download/v2.4.29/TextSync-2.4.29.exe\"}]," +
+                        "\"body\":\"" + intro + "2.4.29: listan syns också i ett litet fönster\\n\\nI ett lågt fönster syntes ingenting.\\r\\nNu göms tidslinjen.\\n\\n\\nCo-Authored-By: Claude <noreply@anthropic.com>\\n\"}," +
+                    "{\"tag_name\":\"v2.4.31\",\"draft\":true,\"assets\":[],\"body\":\"utkast\"}," +
+                    "{\"tag_name\":\"v2.4.30\",\"assets\":[{\"browser_download_url\":\"https://example.com/elak.exe\"}],\"body\":\"" + intro + "2.4.30: programmet visar vad som är nytt\"}," +
+                    "{\"tag_name\":\"provbygge\",\"assets\":[],\"body\":\"x\"}," +
+                    "{\"tag_name\":\"v2.4.28\",\"assets\":[],\"body\":null}]";
+                var all = UpdateCheck.ParseList(list);
+                Console.WriteLine("Nyheter: {0}", string.Join(" | ", all.Select(r => r.Version + " [" + r.Notes.Replace("\n", "/") + "]")));
+                Check("Nyheter: releaserna läses med den nyaste versionen först, utan utkast och utan taggar som inte är versioner",
+                    all.Count == 3 && all[0].Version == "2.4.30" && all[1].Version == "2.4.29" && all[2].Version == "2.4.28");
+                Check("Nyheter: bara en exe-fil bland projektets egna releaser laddas ner, annars öppnas sidan med releaserna",
+                    all.Count == 3 && all[0].Url == UpdateCheck.ReleasesUrl + "/latest" && all[1].Url == "https://github.com/ValpenMrT/Text-Sync/releases/download/v2.4.29/TextSync-2.4.29.exe");
+                Check("Nyheter: texten är commit-meddelandet utan inledning, versionsnummer och Co-Authored-By, med stor bokstav först",
+                    all.Count == 3 && all[0].Notes == "Programmet visar vad som är nytt" &&
+                    all[1].Notes == "Listan syns också i ett litet fönster\n\nI ett lågt fönster syntes ingenting.\nNu göms tidslinjen." && all[2].Notes == "");
+                string news = UpdateCheck.NewsText(all, "2.4.29");
+                Check("Nyheter: nyare versioner märks (ny), den egna (den du har), och en version utan text får en rad om det",
+                    UpdateCheck.NewerCount(all, "2.4.29") == 1 && UpdateCheck.NewerCount(all, "2.4.30") == 0 && UpdateCheck.NewerCount(all, "2.4.1") == 3 &&
+                    news.StartsWith("Version 2.4.30  (ny)\r\nProgrammet visar vad som är nytt\r\n\r\nVersion 2.4.29  (den du har)\r\nListan syns") && news.EndsWith("Version 2.4.28\r\nIngen beskrivning."));
+                Check("Nyheter: första raden till bannern kortas med …, och ett svar som inte går att tolka ger en tom lista",
+                    UpdateCheck.FirstLine(all[1], 200) == "Listan syns också i ett litet fönster" && UpdateCheck.FirstLine(all[1], 12) == "Listan syns…" && UpdateCheck.FirstLine(all[2], 50) == "" &&
+                    UpdateCheck.ParseList("").Count == 0 && UpdateCheck.ParseList(null).Count == 0 && UpdateCheck.ParseList("{\"message\":\"Not Found\"}").Count == 0 && UpdateCheck.ParseList("[{\"tag_name\":").Count == 0);
             }
 
             // ---- grafikkort, ljudspår, Whisper-kontroll, sökvägar (product-check 2026-11-09)
