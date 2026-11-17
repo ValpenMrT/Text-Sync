@@ -88,7 +88,12 @@ if ($Test) {
     New-Item -ItemType Directory -Force $tmp | Out-Null
     $asm = [Reflection.Assembly]::Load([IO.File]::ReadAllBytes((Join-Path $bin 'Tests.exe')))
     $main = $asm.GetType('TextSync.Tests').GetMethod('Main', [Reflection.BindingFlags]'Static,NonPublic,Public')
-    $rc = $main.Invoke($null, @(, [string[]]@($tmp)))
+    try { $rc = $main.Invoke($null, @(, [string[]]@($tmp))) }
+    catch {
+        # Hos GitHub blir raden en anmärkning på körningen, som går att läsa utan inloggning (se docs\operations.md)
+        if ($env:GITHUB_ACTIONS -eq 'true') { Write-Host ("::error::Tests kastade ett undantag: " + ("$($_.Exception.InnerException)" -replace "`r?`n", ' | ')) }
+        throw
+    }
     # Tests avgör själv om kontrollerna gick igenom och returnerar 1 om någon misslyckades (raderna som börjar med FEL).
     if ($rc -ne 0) { throw "Testerna misslyckades. Se raderna som börjar med FEL ovan." }
     Write-Host "Testerna gick igenom."

@@ -2,6 +2,14 @@
 
 Nyast först.
 
+## 2026-11-17 – 2.4.31: Testerna säger hos GitHub vilken kontroll som föll
+- **Område:** test / drift
+- **Vad som hände:** också 2.4.30 föll hos GitHub i "Bygg och testa", fast testet för Inställningar hade rättats. På datorn går alla kontroller igenom, även med engelsk kultur. Slutsatsen i 2.4.30 om orsaken var alltså fel eller ofullständig, och loggen hos GitHub går inte att läsa utan inloggning.
+- **Beslut:** när testerna körs hos GitHub (`GITHUB_ACTIONS=true`) skriver `Check` varje misslyckad kontroll som en anmärkning (`::error::`), och `build.ps1` gör samma sak om `Tests` kastar ett undantag. Anmärkningar går att läsa utan inloggning: `https://api.github.com/repos/ValpenMrT/Text-Sync/check-runs/<jobbets id>/annotations`. Testet för Inställningar skriver också måtten det såg. På datorn skrivs ingenting nytt.
+- **Inget är ändrat i programmet** utom versionen.
+- **Test:** 297 av 297 kontroller på datorn.
+- **Product-check:** Claude granskade själv (bara test och bygge). Inget blockerande.
+
 ## 2026-11-17 – 2.4.30: Programmet visar vad som är nytt, och 2.4.28 och 2.4.29 släpptes aldrig
 - **Område:** GUI / drift
 - **Önskemål (ägaren):** punkt 11 i Claudes lista, och: "Det är ett måste att se vad som är nytt i senaste versionen".

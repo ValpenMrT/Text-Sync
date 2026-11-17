@@ -57,6 +57,15 @@ namespace TextSync
             if (ok) return;
             failed++;
             Console.WriteLine("    FEL: " + what);
+            Note("error", "FEL: " + what);
+        }
+
+        // Hos GitHub blir raden en anmärkning på körningen, som går att läsa utan inloggning (loggen kräver inloggning).
+        // Se docs/operations.md. På datorn skrivs ingenting.
+        static void Note(string level, string text)
+        {
+            if (Environment.GetEnvironmentVariable("GITHUB_ACTIONS") != "true") return;
+            Console.WriteLine("::" + level + "::" + text.Replace("%", "%25").Replace("\r", " ").Replace("\n", " "));
         }
 
         // require = false: resultatet skrivs ut men bedöms inte (Simple klarar inte klipp, eftersom den bara synkar linjärt)
@@ -729,6 +738,10 @@ namespace TextSync
                     // en bärbar dator med 1920 × 1200 och 200 % skalning: arbetsytan är ungefär 960 × 560 punkter vid 100 %
                     d.FitTo(new System.Drawing.Rectangle(0, 0, 960, 560));
                     Console.WriteLine("Inställningar: hela dialogen {0} hög (skärmen rymmer den: {5}), på liten skärm {1} × {2}, rullar {3}, OK syns {4}", fullH, d.Width, d.Height, d.Scrolls, d.OkVisible, screenFits);
+                    var track = System.Windows.Forms.SystemInformation.MaxWindowTrackSize;
+                    if (!big || !(fullH > 560 && d.Height <= 560 && d.Width <= 960 && d.Scrolls && d.OkVisible))
+                        Note("notice", "Installningar: behover " + fullH + ", storsta fonster " + track.Width + " x " + track.Height + ", pa stor skarm rullar=" + !big +
+                            ", liten skarm " + d.Width + " x " + d.Height + " klientyta " + d.ClientSize.Width + " x " + d.ClientSize.Height + " rullar=" + d.Scrolls + " OK syns=" + d.OkVisible);
                     Check("Inställningar: på en stor skärm visas allt utan att rulla, med OK synlig", big);
                     Check("Inställningar: på en liten skärm är dialogen inte högre eller bredare än skärmen, inställningarna rullar och OK syns",
                         fullH > 560 && d.Height <= 560 && d.Width <= 960 && d.Scrolls && d.OkVisible);
