@@ -739,6 +739,7 @@ namespace TextSync
                     d.FitTo(new System.Drawing.Rectangle(0, 0, 960, 560));
                     Console.WriteLine("Inställningar: hela dialogen {0} hög (skärmen rymmer den: {5}), på liten skärm {1} × {2}, rullar {3}, OK syns {4}", fullH, d.Width, d.Height, d.Scrolls, d.OkVisible, screenFits);
                     var track = System.Windows.Forms.SystemInformation.MaxWindowTrackSize;
+                    Note("notice", "Installningar: behover " + fullH + ", storsta fonster " + track.Width + " x " + track.Height + ", liten skarm " + d.Width + " x " + d.Height);
                     if (!big || !(fullH > 560 && d.Height <= 560 && d.Width <= 960 && d.Scrolls && d.OkVisible))
                         Note("notice", "Installningar: behover " + fullH + ", storsta fonster " + track.Width + " x " + track.Height + ", pa stor skarm rullar=" + !big +
                             ", liten skarm " + d.Width + " x " + d.Height + " klientyta " + d.ClientSize.Width + " x " + d.ClientSize.Height + " rullar=" + d.Scrolls + " OK syns=" + d.OkVisible);

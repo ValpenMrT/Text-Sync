@@ -2,6 +2,15 @@
 
 Nyast först.
 
+## 2026-11-17 – 2.4.32: Inställningar räknar ramen rätt på en skärm som är mindre än dialogen
+- **Område:** GUI / test / drift
+- **Vad anmärkningarna från 2.4.31 visade:** hos GitHub (skärm 1024 × 768, största fönster 1044 × 788) föll båda kontrollerna för Inställningar. Dialogen blev 774 punkter hög när arbetsytan sades vara 560.
+- **Orsak:** `SettingsDialog.FitTo` räknade ramen och titelraden som `Height − ClientSize.Height`. Innan fönstret har visats kapar Windows `Height` till det största tillåtna fönstret utan att `ClientSize` följer med, så skillnaden blev negativ (−159) och dialogen fick för mycket höjd. Slutsatsen i 2.4.30 (att bara testet var fel) stämde alltså inte: uträkningen var fel på en skärm som är mindre än hela dialogen, vilket är just det fall ändringen var till för. När dialogen visas i programmet har fönstret redan skapats, och då stämmer måtten troligen, men det är inte provat på en så liten skärm.
+- **Beslut:** ramen räknas ur fönstrets stil (`SizeFromClientSize`), och dialogen begär aldrig mer än arbetsytan eller det största fönster Windows tillåter (`SystemInformation.MaxWindowTrackSize`). Konstruktorn sätter storleken med samma metod.
+- **2.4.28–2.4.31 släpptes aldrig** hos GitHub. Allt i dem följer med i 2.4.32.
+- **Test:** 297 av 297 kontroller på datorn. Hos GitHub: se taggen `v2.4.32`.
+- **Product-check:** Claude granskade själv. Inget blockerande.
+
 ## 2026-11-17 – 2.4.31: Testerna säger hos GitHub vilken kontroll som föll
 - **Område:** test / drift
 - **Vad som hände:** också 2.4.30 föll hos GitHub i "Bygg och testa", fast testet för Inställningar hade rättats. På datorn går alla kontroller igenom, även med engelsk kultur. Slutsatsen i 2.4.30 om orsaken var alltså fel eller ofullständig, och loggen hos GitHub går inte att läsa utan inloggning.

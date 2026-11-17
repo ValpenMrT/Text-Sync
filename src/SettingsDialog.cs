@@ -139,7 +139,7 @@ namespace TextSync
             CancelButton = cancel;
             Theme.Apply(this, null);   // mörkt läge: listor, knappar och titelrad
             ResumeLayout(true);
-            ClientSize = new Size(t.PreferredSize.Width, t.PreferredSize.Height + bar.Height);
+            FitTo(new Rectangle(0, 0, 100000, 100000));   // hela innehållet, om skärmen tillåter. Rätt arbetsyta sätts i OnLoad
         }
 
         readonly Panel body, bar;
@@ -158,17 +158,23 @@ namespace TextSync
         }
         internal bool Scrolls { get { return table.Height > body.ClientSize.Height; } }
         // Höjden dialogen behöver för att visa allt utan att rulla, med ram och titelrad
-        internal int WantedHeight { get { return table.PreferredSize.Height + bar.Height + (Height - ClientSize.Height); } }
+        internal int WantedHeight { get { return table.PreferredSize.Height + bar.Height + Chrome.Height; } }
+
+        // Ramen och titelraden. Räknas ur fönstrets stil, inte som Height − ClientSize.Height: innan fönstret har visats kapar Windows
+        // Height till skärmens storlek utan att ClientSize följer med, och då blir skillnaden fel (hände i testerna hos GitHub, 1024 × 768).
+        Size Chrome { get { return SizeFromClientSize(Size.Empty); } }
 
         // Sätter dialogens storlek så att den får plats inom wa (skärmens arbetsyta): hela innehållet om det ryms,
         // annars så hög som skärmen tillåter, och då rullar inställningarna. Knapparna syns alltid.
         internal void FitTo(Rectangle wa)
         {
-            Size content = table.PreferredSize;
-            int chromeW = Width - ClientSize.Width, chromeH = Height - ClientSize.Height;
-            int wantH = content.Height + bar.Height, maxH = Math.Max(bar.Height + 80, wa.Height - chromeH);
+            Size content = table.PreferredSize, chrome = Chrome, track = SystemInformation.MaxWindowTrackSize;
+            // aldrig större än arbetsytan, och aldrig större än Windows tillåter ett fönster att vara
+            int maxW = Math.Max(200, Math.Min(wa.Width, track.Width) - chrome.Width);
+            int maxH = Math.Max(bar.Height + 80, Math.Min(wa.Height, track.Height) - chrome.Height);
+            int wantH = content.Height + bar.Height;
             int w = content.Width + (wantH > maxH ? SystemInformation.VerticalScrollBarWidth : 0);
-            ClientSize = new Size(Math.Min(w, Math.Max(200, wa.Width - chromeW)), Math.Min(wantH, maxH));
+            Size = new Size(Math.Min(w, maxW) + chrome.Width, Math.Min(wantH, maxH) + chrome.Height);
         }
 
         protected override void OnLoad(EventArgs e)
