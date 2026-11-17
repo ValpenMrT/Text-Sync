@@ -2,6 +2,17 @@
 
 Nyast först.
 
+## 2026-11-17 – 2.4.28: Dialogen Inställningar får plats på en liten skärm
+- **Område:** GUI
+- **Önskemål (ägaren):** punkt 1 i Claudes lista: dialogen var cirka 980 bildpunkter hög vid 100 %, så på en bärbar dator nådde man inte OK.
+- **Beslut:** dialogen blir aldrig högre eller bredare än skärmens arbetsyta (`SettingsDialog.FitTo`, anropas när dialogen visas). Ryms inte allt rullar inställningarna, och **OK** och **Avbryt** ligger i en egen rad längst ner som alltid syns. På en stor skärm ser dialogen ut som förut.
+- **Claudes val:** rullning i stället för flikar eller två kolumner. Flikar ritas ljusa av Windows i mörkt läge, och två kolumner blir bredare än en skärm med 200 % skalning. Rullningen fungerar på alla skärmar utan att något flyttas.
+- **Mushjulet över en lista** (Utseende, Text ur ljudet, SRT-filen sparas för) bläddrar i dialogen i stället för att byta val i listan. Rullisten följer mörkt läge (`Theme.Apply`).
+- **Provat:** dialogen ritad till en bild i samma process, mörkt läge, arbetsyta 960 × 560: 605 × 560, rullist till höger, OK och Avbryt synliga.
+- **Test:** 291 av 291 kontroller (2 nya: stor skärm utan rullning, liten skärm med rullning och OK synlig).
+- **Ej provat:** med klick och mushjul, och vid 200 % skalning på en riktig bärbar dator.
+- **Product-check:** Claude granskade själv (liten ändring). Inget blockerande. Tab flyttar till en inställning utanför bild och rullar dit.
+
 ## 2026-11-17 – 2.4.27: Undertexter i formaten ASS, SSA och VTT går att läsa in
 - **Område:** inläsning / GUI / Hel säsong
 - **Önskemål (ägaren):** "fixa punkt 1, 2, 7 samt 11", efter Claudes lista över det som saknas. Punkt 7: bara SRT gick att läsa in, och ASS, SSA och VTT är vanliga på undertextsajter.

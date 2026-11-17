@@ -699,6 +699,22 @@ namespace TextSync
                     dangling.Count == 2 && dangling[0].Text == "He's gone." && dangling[1].Text == "As you know." && dangling[1].Start > 7000);
             }
 
+            // ---- dialogen Inställningar får plats på en liten skärm, och OK syns alltid
+            {
+                using (var d = new SettingsDialog(0, true, true, false, false, 0, false, false, true))
+                {
+                    d.FitTo(new System.Drawing.Rectangle(0, 0, 3000, 3000));
+                    int fullH = d.Height;
+                    bool big = !d.Scrolls && d.OkVisible;
+                    // en bärbar dator med 1920 × 1200 och 200 % skalning: arbetsytan är ungefär 960 × 560 punkter vid 100 %
+                    d.FitTo(new System.Drawing.Rectangle(0, 0, 960, 560));
+                    Console.WriteLine("Inställningar: hela dialogen {0} hög, på liten skärm {1} × {2}, rullar {3}, OK syns {4}", fullH, d.Width, d.Height, d.Scrolls, d.OkVisible);
+                    Check("Inställningar: på en stor skärm visas allt utan att rulla, med OK synlig", big);
+                    Check("Inställningar: på en liten skärm är dialogen inte högre eller bredare än skärmen, inställningarna rullar och OK syns",
+                        fullH > 560 && d.Height <= 560 && d.Width <= 960 && d.Scrolls && d.OkVisible);
+                }
+            }
+
             // ---- ny version på GitHub (bannern i huvudfönstret)
             {
                 string gh = "{\"url\":\"https://api.github.com/repos/ValpenMrT/Text-Sync/releases/1\",\"tag_name\":\"v2.4.30\",\"name\":\"Text Sync 2.4.30\",\"assets\":[{\"name\":\"TextSync-2.4.30.exe\"," +

@@ -21,7 +21,8 @@ src/
   SeasonSync.cs    Synkar ett avsnitt i kön utan gränssnitt: väljer referens (textspår eller ljud), synkar, bedömer och sparar via SeasonUndo
   Season.cs        Parar ihop filmer och undertexter efter avsnittsnummer (SeasonPlan) och återställer en säsongssynk (SeasonUndo, %LOCALAPPDATA%\TextSync\undo)
   Timeline.cs      Tidslinjen under listan (TimelinePanel)
-  SettingsDialog.cs Dialogen Inställningar: utseende, bildfrekvensfel, betydelsejämförelse, godkänn förslag automatiskt, text för hörselskadade, formatering
+  SettingsDialog.cs Dialogen Inställningar: utseende, bildfrekvensfel, betydelsejämförelse, godkänn förslag automatiskt, text för hörselskadade, formatering.
+                   Blir aldrig större än skärmen: inställningarna rullar och OK syns alltid (FitTo)
   CueDialog.cs     Dialog för att ändra eller lägga till en rad (start, slut, text)
   SplitDialog.cs   Dialog för att dela en rad i två för hand: markören i texten visar var (Dela rad…, Ctrl+D). Reglerna ligger i Align.cs (SnapSplit, SplitAt, SplitTime)
   Align.cs         Förslag om att slå ihop (2↔1) eller dela (1↔2) rader efter referensens radindelning (dynamisk programmering på tider).

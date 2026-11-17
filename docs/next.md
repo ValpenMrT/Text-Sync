@@ -108,7 +108,7 @@ Mätt mot Blacklist S04E01 (`test/SubDiag.cs`, se beslutsloggen). Kvar:
 - **Besvarat 2026-11-13 (2.4.15):** en text ur ljudet skriver aldrig över en fil.
 - **Parakeet är inbyggd i 2.4.16** (beslutsloggen 2026-11-14). Kvar:
   - **Bara engelska provat.** Svenskt tal är inte provat, och språkgissningen skiljer inte säkert norska från danska (då blir koden `und`).
-  - **Dialogen Inställningar är cirka 980 bildpunkter hög** vid 100 %. På en liten skärm når man inte OK. Förslag: flikar eller två kolumner.
+  - ~~**Dialogen Inställningar är cirka 980 bildpunkter hög** vid 100 %. På en liten skärm når man inte OK.~~ **Klart i 2.4.28:** inställningarna rullar och OK syns alltid.
   - **Ljudet läses ur filmen två gånger** (en gång för taldetekteringen till listan, en gång för Parakeet), cirka 15 s extra.
   - **Parakeet på grafikkortet** finns som eget paket (cirka 500 MB till) men behövs knappast: processorn räcker.
   - **Whisper-kontrollen och Ljud B/A+B använder fortfarande Whisper.** Parakeets ordtider kunde användas där också.

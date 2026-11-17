@@ -125,6 +125,8 @@ namespace TextSync
                 var l = c as LinkLabel;
                 if (l != null) { l.LinkColor = Link; l.ActiveLinkColor = Link; l.VisitedLinkColor = Link; }
             }
+            // en ruta som rullar (dialogen Inställningar på en liten skärm): rullisten följer mörkt läge
+            if (!(c is Form) && c is ScrollableControl && ((ScrollableControl)c).AutoScroll) Native(c);
             if (c is Form) { c.BackColor = c is MainForm ? Bg : Card; c.ForeColor = Fg; TitleBar((Form)c); }
             foreach (Control ch in c.Controls) Apply(ch, map);
         }

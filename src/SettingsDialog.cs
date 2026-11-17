@@ -39,12 +39,12 @@ namespace TextSync
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = false; MinimizeBox = false; ShowInTaskbar = false;
             StartPosition = FormStartPosition.CenterParent;
-            AutoSize = true; AutoSizeMode = AutoSizeMode.GrowAndShrink;
             BackColor = Theme.Card; ForeColor = Theme.Fg;
             Color muted = Theme.Dark ? Theme.Muted : SystemColors.GrayText;
 
             var t = new TableLayoutPanel { AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, ColumnCount = 1, Padding = new Padding(16, 12, 16, 12) };
             t.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+            table = t;
             Func<string, Label> head = s => new Label { Text = s, AutoSize = true, Font = new Font("Segoe UI Semibold", 10F), Margin = new Padding(0, 10, 0, 4) };
             Func<string, Label> note = s => new Label { Text = s, AutoSize = true, ForeColor = muted, MaximumSize = new Size(520, 0), Margin = new Padding(20, 0, 0, 6), UseMnemonic = false };
 
@@ -108,17 +108,73 @@ namespace TextSync
             t.Controls.Add(note("Det första valet fungerar nästan överallt. Välj det sista bara om å, ä och ö blir fel i en gammal dvd-spelare eller TV: " +
                 "då sparas filen i den teckentabell som passar textens språk, och tecken som inte finns där (t.ex. ♪) byts mot liknande. Lägg in i MKV… påverkas inte."));
 
-            var ok = new Button { Text = "OK", Width = 90, Height = 30, DialogResult = DialogResult.OK };
-            var cancel = new Button { Text = "Avbryt", Width = 90, Height = 30, DialogResult = DialogResult.Cancel };
-            var btns = new FlowLayoutPanel { FlowDirection = FlowDirection.RightToLeft, AutoSize = true, Anchor = AnchorStyles.Right, Margin = new Padding(0, 10, 0, 0) };
-            btns.Controls.Add(cancel); btns.Controls.Add(ok); ok.TabIndex = 0; cancel.TabIndex = 1;
-            t.Controls.Add(btns);
-
-            Controls.Add(t);
+            // Inställningarna ligger i en ruta som rullar när dialogen inte får plats på skärmen (t.ex. en bärbar dator med 200 % skalning).
+            // OK och Avbryt ligger under rutan och syns alltid. Storleken sätts i FitTo när dialogen visas.
+            t.Location = new Point(0, 0);
+            body = new Panel { Dock = DockStyle.Fill, AutoScroll = true, TabIndex = 0 };
+            body.Controls.Add(t);
+            ok = new Button { Text = "OK", Width = 90, Height = 30, DialogResult = DialogResult.OK, TabIndex = 0 };
+            var cancel = new Button { Text = "Avbryt", Width = 90, Height = 30, DialogResult = DialogResult.Cancel, TabIndex = 1 };
+            var btns = new FlowLayoutPanel { FlowDirection = FlowDirection.RightToLeft, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, Dock = DockStyle.Right, WrapContents = false, Margin = new Padding(0) };
+            btns.Controls.Add(cancel); btns.Controls.Add(ok);
+            bar = new Panel { Dock = DockStyle.Bottom, Height = 54, Padding = new Padding(16, 10, 13, 10), TabIndex = 1 };
+            bar.Controls.Add(btns);
+            bar.Controls.Add(new Panel { Dock = DockStyle.Top, Height = 1, BackColor = Theme.BtnBorder });   // linje mellan inställningarna och knapparna
+            Controls.Add(body);
+            Controls.Add(bar);
+            // Mushjulet över en lista bläddrar i dialogen i stället för att byta val i listan av misstag
+            foreach (var combo in new[] { themeCombo, engineCombo, formatCombo })
+            {
+                var c = combo;
+                c.MouseWheel += (s, e) =>
+                {
+                    if (c.DroppedDown) return;
+                    var h = e as HandledMouseEventArgs; if (h != null) h.Handled = true;
+                    if (!body.VerticalScroll.Visible) return;
+                    var p = body.AutoScrollPosition;
+                    body.AutoScrollPosition = new Point(-p.X, -p.Y - Math.Sign(e.Delta) * 60);
+                };
+            }
             AcceptButton = ok;
             CancelButton = cancel;
             Theme.Apply(this, null);   // mörkt läge: listor, knappar och titelrad
             ResumeLayout(true);
+            ClientSize = new Size(t.PreferredSize.Width, t.PreferredSize.Height + bar.Height);
+        }
+
+        readonly Panel body, bar;
+        readonly Button ok;
+        readonly TableLayoutPanel table;
+
+        // Sant när OK-knappen ligger helt inom dialogen (används av testerna)
+        internal bool OkVisible
+        {
+            get
+            {
+                Rectangle r = ok.Bounds;
+                for (Control p = ok.Parent; p != null && p != this; p = p.Parent) r.Offset(p.Location);
+                return ClientRectangle.Contains(r);
+            }
+        }
+        internal bool Scrolls { get { return table.Height > body.ClientSize.Height; } }
+
+        // Sätter dialogens storlek så att den får plats inom wa (skärmens arbetsyta): hela innehållet om det ryms,
+        // annars så hög som skärmen tillåter, och då rullar inställningarna. Knapparna syns alltid.
+        internal void FitTo(Rectangle wa)
+        {
+            Size content = table.PreferredSize;
+            int chromeW = Width - ClientSize.Width, chromeH = Height - ClientSize.Height;
+            int wantH = content.Height + bar.Height, maxH = Math.Max(bar.Height + 80, wa.Height - chromeH);
+            int w = content.Width + (wantH > maxH ? SystemInformation.VerticalScrollBarWidth : 0);
+            ClientSize = new Size(Math.Min(w, Math.Max(200, wa.Width - chromeW)), Math.Min(wantH, maxH));
+        }
+
+        protected override void OnLoad(EventArgs e)
+        {
+            var wa = Screen.FromControl(Owner ?? (Control)this).WorkingArea;
+            FitTo(wa);
+            base.OnLoad(e);   // här läggs dialogen mitt över huvudfönstret
+            Location = new Point(Math.Max(wa.Left, Math.Min(Left, wa.Right - Width)), Math.Max(wa.Top, Math.Min(Top, wa.Bottom - Height)));
         }
     }
 }
