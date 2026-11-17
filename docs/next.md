@@ -39,6 +39,13 @@
     - I kön för en hel säsong (punkt 5) blir varningen ett "osäkert"-besked för avsnittet i stället för en ruta som stoppar kön.
     - Gränserna sätts mot testerna och testfilmen, så att varningen inte visas för vanliga filmer med förtexter eller eftertexter som saknar text.
 
+## Kvar efter ASS, SSA och VTT 2.4.27 (2026-11-17)
+- **Inte provat mot riktiga filer** från en undertextsajt, bara mot filer skrivna för testerna.
+- **Karaoke och skyltar:** en fansubb med många skyltar eller karaoke ger rader som ligger ovanpå varandra. De sparas som de är. Förslag: hoppa över rader vars stil heter t.ex. Sign eller Karaoke, eller fråga.
+- **`.sub` (MicroDVD) och `.smi`** går inte att läsa in. MicroDVD räknar i bildrutor och behöver filmens bildfrekvens.
+- **Hel säsong** säger inte på raden att en ASS- eller VTT-fil sparas som SRT.
+- **Automatiska texter från YouTube (VTT)** upprepar varje rad medan den rullar. De rensas inte.
+
 ## Kvar efter betydelsejämförelsen 2.4.6 (2026-11-11)
 Mätt mot Blacklist S04E01 i 2.4.7 och 2.4.8 (se beslutsloggen): verktygen fungerar, den vanliga synken ändras inte, och fel på minst fem rader i följd rättas.
 

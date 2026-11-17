@@ -19,15 +19,30 @@ namespace TextSync
     public partial class MainForm
     {
         // ------------------------------------------------------------ inläsning
+        // Undertexter läses in som SRT, ASS, SSA eller WebVTT (Srt.Parse känner igen formatet på innehållet). Det som sparas är alltid SRT.
+        const string TargetHint = "Klicka här eller dra in undertexten (" + Srt.FormatList + ").";
+        const string NoCues = "Hittade inga repliker – är det en undertext (" + Srt.FormatList + ")?";
+        const string OrigLinkText = "Lägg till undertext på filmens originalspråk…";
+
+        // Besked i ruta 2 när filen inte är en SRT: det som sparas är en SRT, och då följer inte allt med. Tomt för SRT.
+        internal static string OtherFormatNote(string path)
+        {
+            string x;
+            try { x = (Path.GetExtension(path) ?? "").ToLowerInvariant(); } catch { return ""; }
+            if (x == ".ass" || x == ".ssa") return "Sparas som SRT: typsnitt, färger och placering följer inte med.";
+            if (x == ".vtt") return "Sparas som SRT.";
+            return "";
+        }
+
         void BrowseRef()
         {
-            using (var d = new OpenFileDialog { Title = "Välj referens (MKV eller SRT)", Filter = "Film eller undertext|*.mkv;*.mks;*.mka;*.mp4;*.m4v;*.mov;*.avi;*.ts;*.m2ts;*.wmv;*.webm;*.mpg;*.srt|Alla filer (*.*)|*.*" })
+            using (var d = new OpenFileDialog { Title = "Välj referens (film eller undertext)", Filter = "Film eller undertext|*.mkv;*.mks;*.mka;*.mp4;*.m4v;*.mov;*.avi;*.ts;*.m2ts;*.wmv;*.webm;*.mpg;" + Srt.SubPatterns + "|Alla filer (*.*)|*.*" })
                 if (d.ShowDialog(this) == DialogResult.OK) LoadReference(d.FileName);
         }
 
         void BrowseTarget()
         {
-            using (var d = new OpenFileDialog { Title = "Välj undertexten som ska synkas", Filter = "SRT-undertext (*.srt)|*.srt|Alla filer (*.*)|*.*" })
+            using (var d = new OpenFileDialog { Title = "Välj undertexten som ska synkas", Filter = Srt.OpenFilter })
             {
                 if (mkvPath != null) d.InitialDirectory = Path.GetDirectoryName(mkvPath);
                 if (d.ShowDialog(this) == DialogResult.OK) LoadTarget(d.FileName);
@@ -43,7 +58,7 @@ namespace TextSync
             mkvPath = null; refSrtCues = null;
             trackCombo.Items.Clear(); trackCombo.Visible = trackLabel.Visible = false;
             audioFilling = true; audioCombo.Items.Clear(); audioFilling = false; audioLabel.Visible = audioCombo.Visible = false; refAudioIndex = 0;
-            origLink.Visible = createLink.Visible = false; origLink.Text = "Lägg till undertext på filmens originalspråk (SRT)…"; refInfoDefault = "";
+            origLink.Visible = createLink.Visible = false; origLink.Text = OrigLinkText; refInfoDefault = "";
             ClearResult();
             if (path.Length == 0) { refInfo.Text = ""; return; }
             if (!File.Exists(path)) { refInfo.Text = "Filen finns inte."; refInfo.ForeColor = ErrColor; UpdateButtons(); return; }
@@ -54,7 +69,7 @@ namespace TextSync
                 if (!video && LooksLikeText(path)) // MKV börjar alltid med byte 0x1A
                 {
                     refSrtCues = Markup.FixAll(Srt.Load(path));
-                    if (refSrtCues.Count == 0) { refSrtCues = null; throw new InvalidDataException("Hittade inga repliker – är det en SRT-fil?"); }
+                    if (refSrtCues.Count == 0) { refSrtCues = null; throw new InvalidDataException(NoCues); }
                     refInfo.Text = refSrtCues.Count + " repliker, " + Duration(refSrtCues);
                 }
                 else
@@ -129,7 +144,7 @@ namespace TextSync
         void BrowseOrig()
         {
             if (busy || mkvPath == null) return;
-            using (var d = new OpenFileDialog { Title = "Välj undertexten på filmens originalspråk (t.ex. engelska)", Filter = "SRT-undertext (*.srt)|*.srt|Alla filer (*.*)|*.*", InitialDirectory = Path.GetDirectoryName(mkvPath) })
+            using (var d = new OpenFileDialog { Title = "Välj undertexten på filmens originalspråk (t.ex. engelska)", Filter = Srt.OpenFilter, InitialDirectory = Path.GetDirectoryName(mkvPath) })
                 if (d.ShowDialog(this) == DialogResult.OK) AddOrig(d.FileName);
         }
 
@@ -141,10 +156,10 @@ namespace TextSync
             List<Cue> cues;
             try
             {
-                if (IsMkv(path) || Audio.IsVideo(path) || !LooksLikeText(path)) throw new InvalidDataException("Det måste vara en undertext (SRT).");
+                if (IsMkv(path) || Audio.IsVideo(path) || !LooksLikeText(path)) throw new InvalidDataException("Det måste vara en undertext (" + Srt.FormatList + ").");
                 if (SamePath(path, tgtLoadedPath)) throw new InvalidDataException("Det är samma fil som undertexten som ska synkas i ruta 2. Välj undertexten på filmens originalspråk (t.ex. engelska).");
                 cues = Markup.FixAll(Srt.Load(path));   // originaltexten kan också sparas, så den rättas på samma sätt
-                if (cues.Count < 5) throw new InvalidDataException("Hittade nästan inga repliker (" + cues.Count + ") – är det en SRT-fil?");
+                if (cues.Count < 5) throw new InvalidDataException("Hittade nästan inga repliker (" + cues.Count + ") – är det en undertext (" + Srt.FormatList + ")?");
             }
             catch (Exception ex)
             {
@@ -182,15 +197,16 @@ namespace TextSync
             if (path.Length == 0) { tgtInfo.Text = ""; return; }
             try
             {
-                if (IsMkv(path) || Audio.IsVideo(path)) throw new InvalidDataException("Här ska undertexten (SRT) som ska synkas ligga. Lägg filmen i ruta 1.");
+                if (IsMkv(path) || Audio.IsVideo(path)) throw new InvalidDataException("Här ska undertexten som ska synkas ligga. Lägg filmen i ruta 1.");
                 // kodade tecken (&amp;) och trasiga taggar rättas alltid, redan vid inläsningen
                 int fixedEnt, fixedTags, fixedGone;
                 tgtCues = Markup.FixAll(Srt.Load(path, (int)Srt.Encodings[encCombo.SelectedIndex][0]), out fixedEnt, out fixedTags, out fixedGone);
                 string fixedInfo = Markup.Summary(fixedEnt, fixedTags, fixedGone);
                 if (fixedInfo.Length > 0) Log.Info(fixedInfo + " (" + path + ")");
                 tgtInfo.ForeColor = Muted;
-                tgtInfo.Text = tgtCues.Count + " repliker, " + Duration(tgtCues) + (fixedInfo.Length > 0 ? ".  " + fixedInfo : "");
-                if (tgtCues.Count == 0) { tgtInfo.ForeColor = ErrColor; tgtInfo.Text = "Hittade inga repliker – är det en SRT-fil?"; tgtCues = null; }
+                string other = OtherFormatNote(path);
+                tgtInfo.Text = tgtCues.Count + " repliker, " + Duration(tgtCues) + (fixedInfo.Length > 0 ? ".  " + fixedInfo : "") + (other.Length > 0 ? (fixedInfo.Length > 0 ? "  " : ".  ") + other : "");
+                if (tgtCues.Count == 0) { tgtInfo.ForeColor = ErrColor; tgtInfo.Text = NoCues; tgtCues = null; }
                 string guess = GuessLang(path);
                 if (guess != null) langBox.Text = guess;
             }
@@ -226,7 +242,7 @@ namespace TextSync
             {
                 tgtCues = null;
                 if (tgtName != null) ShowFile(tgtName, "");
-                if (tgtInfo != null) { tgtInfo.ForeColor = Muted; tgtInfo.Text = "Klicka här eller dra in SRT-filen."; }
+                if (tgtInfo != null) { tgtInfo.ForeColor = Muted; tgtInfo.Text = TargetHint; }
                 if (langBox != null && langBeforeCreate != null) langBox.Text = langBeforeCreate;
                 langBeforeCreate = null;
             }

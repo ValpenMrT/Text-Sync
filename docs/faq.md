@@ -6,10 +6,17 @@ Text Sync är inte signerat med ett köpt certifikat.
 - Står det att *Smart App Control* blockerade programmet: då går det tyvärr inte att köra på den datorn. Stäng inte av Smart App Control för Text Sync skull, för det går inte att slå på igen utan att installera om Windows.
 
 **Hur gör jag?**
-1. Dra in filmen (MKV) och den svenska SRT-filen i fönstret. Det går också att klicka var som helst i ruta 1 eller 2 och välja filen.
+1. Dra in filmen (MKV) och den svenska undertexten (SRT, ASS, SSA eller VTT) i fönstret. Det går också att klicka var som helst i ruta 1 eller 2 och välja filen.
 2. Klicka **Synka**. Medan programmet arbetar är knappen du klickade på **Avbryt** (också **Lägg in i MKV…**).
 3. Titta på några rader i listan. Den engelska texten bredvid ska betyda samma sak, och **Synkad start** ska ligga nära **Referenstid**. **Före synk** visar tiden i din osynkade fil, och **Flyttad** hur mycket raden flyttades. Ett plötsligt hopp i Flyttad betyder ett klipp i filmen. Kontrollera gärna raderna där.
 4. Klicka **Spara SRT…**. Filen sparas som `Filmnamn.sv.srt` bredvid filmen, och då hittar VLC, Plex och Kodi den automatiskt. Finns den filen redan föreslås `Filmnamn.synkad.sv.srt`: programmet skriver aldrig över en fil.
+
+**Min undertext är en ASS-, SSA- eller VTT-fil. Går den att använda?**
+Ja. Dra in den som en SRT-fil, i ruta 1 eller 2 eller i Hel säsong. Programmet känner igen formatet på innehållet.
+- Det som sparas är alltid en SRT. Raden under filnamnet i ruta 2 säger det.
+- Ur en ASS- eller SSA-fil följer kursiv, fetstil och text överst i bilden med. Typsnitt, färger, exakt placering och ritade figurer följer inte med.
+- Originalfilen ändras aldrig. Den ligger kvar bredvid den nya SRT-filen, så spelaren kan visa båda tills du tar bort den gamla.
+- Andra format, till exempel `.sub` och `.smi`, går inte att läsa in.
 
 **Kan jag synka en hel säsong på en gång?**
 Ja. Klicka **Hel säsong…** längst upp till höger, eller dra in mappen med säsongen i Text Sync-fönstret. Det går också att dra in flera filmer och undertexter samtidigt.

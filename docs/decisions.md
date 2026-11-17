@@ -2,6 +2,20 @@
 
 Nyast först.
 
+## 2026-11-17 – 2.4.27: Undertexter i formaten ASS, SSA och VTT går att läsa in
+- **Område:** inläsning / GUI / Hel säsong
+- **Önskemål (ägaren):** "fixa punkt 1, 2, 7 samt 11", efter Claudes lista över det som saknas. Punkt 7: bara SRT gick att läsa in, och ASS, SSA och VTT är vanliga på undertextsajter.
+- **Beslut:**
+  - **Formatet känns igen på innehållet**, inte på filändelsen (`Srt.DetectFormat` i `Engine.cs`): en fil som börjar med `WEBVTT` är WebVTT, och en fil med `[Script Info]` eller `[Events]` och rader som börjar med `Dialogue:` är ASS/SSA. Har filen tidrader med `-->` är den en SRT, vad texten än innehåller. Alla ställen som läser en undertext går genom `Srt.Parse`, så formaten fungerar i ruta 1, ruta 2, som originaltext och i Hel säsong.
+  - **ASS och SSA:** raderna `Dialogue:` under `[Events]`, med fältens ordning ur raden `Format:`. Kursiv, fetstil, understruken och genomstruken blir `<i>`, `<b>`, `<u>`, `<s>`, och `{\an8}` (text överst) står kvar. Typsnitt, färg, plats och toning tas bort. Kommentarer, ritade figurer (`{\p1}`) och rader som står två gånger med samma tid och text tas inte med.
+  - **WebVTT:** tider utan timmar, inställningar efter tiden, `NOTE`, `STYLE` och `REGION` hoppas över, liksom namnet på raden före tiden. `<v>`, `<c>`, `<lang>`, `<ruby>` och tidskoder inuti raden tas bort.
+  - **Det som sparas är alltid SRT** (Claudes val: spelarna hittar `Filmnamn.sv.srt`, och allt i programmet arbetar med SRT-rader). Raden under filnamnet i ruta 2 säger "Sparas som SRT: typsnitt, färger och placering följer inte med."
+  - **Filväljarna och dra-och-släpp** tar `.srt`, `.ass`, `.ssa` och `.vtt` (`Srt.IsSubFile`). Texterna i fönstret säger "undertext" i stället för "SRT" där en fil väljs.
+- **Ej gjort:** `.sub` (MicroDVD, behöver bildfrekvensen) och `.smi`. Karaoke och fansubbar med många skyltar ger många rader som ligger ovanpå varandra.
+- **Test:** 289 av 289 kontroller (11 nya: ASS med koder, kommentarer och dubbletter, SSA med egen fältordning, WebVTT, en SRT som liknar de andra formaten, ASS-fil i Windows-1252, dra-och-släpp, Hel säsong, beskedet i ruta 2).
+- **Ej provat:** en riktig ASS- eller VTT-fil från en undertextsajt, och i fönstret med klick.
+- **Product-check:** Claude granskade själv (utbyggnad av inläsningen, inget sparas på nytt sätt). Inget blockerande: originalfilen ändras aldrig, och efter Spara SRT… säger programmet att den gamla filen ligger kvar. Kan vänta: se `docs/next.md`.
+
 ## 2026-11-14 – 2.4.26: Programmet säger till när det finns en ny version på GitHub
 - **Område:** GUI / drift
 - **Önskemål (ägaren):** "varje gång man startar text sync så kontrollerar den om det finns en ny version på github … om det finns en ny version gör en banner som informerar om detta", och "att användaren kan klicka på den och ladda ner senaste".

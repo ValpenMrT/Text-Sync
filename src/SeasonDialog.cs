@@ -276,7 +276,7 @@ namespace TextSync
 
         void BrowseFiles()
         {
-            using (var d = new OpenFileDialog { Title = "Välj filmer och undertexter", Multiselect = true, Filter = "Filmer och undertexter|*.mkv;*.mp4;*.m4v;*.mov;*.avi;*.ts;*.m2ts;*.wmv;*.webm;*.mpg;*.srt|Alla filer (*.*)|*.*" })
+            using (var d = new OpenFileDialog { Title = "Välj filmer och undertexter", Multiselect = true, Filter = "Filmer och undertexter|*.mkv;*.mp4;*.m4v;*.mov;*.avi;*.ts;*.m2ts;*.wmv;*.webm;*.mpg;" + Srt.SubPatterns + "|Alla filer (*.*)|*.*" })
                 if (d.ShowDialog(this) == DialogResult.OK) AddPaths(d.FileNames);
         }
 
@@ -296,7 +296,7 @@ namespace TextSync
             int before = files.Count;
             foreach (var f in found) if (fileSet.Add(f)) files.Add(f);
             Replan();
-            if (found.Count == 0) SetStatus("Hittade inga filmer eller undertexter (SRT) där.", false);
+            if (found.Count == 0) SetStatus("Hittade inga filmer eller undertexter (" + Srt.FormatList + ") där.", false);
             else if (files.Count == before) SetStatus("Filerna finns redan i listan.", false);
             else SetStatus("", false);
         }
@@ -308,7 +308,7 @@ namespace TextSync
             // nämn bara undertexter som hade kunnat synkas: en engelsk text bredvid filmen är inget att påpeka
             string want = MainForm.Norm(Options.Lang) ?? "sv";
             Log.Info("Säsong: " + items.Count + " avsnitt, " + unused.Count + " filer används inte" + (unused.Count > 0 ? ": " + string.Join("; ", unused) : ""));
-            unused = unused.Where(f => MainForm.IsSrt(f) && (MainForm.GuessLang(f) == null || MainForm.Norm(MainForm.GuessLang(f)) == want)).ToList();
+            unused = unused.Where(f => MainForm.IsSubFile(f) && (MainForm.GuessLang(f) == null || MainForm.Norm(MainForm.GuessLang(f)) == want)).ToList();
             // behåll det som användaren har ändrat och det som redan är synkat (samma film, eller samma referens)
             var old = new Dictionary<string, Row>(StringComparer.OrdinalIgnoreCase);
             foreach (var r in rows) if (r.Item.RefPath != null) old[r.Item.RefPath] = r;
@@ -333,7 +333,7 @@ namespace TextSync
             int noNumber = rows.Count(r => r.Item.TargetPath == null && r.Item.Id == null);
             int done = rows.Count(r => r.Out.State == EpisodeState.Done);
             int overwrite = rows.Count(r => Pending(r) && File.Exists(r.Item.OutputPath(Options.Lang) ?? ""));
-            int otherLang = files.Count(f => MainForm.IsSrt(f) && MainForm.GuessLang(f) != null && MainForm.Norm(MainForm.GuessLang(f)) != want);
+            int otherLang = files.Count(f => MainForm.IsSubFile(f) && MainForm.GuessLang(f) != null && MainForm.Norm(MainForm.GuessLang(f)) != want);
             var parts = new List<string>();
             if (done > 0) parts.Add((done == 1 ? "1 avsnitt är redan synkat" : done + " avsnitt är redan synkade") + " och synkas inte igen.");
             if (noNumber > 0) parts.Add("Filnamn utan avsnittsnummer (t.ex. S04E01) kan inte paras ihop automatiskt. Markera filmen och klicka Byt undertext….");
@@ -551,7 +551,7 @@ namespace TextSync
 
         void PickTargetFile(Row r)
         {
-            using (var d = new OpenFileDialog { Title = "Välj undertexten för " + r.Item.Title, Filter = "SRT-undertext (*.srt)|*.srt|Alla filer (*.*)|*.*" })
+            using (var d = new OpenFileDialog { Title = "Välj undertexten för " + r.Item.Title, Filter = Srt.OpenFilter })
             {
                 string near = r.Item.TargetPath ?? r.Item.RefPath;
                 try { if (near != null) d.InitialDirectory = Path.GetDirectoryName(near); } catch { }
@@ -562,7 +562,7 @@ namespace TextSync
         void SetTarget(Row r, string path)
         {
             if (busy) return;
-            if (MainForm.IsMkv(path) || Audio.IsVideo(path)) { SetStatus("Det måste vara en undertext (SRT), inte en film.", false); return; }
+            if (MainForm.IsMkv(path) || Audio.IsVideo(path)) { SetStatus("Det måste vara en undertext (" + Srt.FormatList + "), inte en film.", false); return; }
             if (MainForm.SamePath(path, r.Item.RefPath)) { SetStatus("Det är samma fil som referensen.", false); return; }
             r.Item.TargetPath = path;
             if (!r.Item.Candidates.Any(c => MainForm.SamePath(c, path))) r.Item.Candidates.Insert(0, path);

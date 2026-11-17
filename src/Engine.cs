@@ -118,8 +118,157 @@ namespace TextSync
 
         public static List<Cue> Parse(string text) { return Parse(text, false); }
 
+        // ---- Andra undertextformat än SRT: ASS/SSA (Aegisub, fansubbar) och WebVTT (webben). De känns igen på innehållet,
+        // inte på filändelsen, och läses in som vanliga rader. Programmet sparar alltid SRT.
+        public static readonly string[] SubExtensions = { ".srt", ".ass", ".ssa", ".vtt" };
+        public const string SubPatterns = "*.srt;*.ass;*.ssa;*.vtt";
+        public const string OpenFilter = "Undertext (SRT, ASS, SSA, VTT)|" + SubPatterns + "|Alla filer (*.*)|*.*";
+        public const string FormatList = "SRT, ASS, SSA eller VTT";
+
+        public static bool IsSubFile(string path)
+        {
+            try { return SubExtensions.Contains((Path.GetExtension(path) ?? "").ToLowerInvariant()); } catch { return false; }
+        }
+
+        static readonly Regex AssSection = new Regex(@"^[ \t]*\[(?:Script Info|Events|V4\+? Styles)\][ \t]*\r?$", RegexOptions.Multiline | RegexOptions.IgnoreCase);
+        static readonly Regex AssDialogue = new Regex(@"^[ \t]*Dialogue[ \t]*:", RegexOptions.Multiline);
+
+        // "srt", "ass" (också SSA) eller "vtt"
+        public static string DetectFormat(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return "srt";
+            int i = 0;
+            while (i < text.Length && (text[i] == '﻿' || char.IsWhiteSpace(text[i]))) i++;
+            if (string.CompareOrdinal(text, i, "WEBVTT", 0, 6) == 0) return "vtt";
+            // en SRT vars text råkar innehålla "[Events]" och "Dialogue:" har tidrader med -->, vilket en ASS-fil aldrig har
+            if (AssSection.IsMatch(text) && AssDialogue.IsMatch(text) && !TimeRx.IsMatch(text)) return "ass";
+            return "srt";
+        }
+
+        static readonly Regex AssTimeRx = new Regex(@"^\s*(\d+):(\d{1,2}):(\d{1,2})(?:[.,:](\d{1,3}))?\s*$");
+        static readonly Regex AssBlock = new Regex(@"\{[^{}]*\}");
+        static readonly Regex AssDrawing = new Regex(@"\{[^{}]*\\p[1-9]");                    // {\p1}m 0 0 l 10 0 …: en ritad figur, ingen text
+        static readonly Regex AssStyleCode = new Regex(@"\\([ibus])([01])(?=[\\}])");          // \i1 \b0 … men inte \bord2 eller \b700
+        static readonly Regex AssAlign = new Regex(@"\\an([1-9])(?=[\\}])");
+
+        // Koderna i en ASS-rad: kursiv, fetstil, understruken och genomstruken blir <i>, <b>, <u>, <s>, och {\an8} (text överst) står kvar,
+        // eftersom många spelare förstår den i en SRT. Allt annat (typsnitt, färg, plats, toning) tas bort. \N är radbrytning.
+        static string AssText(string t)
+        {
+            t = AssBlock.Replace(t, m =>
+            {
+                if (m.Value.IndexOf('\\') < 0) return m.Value;   // {en kommentar} utan koder: vanlig text inom klamrar står kvar
+                var sb = new StringBuilder();
+                var a = AssAlign.Match(m.Value);
+                if (a.Success && a.Groups[1].Value != "2") sb.Append("{\\an").Append(a.Groups[1].Value).Append('}');
+                foreach (Match x in AssStyleCode.Matches(m.Value))
+                    sb.Append(x.Groups[2].Value == "1" ? "<" : "</").Append(x.Groups[1].Value).Append('>');
+                return sb.ToString();
+            });
+            t = t.Replace("\\N", "\n").Replace("\\n", "\n").Replace("\\h", " ");
+            return string.Join("\n", t.Split('\n').Select(l => l.Trim()).Where(l => l.Length > 0));
+        }
+
+        // ASS och SSA: raderna "Dialogue:" under [Events]. Raden "Format:" säger i vilken ordning fälten står, och Text är alltid sist
+        // (texten får innehålla kommatecken). Kommentarer, ritade figurer och rader som står två gånger (samma tid och text) tas inte med.
+        static List<Cue> ParseAss(string text)
+        {
+            var cues = new List<Cue>();
+            var seen = new HashSet<string>();
+            int iStart = 1, iEnd = 2, n = 10;   // Layer/Marked, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+            bool events = false;
+            foreach (string raw in text.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n'))
+            {
+                string l = raw.Trim().TrimStart('﻿');
+                if (l.StartsWith("[")) { events = l.StartsWith("[Events]", StringComparison.OrdinalIgnoreCase); continue; }
+                if (!events) continue;
+                if (l.StartsWith("Format:", StringComparison.OrdinalIgnoreCase))
+                {
+                    var f = l.Substring(7).Split(',').Select(x => x.Trim().ToLowerInvariant()).ToList();
+                    int s = f.IndexOf("start"), e = f.IndexOf("end");
+                    if (s >= 0 && e >= 0 && f.Count >= 3 && f[f.Count - 1] == "text") { iStart = s; iEnd = e; n = f.Count; }
+                    continue;
+                }
+                if (!l.StartsWith("Dialogue:", StringComparison.OrdinalIgnoreCase)) continue;
+                var p = l.Substring(9).Split(new[] { ',' }, n);
+                if (p.Length < n) continue;
+                Match ms = AssTimeRx.Match(p[iStart]), me = AssTimeRx.Match(p[iEnd]);
+                if (!ms.Success || !me.Success) continue;
+                double st, en;
+                try
+                {
+                    st = Ms(ms.Groups[1], ms.Groups[2], ms.Groups[3], ms.Groups[4]);
+                    en = Ms(me.Groups[1], me.Groups[2], me.Groups[3], me.Groups[4]);
+                }
+                catch (OverflowException) { continue; }
+                if (AssDrawing.IsMatch(p[n - 1])) continue;
+                string t = AssText(p[n - 1]);
+                if (t.Length == 0) continue;
+                if (en < st) en = st + 1000;
+                if (!seen.Add(st.ToString(CultureInfo.InvariantCulture) + "|" + en.ToString(CultureInfo.InvariantCulture) + "|" + t)) continue;
+                cues.Add(new Cue(st, en, t));
+            }
+            cues.Sort((a, b) => a.Start.CompareTo(b.Start));
+            return cues;
+        }
+
+        // WebVTT: timmarna får saknas (01:02.500), och efter tiden kan det stå inställningar (line:0 position:50%)
+        static readonly Regex VttTimeRx = new Regex(
+            @"^\s*(?:(\d+):)?(\d{1,2}):(\d{1,2})[.,](\d{1,3})\s+-+>\s+(?:(\d+):)?(\d{1,2}):(\d{1,2})[.,](\d{1,3})(?:\s|$)", RegexOptions.Compiled);
+        // <c.gul>, <v Anna>, <lang en>, <ruby>, <rt> och tidskoder inuti raden (<00:01:02.500>). <i>, <b> och <u> står kvar.
+        static readonly Regex VttTag = new Regex(@"</?(?:c|v|lang|ruby|rt)(?:[.\s][^<>]*)?>|<\d{1,2}:\d{2}(?::\d{2})?[.,]\d{3}>");
+
+        static double VttMs(Group h, Group m, Group s, Group f)
+        {
+            double ms = int.Parse(f.Value, CultureInfo.InvariantCulture);
+            if (f.Value.Length == 1) ms *= 100; else if (f.Value.Length == 2) ms *= 10;
+            return (((h.Success ? int.Parse(h.Value) : 0) * 60.0 + int.Parse(m.Value)) * 60.0 + int.Parse(s.Value)) * 1000.0 + ms;
+        }
+
+        // WebVTT: rubriken, NOTE, STYLE och REGION hoppas över, liksom namnet som får stå på raden före tiden.
+        static List<Cue> ParseVtt(string text)
+        {
+            var cues = new List<Cue>();
+            string[] lines = text.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
+            int i = 0;
+            while (i < lines.Length)
+            {
+                string l = lines[i].Trim();
+                if (l.StartsWith("NOTE") || l.StartsWith("STYLE") || l.StartsWith("REGION"))
+                {
+                    while (i < lines.Length && lines[i].Trim().Length > 0) i++;
+                    continue;
+                }
+                Match m = VttTimeRx.Match(lines[i]);
+                if (!m.Success) { i++; continue; }
+                double st, en;
+                try
+                {
+                    st = VttMs(m.Groups[1], m.Groups[2], m.Groups[3], m.Groups[4]);
+                    en = VttMs(m.Groups[5], m.Groups[6], m.Groups[7], m.Groups[8]);
+                }
+                catch (OverflowException) { i++; continue; }
+                i++;
+                var sb = new List<string>();
+                while (i < lines.Length && lines[i].Trim().Length > 0 && !VttTimeRx.IsMatch(lines[i]))
+                {
+                    string t = VttTag.Replace(lines[i], "").Trim();
+                    if (t.Length > 0) sb.Add(t);
+                    i++;
+                }
+                if (sb.Count == 0) continue;
+                if (en < st) en = st + 1000;
+                cues.Add(new Cue(st, en, string.Join("\n", sb)));
+            }
+            cues.Sort((a, b) => a.Start.CompareTo(b.Start));
+            return cues;
+        }
+
         public static List<Cue> Parse(string text, bool keepOrder)
         {
+            string fmt = DetectFormat(text);
+            if (fmt == "ass") return ParseAss(text);
+            if (fmt == "vtt") return ParseVtt(text);
             var cues = new List<Cue>();
             string[] lines = text.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
             int i = 0;

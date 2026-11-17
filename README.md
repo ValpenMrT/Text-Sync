@@ -27,7 +27,7 @@ Text Sync skriver aldrig över en fil. Finns `Filmnamn.sv.srt` redan sparas den 
 ## För utvecklare
 
 ### Vad programmet gör
-Referensen kan vara ett textspår i en MKV-fil, en separat SRT eller filmens ljud. Ljudet analyseras med taldetektering, Whisper eller båda kombinerat. Ett textspår, eller en separat SRT på filmens originalspråk, kan också **kontrolleras ord för ord med Whisper** innan den svenska texten synkas mot det. Whisper körs på NVIDIA-grafikkort om det finns, annars på processorn.
+Referensen kan vara ett textspår i en MKV-fil, en separat undertext eller filmens ljud. Undertexter läses in som SRT, ASS, SSA eller WebVTT, och det som sparas är alltid SRT. Ljudet analyseras med taldetektering, Whisper eller båda kombinerat. Ett textspår, eller en separat SRT på filmens originalspråk, kan också **kontrolleras ord för ord med Whisper** innan den svenska texten synkas mot det. Whisper körs på NVIDIA-grafikkort om det finns, annars på processorn.
 
 Programmet jämför *när* det pratas och *när* repliker börjar, inte vad som sägs. Därför fungerar olika språk. Som ett val i Inställningar kan det också jämföra vad raderna betyder, med en flerspråkig språkmodell (se [docs/decisions.md](docs/decisions.md), 2.4.6). Det hanterar förskjutning, fel bildfrekvens (25 ↔ 23,976 fps m.fl.), drift och klipp/reklampauser.
 

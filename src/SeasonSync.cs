@@ -87,7 +87,7 @@ namespace TextSync
             if (wantMkv) progress = (p, s) => report(p / 2, s);
             progress(0, "Läser undertexten…");
             var tgt = Markup.FixAll(Srt.Load(it.TargetPath));
-            if (tgt.Count == 0) throw new InvalidDataException("Hittade inga repliker i undertexten – är det en SRT-fil?");
+            if (tgt.Count == 0) throw new InvalidDataException("Hittade inga repliker i undertexten – är det en undertext (" + Srt.FormatList + ")?");
             if (o.RemoveHi)
             {
                 // tas bort före synken, som i huvudfönstret

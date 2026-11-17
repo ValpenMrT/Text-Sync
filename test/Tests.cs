@@ -217,6 +217,62 @@ namespace TextSync
             Console.WriteLine("Sloppy 1252 SRT: {0} cues, '{1}' '{2}'", back.Count, back[0].Text, back[1].Text);
             Check("SRT utan tomrader i Windows-1252: 2 rader med rätt text", back.Count == 2 && back[0].Text == "Rad ett" && back[1].Text == "Rad två");
 
+            // ---- andra undertextformat: ASS, SSA och WebVTT läses in som vanliga rader (formatet känns igen på innehållet)
+            {
+                string ass = "[Script Info]\r\nTitle: Prov\r\nScriptType: v4.00+\r\n\r\n[V4+ Styles]\r\nFormat: Name, Fontname, Fontsize\r\nStyle: Default,Arial,20\r\n\r\n[Events]\r\n" +
+                    "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\r\n" +
+                    "Dialogue: 0,0:00:05.00,0:00:07.50,Default,,0,0,0,,Andra raden, med komma\r\n" +
+                    "Dialogue: 0,0:00:01.50,0:00:03.00,Default,,0,0,0,,{\\i1}Hej{\\i0} där\\NRad två\r\n" +
+                    "Comment: 0,0:00:08.00,0:00:09.00,Default,,0,0,0,,En kommentar\r\n" +
+                    "Dialogue: 0,0:00:10.00,0:00:12.00,Default,,0,0,0,,{\\an8\\pos(320,40)\\fad(200,200)}Skylt överst\r\n" +
+                    "Dialogue: 0,0:00:13.00,0:00:14.00,Default,,0,0,0,,{\\p1}m 0 0 l 100 0 100 100 0 100{\\p0}\r\n" +
+                    "Dialogue: 1,0:00:05.00,0:00:07.50,Default,,0,0,0,,Andra raden, med komma\r\n" +
+                    "Dialogue: 0,1:02:03.45,1:02:05.00,Default,,0,0,0,,Sista {inte en kod} raden\r\n";
+                var a = Srt.Parse(ass);
+                Console.WriteLine("ASS: {0} rader: {1}", a.Count, string.Join(" | ", a.Select(c => c.Start + " " + c.Text.Replace("\n", "/"))));
+                Check("ASS: raderna under [Events] läses i tidsordning, med rätt tider och med kommatecken i texten",
+                    Srt.DetectFormat(ass) == "ass" && a.Count == 4 && a[0].Start == 1500 && a[0].End == 3000 && a[1].Start == 5000 && a[1].Text == "Andra raden, med komma" &&
+                    a[3].Start == 3723450 && a[3].Text == "Sista {inte en kod} raden");
+                Check("ASS: kursiv blir <i>, \\N blir radbrytning, {\\an8} står kvar och övriga koder tas bort",
+                    a.Count == 4 && a[0].Text == "<i>Hej</i> där\nRad två" && a[2].Text == "{\\an8}Skylt överst");
+                Check("ASS: kommentarer, ritade figurer och rader som står två gånger tas inte med",
+                    a.Count == 4 && !a.Any(c => c.Text.Contains("kommentar") || c.Text.Contains("m 0 0")));
+                // SSA: fältet Marked i stället för Layer, och en egen ordning på fälten
+                string ssa = "[Script Info]\nScriptType: v4.00\n\n[Events]\nFormat: Marked, Style, Start, End, Text\nDialogue: Marked=0,Default,0:00:02.00,0:00:04.00,Hej, hej\n";
+                var sa = Srt.Parse(ssa);
+                Check("SSA: fältens ordning läses ur raden Format", sa.Count == 1 && sa[0].Start == 2000 && sa[0].End == 4000 && sa[0].Text == "Hej, hej");
+
+                string vtt = "\uFEFFWEBVTT - Prov\n\nNOTE\nEn anteckning\növer två rader\n\nSTYLE\n::cue { color: yellow }\n\n" +
+                    "1\n00:01.500 --> 00:03.000 line:0 position:50%\n<v Anna>Hej <c.gul>där</c>\nRad <i>två</i>\n\n" +
+                    "namn\n01:02:03.450 --> 01:02:05.000\nKara<00:01:02.500>oke\n\n00:07.000 --> 00:08.000\n\n";
+                var v = Srt.Parse(vtt);
+                Console.WriteLine("VTT: {0} rader: {1}", v.Count, string.Join(" | ", v.Select(c => c.Start + " " + c.Text.Replace("\n", "/"))));
+                Check("WebVTT: tider utan timmar, inställningar efter tiden, NOTE och STYLE hoppas över, namn före tiden tas inte med",
+                    Srt.DetectFormat(vtt) == "vtt" && v.Count == 2 && v[0].Start == 1500 && v[0].End == 3000 && v[1].Start == 3723450 && v[1].End == 3725000);
+                Check("WebVTT: <v>, <c> och tidskoder tas bort, <i> står kvar", v.Count == 2 && v[0].Text == "Hej där\nRad <i>två</i>" && v[1].Text == "Karaoke");
+                // en vanlig SRT läses som förut, även om texten råkar innehålla "Dialogue:" eller "WEBVTT"
+                string plain = "1\n00:00:01,000 --> 00:00:02,000\nDialogue: det här är text\n\n2\n00:00:03,000 --> 00:00:04,000\nWEBVTT\n[Events]\n";
+                var pl = Srt.Parse(plain);
+                Check("SRT med ord som liknar andra format läses fortfarande som SRT", Srt.DetectFormat(plain) == "srt" && pl.Count == 2 && pl[0].Text == "Dialogue: det här är text" && pl[1].Text == "WEBVTT\n[Events]");
+                // filen läses in på samma väg som en SRT (teckenkodning, Markup.FixAll), också när den har fel ändelse
+                string pa = Path.Combine(dir, "prov.ass");
+                File.WriteAllText(pa, ass, Encoding.GetEncoding(1252));
+                var fa = Markup.FixAll(Srt.Load(pa));
+                Check("ASS-fil i Windows-1252 läses in med å, ä och ö", fa.Count == 4 && fa[0].Text == "<i>Hej</i> där\nRad två" && fa[1].Text.Contains("Andra"));
+                string rf2, tf2, note2;
+                MainForm.PlanRoute(new[] { @"C:\a\Film.mkv", @"C:\a\Film.sv.ass" }, "sv", out rf2, out tf2, out note2);
+                bool f1 = rf2 == @"C:\a\Film.mkv" && tf2 == @"C:\a\Film.sv.ass" && note2 == null;
+                MainForm.PlanRoute(new[] { @"C:\a\Film.en.vtt", @"C:\a\Film.sv.ssa" }, "sv", out rf2, out tf2, out note2);
+                bool f2 = rf2 == @"C:\a\Film.en.vtt" && tf2 == @"C:\a\Film.sv.ssa";
+                Check("Dra-och-släpp: ASS, SSA och VTT räknas som undertexter", f1 && f2 && Srt.IsSubFile("a.VTT") && !Srt.IsSubFile("a.txt") && !Srt.IsSubFile("a.sub"));
+                List<string> unF;
+                var planF = SeasonPlan.Build(new[] { @"C:\s\F.S01E01.mkv", @"C:\s\F.S01E01.sv.ass", @"C:\s\F.S01E02.mkv", @"C:\s\F.S01E02.vtt" }, "sv", out unF);
+                Check("Hel säsong: en ASS- eller VTT-fil paras med sitt avsnitt och sparas som SRT bredvid filmen",
+                    planF.Count == 2 && planF[0].TargetPath == @"C:\s\F.S01E01.sv.ass" && planF[1].TargetPath == @"C:\s\F.S01E02.vtt" && planF[0].OutputPath("sv") == @"C:\s\F.S01E01.sv.srt");
+                Check("Ruta 2 säger att en ASS- eller VTT-fil sparas som SRT, och ingenting för en SRT",
+                    MainForm.OtherFormatNote(@"C:\a\x.ASS").Contains("SRT") && MainForm.OtherFormatNote(@"C:\a\x.vtt").Contains("SRT") && MainForm.OtherFormatNote(@"C:\a\x.srt") == "");
+            }
+
             // Dra-och-släpp: vilken fil blir referens/mål
             {
                 string rf, tf, note;

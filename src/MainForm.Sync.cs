@@ -114,7 +114,7 @@ namespace TextSync
                     string path = mkvPath; int ai = so.AudioIndex; bool pk = useParakeet;
                     var at = await Task.Run(() => Subtitler.Create(path, ai, pk, (p, s) => { token.ThrowIfCancellationRequested(); Progress(p, s); }, token));
                     refc = at.Subs; string wl = at.Language;
-                    if (refc.Count < 5) throw new InvalidDataException(at.Engine + " hörde nästan inget tal i filmen. Prova en annan metod i listan Referens, eller en undertext (SRT) som referens.");
+                    if (refc.Count < 5) throw new InvalidDataException(at.Engine + " hörde nästan inget tal i filmen. Prova en annan metod i listan Referens, eller en undertextfil som referens.");
                     transcript = refc; transcriptLang = wl;
                     audioInfo = "text ur ljudet med " + at.Engine + ", " + refc.Count + " rader" + (wl.Length > 0 ? " (" + MkvTrack.LanguageName(wl) + ")" : "");
                     }
@@ -126,7 +126,7 @@ namespace TextSync
                     var ar = await Task.Run(() => Audio.GetReference(path, aopt, (p, s) => { token.ThrowIfCancellationRequested(); Progress(p, s); }, token));
                     refc = ar.Cues; audioInfo = ar.Info;
                     transcript = ar.Transcript; transcriptLang = ar.Language;
-                    if (refc.Count < 5) throw new InvalidDataException("Det gick nästan inte att hitta något tal i ljudet. Prova en annan metod i listan Referens, eller en undertext (SRT) som referens.");
+                    if (refc.Count < 5) throw new InvalidDataException("Det gick nästan inte att hitta något tal i ljudet. Prova en annan metod i listan Referens, eller en undertextfil som referens.");
                 }
                 else if (refc == null)
                 {

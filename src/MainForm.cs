@@ -218,7 +218,7 @@ namespace TextSync
                 if (oo != null) { refInfo.ForeColor = Muted; refInfo.Text = "Originaltext: " + oo.Cues.Count + " repliker – synkas mot ljudet och kontrolleras med Whisper."; }
                 else if (refInfoDefault.Length > 0 && refInfo.ForeColor != ErrColor) refInfo.Text = refInfoDefault;
             };
-            refInfo = new Label { AutoSize = true, ForeColor = Muted, UseMnemonic = false, Text = "Klicka här eller dra in en MKV- eller SRT-fil." };
+            refInfo = new Label { AutoSize = true, ForeColor = Muted, UseMnemonic = false, Text = "Klicka här eller dra in en film eller en undertext." };
             // grafikkort för Whisper (visas bara när en ljudmetod med Whisper är vald)
             gpuLabel = new Label { Text = "&Grafikkort:", AutoSize = true, Margin = new Padding(0, 7, 6, 0), Visible = false };
             gpuCombo = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Anchor = AnchorStyles.Left | AnchorStyles.Right, Margin = new Padding(0, 3, 0, 0), Visible = false, AccessibleName = "Grafikkort för taligenkänning" };
@@ -231,7 +231,7 @@ namespace TextSync
                 Tools.SetSetting("gpu", dev < 0 ? "cpu" : dev.ToString());
             };
             // separat undertext på filmens originalspråk (t.ex. engelska), som synkas mot ljudet och kontrolleras av Whisper
-            origLink = new HandLink { Text = "Lägg till undertext på filmens originalspråk (SRT)…", AutoSize = true, Margin = new Padding(0, 6, 0, 0), Visible = false, LinkColor = Accent };
+            origLink = new HandLink { Text = OrigLinkText, AutoSize = true, Margin = new Padding(0, 6, 0, 0), Visible = false, LinkColor = Accent };
             origLink.LinkClicked += (s, e) => BrowseOrig();
             audioLabel = new Label { Text = "Lj&udspår:", AutoSize = true, Margin = new Padding(0, 7, 6, 0), Visible = false };
             audioCombo = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Anchor = AnchorStyles.Left | AnchorStyles.Right, Margin = new Padding(0, 3, 0, 0), Visible = false, AccessibleName = "Ljudspår för synk mot ljudet" };
@@ -258,12 +258,12 @@ namespace TextSync
             tips.SetToolTip(createLink, "Programmet lyssnar på filmen och skriver en undertext på filmens språk (med Whisper eller Parakeet, se Inställningar). Texten visas i listan, där du kan rätta den och spara den bredvid filmen.");
             rinfo.Controls.Add(createLink, 0, 4); rinfo.SetColumnSpan(createLink, 2);
             Tools.GpuScan();   // letar efter NVIDIA-kort i bakgrunden redan nu, så att listan Grafikkort är klar när den behövs
-            var refCard = MakeCard("1.  Referens – undertext i takt med filmen (textspår i MKV eller SRT) eller filmens ljud", refName, refBtn, refInfo, rinfo, BrowseRef, LoadReference);
+            var refCard = MakeCard("1.  Referens – undertext i takt med filmen (textspår i MKV eller en undertextfil) eller filmens ljud", refName, refBtn, refInfo, rinfo, BrowseRef, LoadReference);
 
             // --- 2. mål
             tgtBtn = MakeButton("Bläddra…", false);
             tgtBtn.Click += (s, e) => BrowseTarget();
-            tgtInfo = new Label { AutoSize = true, ForeColor = Muted, Text = "Klicka här eller dra in SRT-filen.", UseMnemonic = false };   // texten kan innehålla "&amp;"
+            tgtInfo = new Label { AutoSize = true, ForeColor = Muted, Text = TargetHint, UseMnemonic = false };   // texten kan innehålla "&amp;"
             // teckenkodning: automatisk räcker nästan alltid; manuellt val om å/ä/ö eller t.ex. kyrilliska tecken blir fel
             encCombo = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Anchor = AnchorStyles.Left | AnchorStyles.Right, Margin = new Padding(0, 3, 0, 0), AccessibleName = "Teckenkodning" };
             encCombo.DropDown += WidenDropDown;
@@ -273,7 +273,7 @@ namespace TextSync
             var tinfo = MakeRows();
             tinfo.Controls.Add(new Label { Text = "&Teckenkodning:", AutoSize = true, Margin = new Padding(0, 7, 6, 0) }, 0, 0);
             tinfo.Controls.Add(encCombo, 1, 0);
-            var tgtCard = MakeCard("2.  Undertext att synka (SRT som inte går i takt)", tgtName, tgtBtn, tgtInfo, tinfo, BrowseTarget, LoadTarget);
+            var tgtCard = MakeCard("2.  Undertext att synka (" + Srt.FormatList + " som inte går i takt)", tgtName, tgtBtn, tgtInfo, tinfo, BrowseTarget, LoadTarget);
 
             // rutorna delar bredden lika och blir lika höga
             var cards = new TableLayoutPanel { Dock = DockStyle.Top, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, ColumnCount = 2, RowCount = 1, Margin = new Padding(0) };
@@ -1145,7 +1145,7 @@ namespace TextSync
         }
 
         internal static bool IsMkv(string f) { string x = Path.GetExtension(f).ToLowerInvariant(); return x == ".mkv" || x == ".mks" || x == ".mka"; }
-        internal static bool IsSrt(string f) { return Path.GetExtension(f).ToLowerInvariant() == ".srt"; }
+        internal static bool IsSubFile(string f) { return Srt.IsSubFile(f); }   // SRT, ASS, SSA och VTT
 
         static readonly Dictionary<string, string> Iso3 = new Dictionary<string, string> {
             {"swe","sv"},{"eng","en"},{"nor","no"},{"nob","no"},{"dan","da"},{"fin","fi"},{"ger","de"},{"deu","de"},
@@ -1171,8 +1171,8 @@ namespace TextSync
         {
             refFile = null; targetFile = null; origFile = null; note = null;
             var mkvs = files.Where(f => IsMkv(f) || Audio.IsVideo(f)).ToList();
-            var srts = files.Where(IsSrt).ToList();
-            if (mkvs.Count == 0 && srts.Count == 0) { note = "Bara .mkv- och .srt-filer stöds."; return; }
+            var srts = files.Where(IsSubFile).ToList();
+            if (mkvs.Count == 0 && srts.Count == 0) { note = "Bara filmer och undertexter (" + Srt.FormatList + ") stöds."; return; }
             string want = Norm(wantLang) ?? "sv";
             if (mkvs.Count > 0) refFile = mkvs[0];
             if (srts.Count >= 2 && mkvs.Count == 0)
@@ -1209,7 +1209,7 @@ namespace TextSync
                 }
                 targetFile = two[ti];
                 origFile = two[1 - ti];
-                if (srts.Count > 2) note = "Bara två SRT-filer används: \"" + Path.GetFileName(targetFile) + "\" synkas och \"" + Path.GetFileName(origFile) + "\" blir originaltext.";
+                if (srts.Count > 2) note = "Bara två undertexter används: \"" + Path.GetFileName(targetFile) + "\" synkas och \"" + Path.GetFileName(origFile) + "\" blir originaltext.";
             }
             else if (srts.Count >= 1)
                 targetFile = srts.FirstOrDefault(f => Norm(GuessLang(f)) == want) ?? srts[0];
@@ -1261,7 +1261,7 @@ namespace TextSync
             if (LooksLikeSeason(files)) { BeginInvoke(new Action(() => OpenSeason(files))); return; }
             string rf, tf, of, note;
             // filmen ligger redan i ruta 1 och bara SRT-filer dras in: behåll filmen, den andra SRT:n blir originaltext
-            bool keepFilm = mkvPath != null && !files.Any(f => IsMkv(f) || Audio.IsVideo(f)) && files.Count(IsSrt) >= 2;
+            bool keepFilm = mkvPath != null && !files.Any(f => IsMkv(f) || Audio.IsVideo(f)) && files.Count(IsSubFile) >= 2;
             PlanRoute(keepFilm ? new[] { mkvPath }.Concat(files).ToArray() : files, langBox.Text.Trim(), out rf, out tf, out of, out note);
             if (rf != null && !keepFilm) LoadReference(rf);
             if (tf != null) LoadTarget(tf);
@@ -1381,8 +1381,8 @@ namespace TextSync
         {
             var a = MessageBox.Show(this,
                 "Så här gör du:\n" +
-                "1. Referens: välj filmen (MKV) – eller en SRT som redan går i takt. Klicka i rutan eller dra in filen.\n" +
-                "2. Välj undertexten som inte går i takt.\n" +
+                "1. Referens: välj filmen (MKV) – eller en undertext som redan går i takt. Klicka i rutan eller dra in filen.\n" +
+                "2. Välj undertexten som inte går i takt (" + Srt.FormatList + "). Det som sparas är alltid en SRT.\n" +
                 "3. Klicka Synka. Medan programmet arbetar är samma knapp Avbryt. Beskedet ovanför listan säger om synken blev bra, och Detaljer bredvid visar förskjutningen, vad färgerna i listan betyder och hur du ändrar rader. Står det \"Kontrollera\" hoppar du mellan ställena med länkarna bredvid (märkta ⚠ i listan).\n" +
                 "4. Spara SRT: sparas som Filmnamn.sv.srt bredvid filmen, så hittar spelaren den. Text Sync skriver aldrig över en fil: finns den redan föreslås Filmnamn.synkad.sv.srt.\n\n" +
                 "Klicka på ▶ på en rad (eller tryck P) för att spela filmen 5 sekunder före och efter raden, med texten ovanpå. Esc stänger filmfönstret.\n\n" +

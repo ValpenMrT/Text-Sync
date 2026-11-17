@@ -92,7 +92,7 @@ namespace TextSync
 
         // ------------------------------------------------------------ samla filer
         // Mappar görs om till filerna i dem (även undermappar, högst 3 nivåer ner). Filer tas med som de är.
-        // Mappar som heter MainForm.BackupFolder hoppas över. Bara filmer och .srt tas med.
+        // Mappar som heter MainForm.BackupFolder hoppas över. Bara filmer och undertexter (SRT, ASS, SSA, VTT) tas med.
         // Fel på en mapp (behörighet m.m.) kastar inte: mappen hoppas över.
         public static List<string> Collect(IEnumerable<string> paths)
         {
@@ -305,7 +305,7 @@ namespace TextSync
 
         // ------------------------------------------------------------ hjälpare
         static bool IsFilm(string f) { try { return MainForm.IsMkv(f) || Audio.IsVideo(f); } catch { return false; } }
-        static bool IsSub(string f) { try { return MainForm.IsSrt(f); } catch { return false; } }
+        static bool IsSub(string f) { try { return MainForm.IsSubFile(f); } catch { return false; } }
         static string FileName(string f) { try { return Path.GetFileName(f) ?? ""; } catch { return f ?? ""; } }
         static string NameNoExt(string f) { try { return Path.GetFileNameWithoutExtension(f) ?? ""; } catch { return f ?? ""; } }
         static string DirOf(string f) { try { return Path.GetDirectoryName(Path.GetFullPath(f)) ?? ""; } catch { return ""; } }

@@ -36,7 +36,7 @@ src/
                    rättning av rader som ligger fel, förslag om att flytta repliker mellan rader (Flytta?), växling mot den vanliga synken. Också cachen för vektorerna och en liten JSON-läsare
   Subtitler.cs     Text ur ljudet: gör undertextrader av Whispers eller Parakeets ord (meningsslut, pauser, replikstreck, 2 × 42 tecken), rättar ordtider mot taldetekteringen.
                    Används av länken "Skapa text ur ljudet…" och av valet Ljud C i listan Referens
-  Engine.cs        SRT läs/skriv och synkmotorn
+  Engine.cs        SRT läs/skriv, inläsning av ASS, SSA och WebVTT (Srt.Parse känner igen formatet på innehållet) och synkmotorn
   Sdh.cs           Tar bort text för hörselskadade: [MUSIK], (skrattar), ♪ och talarnamn i versaler
   Markup.cs        Kodade tecken (&amp; → &) och taggar (<i>, <b>, <u>, <s>, <font>): avkodas och lagas alltid vid inläsningen, tas bort som ett val.
                    Också koder från webbsidor (<br>, <p>, <span>), ASS (\N, {\i1}) och MicroDVD ({y:i})
@@ -47,7 +47,7 @@ src/
   Log.cs           Loggfil i %LOCALAPPDATA%\TextSync\log.txt
   TextSync.ico     Programikon
 test/
-  Tests.cs         Tester: synk i 7 scenarier × 3 metoder (G = korta klipp), tid före synk, SRT/teckenkodningar, dra-och-släpp-fördelning,
+  Tests.cs         Tester: synk i 7 scenarier × 3 metoder (G = korta klipp), tid före synk, SRT/teckenkodningar, ASS/SSA/WebVTT, dra-och-släpp-fördelning,
                    spara med säkerhetskopia, MKV-läsning (egen MKV-skrivare, avkortade filer), mkvmerge-inbäddning,
                    matchning av rader (dela, slå ihop, radlängd, mitt i mening, gles referens), dela en rad för hand, synka om markerade rader,
                    text för hörselskadade, kodade tecken och taggar, text ur ljudet (ord → undertexter),
