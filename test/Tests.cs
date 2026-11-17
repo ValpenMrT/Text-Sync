@@ -788,6 +788,21 @@ namespace TextSync
                 Check("Nyheter: nyare versioner märks (ny), den egna (den du har), och en version utan text får en rad om det",
                     UpdateCheck.NewerCount(all, "2.4.29") == 1 && UpdateCheck.NewerCount(all, "2.4.30") == 0 && UpdateCheck.NewerCount(all, "2.4.1") == 3 &&
                     news.StartsWith("Version 2.4.30  (ny)\r\nProgrammet visar vad som är nytt\r\n\r\nVersion 2.4.29  (den du har)\r\nListan syns") && news.EndsWith("Version 2.4.28\r\nIngen beskrivning."));
+                // reservvägen: releasernas flöde (Atom), som GitHub ger det
+                string feed = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<feed xmlns=\"http://www.w3.org/2005/Atom\">\n  <title>Release notes from Text-Sync</title>\n" +
+                    "  <entry>\n    <link rel=\"alternate\" type=\"text/html\" href=\"https://github.com/ValpenMrT/Text-Sync/releases/tag/v2.4.27\"/>\n    <title>Text Sync 2.4.27</title>\n" +
+                    "    <content type=\"html\">&lt;p&gt;Ladda ner &lt;strong&gt;TextSync-2.4.27.exe&lt;/strong&gt;.&lt;/p&gt;\n&lt;h2&gt;Ändrat i den här versionen&lt;/h2&gt;\n&lt;p&gt;2.4.27: undertexter i ASS går att läsa in&lt;/p&gt;</content>\n  </entry>\n" +
+                    "  <entry>\n    <link rel=\"alternate\" type=\"text/html\" href=\"https://github.com/ValpenMrT/Text-Sync/releases/tag/v2.4.32\"/>\n    <title>Text Sync 2.4.32</title>\n" +
+                    "    <content type=\"html\">&lt;p&gt;Ladda ner.&lt;/p&gt;\n&lt;h2&gt;Ändrat i den här versionen&lt;/h2&gt;\n&lt;p&gt;2.4.32: programmet visar vad som är nytt&lt;/p&gt;\n&lt;p&gt;Nytt sedan 2.4.27:&lt;/p&gt;\n&lt;ul&gt;\n" +
+                    "&lt;li&gt;Vad som är nytt: en rad&lt;br&gt;\noch en till. Q&amp;amp;A&lt;/li&gt;\n&lt;li&gt;Inställningar får plats.&lt;/li&gt;\n&lt;/ul&gt;\n" +
+                    "&lt;p&gt;Co-Authored-By: Claude &lt;a href=&quot;mailto:x@y.z&quot;&gt;x@y.z&lt;/a&gt;&lt;/p&gt;</content>\n  </entry>\n</feed>";
+                var fd = UpdateCheck.ParseFeed(feed);
+                Console.WriteLine("Nyheter ur flödet: {0}", string.Join(" | ", fd.Select(r => r.Version + " [" + r.Notes.Replace("\n", "/") + "]")));
+                Check("Nyheter: releasernas flöde ger samma sak som API:et (version, adress till exe-filen och texten utan HTML)",
+                    fd.Count == 2 && fd[0].Version == "2.4.32" && fd[0].Url == "https://github.com/ValpenMrT/Text-Sync/releases/download/v2.4.32/TextSync-2.4.32.exe" &&
+                    fd[0].Notes == "Programmet visar vad som är nytt\n\nNytt sedan 2.4.27:\n\n- Vad som är nytt: en rad\noch en till. Q&A\n- Inställningar får plats." &&
+                    fd[1].Version == "2.4.27" && fd[1].Notes == "Undertexter i ASS går att läsa in" &&
+                    UpdateCheck.ParseFeed("").Count == 0 && UpdateCheck.ParseFeed("<html>fel sida</html>").Count == 0);
                 Check("Nyheter: första raden till bannern kortas med …, och ett svar som inte går att tolka ger en tom lista",
                     UpdateCheck.FirstLine(all[1], 200) == "Listan syns också i ett litet fönster" && UpdateCheck.FirstLine(all[1], 12) == "Listan syns…" && UpdateCheck.FirstLine(all[2], 50) == "" &&
                     UpdateCheck.ParseList("").Count == 0 && UpdateCheck.ParseList(null).Count == 0 && UpdateCheck.ParseList("{\"message\":\"Not Found\"}").Count == 0 && UpdateCheck.ParseList("[{\"tag_name\":").Count == 0);

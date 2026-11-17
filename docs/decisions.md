@@ -2,6 +2,18 @@
 
 Nyast först.
 
+## 2026-11-17 – 2.4.33: Nyheter och versionskontrollen fungerar också när GitHubs API säger nej
+- **Område:** drift / GUI
+- **Vad som hände (ägaren):** "jag får inte upp att en ny version finns samt jag kan inte läsa nyheter. varför?", med en skärmbild av rutan "Nyheterna gick inte att hämta. Kontrollera att datorn har internet".
+- **Orsak:** GitHubs API svarar bara på 60 frågor i timmen per nätverksadress utan inloggning. Claude hade frågat API:et var 15:e sekund medan körningarna hos GitHub väntades in, så gränsen var nådd för ägarens adress. Datorn hade internet: meddelandet var missvisande. Samma sak kan hända vänner som delar nätverksadress med många andra.
+- **Beslut:**
+  - **Reservväg:** svarar API:et inte, eller går svaret inte att tolka, hämtas releasernas flöde på github.com (`…/releases.atom`, `UpdateCheck.ParseFeed`). Det har ingen sådan gräns och ger samma uppgifter: version, text och adressen till exe-filen (som alltid heter `TextSync-<version>.exe` under taggen). Flödet har de senaste releaserna, färre än API:ets 30.
+  - **Meddelandet** säger nu "gick inte att hämta just nu … eller försök igen om en stund".
+  - **Arbetssätt:** vänta in en release med `git ls-remote --tags origin`, inte med upprepade frågor till API:et (står i `docs/operations.md`).
+- **Provat:** med API:et spärrat för adressen hämtade programmets `UpdateCheck.Fetch` fyra releaser (2.4.32, 2.4.27, 2.4.26, 2.4.25) med text och rätt adresser.
+- **Test:** 298 av 298 kontroller (1 ny: flödet ger version, adress och text utan HTML, och en sida som inte är ett flöde ger en tom lista).
+- **Product-check:** Claude granskade själv. Inget blockerande: samma uppgifter skickas som förut (`TextSync/<version>` som User-Agent), nu ibland också till github.com.
+
 ## 2026-11-17 – 2.4.32: Inställningar räknar ramen rätt på en skärm som är mindre än dialogen
 - **Område:** GUI / test / drift
 - **Vad anmärkningarna från 2.4.31 visade:** hos GitHub (skärm 1024 × 768, största fönster 1044 × 788) föll båda kontrollerna för Inställningar. Dialogen blev 774 punkter hög när arbetsytan sades vara 560.

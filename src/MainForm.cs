@@ -1496,7 +1496,7 @@ namespace TextSync
                         if (!busy && statusLabel.Text == "Hämtar nyheterna från GitHub…") { statusLabel.Text = before; statusLabel.ForeColor = beforeColor; }
                         if (all == null)
                         {
-                            MessageBox.Show(this, "Nyheterna gick inte att hämta. Kontrollera att datorn har internet och försök igen.\n\nDe finns också på:\n" + UpdateCheck.ReleasesUrl,
+                            MessageBox.Show(this, "Nyheterna gick inte att hämta just nu. Kontrollera att datorn har internet, eller försök igen om en stund.\n\nDe finns också på:\n" + UpdateCheck.ReleasesUrl,
                                 Caption, MessageBoxButtons.OK, MessageBoxIcon.Information);
                             return;
                         }

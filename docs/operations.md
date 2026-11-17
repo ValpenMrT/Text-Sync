@@ -53,6 +53,7 @@ Att tänka på:
 - Pushas flera commits på en gång släpps bara den senaste versionen.
 - Finns taggen redan släpps inget. Versionen ökar i varje commit, så det händer bara när ett jobb körs om.
 - Hur det gick syns under **Actions** på GitHub. Från datorn: `git ls-remote --tags origin` visar taggen när releasen är klar (ett par minuter).
+- Vänta in releasen med `git ls-remote --tags origin`, inte med upprepade frågor till `api.github.com`: API:et svarar bara på 60 frågor i timmen per nätverksadress utan inloggning, och programmets egen versionskontroll delar den gränsen (2026-11-17 nåddes den, och programmet kunde inte hämta nyheterna förrän reservvägen via `releases.atom` kom i 2.4.33).
 - Kommer taggen inte upp har jobbet fallit. Utan inloggning går det att se vilket steg som föll: `https://api.github.com/repos/ValpenMrT/Text-Sync/actions/runs?per_page=5` och sedan `…/actions/runs/<id>/jobs`. Loggen kräver inloggning, men testerna skriver varje misslyckad kontroll som en anmärkning, och den går att läsa på `…/check-runs/<jobbets id>/annotations`.
 - GitHubs maskiner har en skärm på 1024 × 768, och Windows låter inte ett fönster bli större än skärmen. Ett test som skapar ett fönster får därför inte förutsätta att det ryms (2.4.28 och 2.4.29 släpptes aldrig av det skälet).
 - Testet av "Lägg in i MKV" hoppas över hos GitHub, eftersom mkvmerge inte finns där.

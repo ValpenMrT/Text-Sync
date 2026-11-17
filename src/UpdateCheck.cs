@@ -57,7 +57,7 @@ namespace TextSync
         // ---- Nyheter: vad som är ändrat i varje version. Texten i en release är det GitHub-jobbet skrev (release.yml):
         // en fast inledning om nedladdningen, rubriken nedan och sedan commit-meddelandet.
         const string ListUrl = "https://api.github.com/repos/ValpenMrT/Text-Sync/releases?per_page=30";
-        const string NotesHeading = "## Ändrat i den här versionen";
+        const string NotesHeading = "Ändrat i den här versionen";   // "## Ändrat …" i API:ets text, en rubrik utan ## i flödets
 
         // Det som är ändrat i versionen, som vanlig text: inledningen och rubriken tas bort, liksom raden Co-Authored-By
         // och versionsnumret först i commit-meddelandet ("2.4.30: listan syns …" blir "Listan syns …").
@@ -151,31 +151,84 @@ namespace TextSync
             return sb.ToString();
         }
 
-        // Hämtar listan över releaser från GitHub, den nyaste först. null om det inte gick (inget nät, GitHub svarar inte).
+        // ---- Reservväg: releasernas flöde på github.com (Atom). GitHubs API svarar bara på 60 frågor i timmen per nätverksadress
+        // utan inloggning, och den gränsen delas av alla datorer bakom samma router. Flödet har ingen sådan gräns.
+        // Det innehåller de senaste releaserna med texten som HTML.
+        const string FeedUrl = ReleasesUrl + ".atom";
+        static readonly Regex FeedEntry = new Regex(@"<entry>(.*?)</entry>", RegexOptions.Singleline);
+        static readonly Regex FeedTag = new Regex(@"/releases/tag/(v?\d+(?:\.\d+){0,3})""");
+        static readonly Regex FeedContent = new Regex(@"<content[^>]*>(.*?)</content>", RegexOptions.Singleline);
+
+        // HTML från flödet → vanlig text: <br> och slutet på ett stycke blir radbrytningar, punktlistor får streck
+        static string HtmlToText(string html)
+        {
+            string s = Regex.Replace(html.Replace("\r", ""), @"<br\s*/?>\s*", "\u0001", RegexOptions.IgnoreCase).Replace("\n", " ");
+            s = Regex.Replace(s, @"<li[^>]*>\s*", "- ", RegexOptions.IgnoreCase);
+            s = Regex.Replace(s, @"\s*</li>\s*", "\u0001", RegexOptions.IgnoreCase);
+            s = Regex.Replace(s, @"\s*</(?:p|h\d|ul|ol)>\s*", "\u0001\u0001", RegexOptions.IgnoreCase);
+            s = Regex.Replace(s, @"<[^<>]+>", "");
+            return Regex.Replace(WebUtility.HtmlDecode(s).Replace('\u0001', '\n'), @"[ \t]*\n[ \t]*", "\n");
+        }
+
+        // Releaserna i flödet, den nyaste versionen först. En tom lista om flödet inte går att tolka.
+        public static System.Collections.Generic.List<Release> ParseFeed(string xml)
+        {
+            var res = new System.Collections.Generic.List<Release>();
+            if (string.IsNullOrEmpty(xml)) return res;
+            try
+            {
+                foreach (Match e in FeedEntry.Matches(xml))
+                {
+                    var t = FeedTag.Match(e.Groups[1].Value);
+                    if (!t.Success || Parts(t.Groups[1].Value) == null) continue;
+                    string tag = t.Groups[1].Value, ver = tag.TrimStart('v', 'V');
+                    // exe-filen heter alltid TextSync-<version>.exe och ligger under taggen (release.yml)
+                    var r = new Release { Version = ver, Url = DownloadPrefix + tag + "/TextSync-" + ver + ".exe" };
+                    var c = FeedContent.Match(e.Groups[1].Value);
+                    if (c.Success) r.Notes = CleanNotes(HtmlToText(WebUtility.HtmlDecode(c.Groups[1].Value)), ver);
+                    res.Add(r);
+                }
+            }
+            catch (Exception) { return new System.Collections.Generic.List<Release>(); }
+            res.Sort((a, b) => IsNewer(a.Version, b.Version) ? -1 : IsNewer(b.Version, a.Version) ? 1 : 0);
+            return res;
+        }
+
+        static string Download(string url, string accept)
+        {
+            ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12;
+            var req = (HttpWebRequest)WebRequest.Create(url);
+            req.UserAgent = "TextSync/" + Program.Version;
+            req.Accept = accept;
+            req.Timeout = 10000; req.ReadWriteTimeout = 10000;
+            using (var resp = (HttpWebResponse)req.GetResponse())
+            using (var rd = new StreamReader(resp.GetResponseStream(), Encoding.UTF8))
+                return rd.ReadToEnd();
+        }
+
+        // Hämtar listan över releaser från GitHub, den nyaste först: först från API:et, och går det inte (t.ex. för många frågor
+        // från samma nätverksadress) från releasernas flöde. null om inget av dem gick (inget nät, GitHub svarar inte).
         // Körs i en bakgrundstråd. Kastar aldrig.
         public static System.Collections.Generic.List<Release> Fetch()
         {
+            System.Collections.Generic.List<Release> all = null;
             try
             {
-                ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12;
-                var req = (HttpWebRequest)WebRequest.Create(ListUrl);
-                req.UserAgent = "TextSync/" + Program.Version;
-                req.Accept = "application/vnd.github+json";
-                req.Timeout = 10000; req.ReadWriteTimeout = 10000;
-                string json;
-                using (var resp = (HttpWebResponse)req.GetResponse())
-                using (var rd = new StreamReader(resp.GetResponseStream(), Encoding.UTF8))
-                    json = rd.ReadToEnd();
-                var all = ParseList(json);
-                if (all.Count == 0) { Log.Info("Versionskontroll: svaret från GitHub gick inte att tolka."); return null; }
-                if (IsNewer(all[0].Version, Program.Version)) Log.Info("Versionskontroll: version " + all[0].Version + " finns (du har " + Program.Version + ").");
-                return all;
+                all = ParseList(Download(ListUrl, "application/vnd.github+json"));
+                if (all.Count == 0) Log.Info("Versionskontroll: svaret från GitHubs API gick inte att tolka. Provar flödet.");
             }
-            catch (Exception ex)
+            catch (Exception ex) { Log.Info("Versionskontroll: GitHubs API svarade inte (" + ex.Message + "). Provar flödet."); }
+            if (all == null || all.Count == 0)
             {
-                Log.Info("Versionskontroll: gick inte att göra (" + ex.Message + ").");
-                return null;
+                try
+                {
+                    all = ParseFeed(Download(FeedUrl, "application/atom+xml"));
+                    if (all.Count == 0) { Log.Info("Versionskontroll: flödet gick inte att tolka."); return null; }
+                }
+                catch (Exception ex) { Log.Info("Versionskontroll: gick inte att göra (" + ex.Message + ")."); return null; }
             }
+            if (IsNewer(all[0].Version, Program.Version)) Log.Info("Versionskontroll: version " + all[0].Version + " finns (du har " + Program.Version + ").");
+            return all;
         }
     }
 }
