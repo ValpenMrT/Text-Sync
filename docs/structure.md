@@ -32,6 +32,7 @@ src/
   Audio.cs         Ljudreferens: ffmpeg → 16 kHz mono WAV (mittkanal), taldetektering (A), Whisper (B), kombination (A+B), cache.
                    Också orden till text ur ljudet: Whisper (GetTextWords) eller Parakeet via sherpa-onnx (GetParakeetWords: ljudet i bitar om högst 20 s)
   Tools.cs         Hittar/laddar ner ffmpeg, whisper.cpp, språkmodell, Silero, llama.cpp, bge-m3, sherpa-onnx och Parakeet (fasta URL:er + SHA-256), grafikkort, inställningar
+  TarBz2.cs        Packar upp .tar.bz2 med egen kod (bzip2-läsare och tar-uppackare), eftersom tar.exe i äldre Windows inte kan bzip2. Används för sherpa-onnx och Parakeet
   TextCheck.cs     Kontroll av textspår mot Whisper ord för ord (ankare, utjämning, rättning); separat SRT på originalspråket synkas först grovt mot ljudet
   Meaning.cs       Jämför vad raderna betyder (inställning): vektorer från llama-server och modellen bge-m3, parning efter betydelse (rader och repliker),
                    rättning av rader som ligger fel, förslag om att flytta repliker mellan rader (Flytta?), växling mot den vanliga synken. Också cachen för vektorerna och en liten JSON-läsare

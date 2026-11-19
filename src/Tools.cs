@@ -18,7 +18,7 @@ namespace TextSync
         public long Size;
         public string Folder;    // undermapp i tools\
         public bool Zip;         // packas upp, annars sparas som fil
-        public bool Tar;         // .tar.bz2: packas upp med tar.exe som finns i Windows 10 och 11 (.NET Framework kan inte bzip2)
+        public bool Tar;         // .tar.bz2: packas upp med egen kod i TarBz2.cs (varken .NET Framework eller tar.exe i äldre Windows kan bzip2)
         public string FileName;  // filnamn om inte zip
     }
 
@@ -353,28 +353,25 @@ namespace TextSync
             return FindModel(p) != null;
         }
 
-        // Packar upp ett .tar.bz2-arkiv med tar.exe ur Windows (System32, finns från Windows 10 version 1803). Arkivet är redan kontrollerat mot SHA-256.
-        static void Untar(string archive, string dir, CancellationToken ct)
+        // Meddelandet till användaren när ett nedladdat verktyg inte gick att packa upp. Det säger vad som faktiskt hände:
+        // full disk, låsta filer eller ett arkiv som inte gick att läsa. Felet i sin helhet står i loggen.
+        public static string UnpackMessage(ToolPackage p, Exception ex)
         {
-            string tar = Path.Combine(Environment.SystemDirectory, "tar.exe");
-            if (!File.Exists(tar)) throw new UserMessageException("Verktyget kunde inte packas upp, eftersom tar.exe saknas i Windows. Det finns i Windows 10 (version 1803 och senare) och Windows 11.");
-            var psi = new System.Diagnostics.ProcessStartInfo(tar, "-xf \"" + archive + "\" -C \"" + dir + "\"") { UseShellExecute = false, CreateNoWindow = true, RedirectStandardError = true };
-            using (var pr = System.Diagnostics.Process.Start(psi))
-            using (ct.Register(() => { try { if (!pr.HasExited) pr.Kill(); } catch { } }))
-            {
-                string err = pr.StandardError.ReadToEnd();
-                pr.WaitForExit();
-                ct.ThrowIfCancellationRequested();
-                if (pr.ExitCode != 0)
-                {
-                    Log.Info("tar misslyckades, kod " + pr.ExitCode + ": " + err.Trim());
-                    throw new UserMessageException("Verktyget kunde inte packas upp. Det kan vara för lite ledigt utrymme på disken. Mer står i loggen (Hjälp → loggmapp).");
-                }
-            }
+            string drive = Path.GetPathRoot(Path.GetFullPath(Root)).TrimEnd('\\');
+            int code = ex.HResult & 0xFFFF;
+            if (ex is IOException && (code == 112 || code == 39))   // ERROR_DISK_FULL, ERROR_HANDLE_DISK_FULL
+                return "Det lediga utrymmet på disken " + drive + " tog slut när " + p.Name + " packades upp.\n\n" +
+                    "Frigör utrymme, till exempel genom att tömma Papperskorgen, och försök igen.";
+            if (ex is InvalidDataException)
+                return p.Name + " laddades ner, men filen gick inte att packa upp.\n\n" +
+                    "Försök igen. Om det händer en gång till är det ett fel i Text Sync: skicka då loggen (Hjälp → loggmapp) till den du fick programmet av.\n\n(" + ex.Message + ")";
+            return p.Name + " laddades ner, men kunde inte packas upp till\n" + Path.Combine(Root, p.Folder) + "\n\n" +
+                "Ett annat program, till exempel ett antivirusprogram, kan ha låst filerna. Starta om Text Sync och försök igen.\n\n(" + ex.Message + ")";
         }
 
         // Ladda ner, kontrollera SHA-256 och packa upp. Kastar vid fel; inget halvfärdigt lämnas kvar.
-        public static void Download(ToolPackage p, Action<long, long> progress, CancellationToken ct)
+        // unpack får 0–100 medan ett .tar.bz2-arkiv packas upp (det tar en stund för stora arkiv).
+        public static void Download(ToolPackage p, Action<long, long> progress, CancellationToken ct, Action<int> unpack = null)
         {
             ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12;
             string dl = Path.Combine(Root, "downloads");
@@ -420,13 +417,23 @@ namespace TextSync
                 }
                 else if (p.Tar)
                 {
-                    if (Directory.Exists(target)) Directory.Delete(target, true);
                     string unz = target + ".unzip";
                     if (Directory.Exists(unz)) Directory.Delete(unz, true);
                     Directory.CreateDirectory(unz);
-                    try { Untar(tmp, unz, ct); }
-                    catch { try { Directory.Delete(unz, true); } catch { } throw; }
-                    Directory.Move(unz, target);
+                    // Packas upp med egen kod (TarBz2.cs): tar.exe i Windows 10 och tidiga Windows 11 kan inte bzip2. Arkivet är redan kontrollerat mot SHA-256.
+                    try
+                    {
+                        TarBz2.Extract(tmp, unz, ct, unpack);
+                        if (Directory.Exists(target)) Directory.Delete(target, true);   // det gamla tas bort först när det nya är uppackat
+                        Directory.Move(unz, target);
+                    }
+                    catch (Exception ex)
+                    {
+                        try { Directory.Delete(unz, true); } catch { }
+                        if (ex is OperationCanceledException || ct.IsCancellationRequested) throw new OperationCanceledException();
+                        Log.Info("Uppackningen av " + p.Name + " misslyckades: " + ex);
+                        throw new UserMessageException(UnpackMessage(p, ex), ex);
+                    }
                 }
                 else
                 {

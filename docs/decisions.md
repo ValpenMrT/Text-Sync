@@ -2,6 +2,20 @@
 
 Nyast först.
 
+## 2026-11-19 – 2.4.34: Parakeet packas upp med egen kod, inte med tar.exe
+- **Område:** drift / verktyg / GUI
+- **Vad som hände (en vän, via ägaren):** synk med Parakeet stannade med "Verktyget kunde inte packas upp. Det kan vara för lite ledigt utrymme på disken." tre gånger i rad i 2.4.26. I loggen stod `tar.exe: Error opening archive: Can't initialize filter; unable to run program "bzip2 -d"`.
+- **Orsak:** sherpa-onnx och Parakeet-modellen finns bara som `.tar.bz2`, och de packades upp med `tar.exe` ur Windows. `tar.exe` i Windows 10 och tidiga Windows 11 är byggd utan bzip2 och försöker starta ett program `bzip2` som inte finns. På ägarens dator (bsdtar 3.8.9 med `bz2lib`) fungerade det, så felet syntes inte där. Uppgiften i beslutet från 2026-11-14 om att `tar.exe` klarar det gällde alltså bara nyare Windows. Meddelandet om diskutrymme var en gissning och stämde inte.
+- **Beslut:**
+  - **Egen uppackning** i `src/TarBz2.cs`: en bzip2-läsare (`BZip2Stream`, kontrollerar kontrollsumman för varje block och för hela arkivet) och en tar-uppackare (`TarBz2.ExtractTar`: filer och mappar, långa namn enligt ustar, pax och GNU; länkar hoppas över). `tar.exe` används inte längre, så det fungerar lika på alla Windows-versioner som kan köra programmet. Ingen NuGet och inget nytt verktyg att ladda ner.
+  - **Skydd:** en post som pekar utanför målmappen (`..`, enhetsbokstav eller rot) avvisas. Arkivet är dessutom kontrollerat mot SHA-256 före uppackningen, som förut.
+  - **Felmeddelandet** säger vad som hände (`Tools.UnpackMessage`): disken blev full (bara när Windows säger det), arkivet gick inte att läsa, eller filerna kunde inte skrivas (till exempel låsta av ett antivirusprogram). Hela felet står i loggen.
+  - **Förloppet** visar "Packar upp … N %" under uppackningen, eftersom modellen tar en stund.
+  - **Det gamla verktyget tas bort först när det nya är uppackat**, så att en misslyckad uppackning inte lämnar datorn utan verktyget.
+- **Provat:** båda riktiga arkiven packades upp med den nya koden och jämfördes fil för fil (SHA-256) med det `tar.exe` hade packat upp: sherpa-onnx 31 av 31 filer på 2,5 s, modellen 9 av 9 filer (670 MB) på 34 s. `Tools.Download` hämtade och packade upp sherpa-onnx hela vägen, och `sherpa-onnx-offline.exe` startar. Inte provat på en dator med Windows 10: koden använder inget ur Windows utöver .NET Framework, så Windows-versionen ska inte spela någon roll.
+- **Test:** 310 av 310 kontroller (12 nya: ett litet arkiv med flera block, löplängder, tom fil och långt filnamn; ändrat, avkortat och främmande arkiv avvisas; pax- och GNU-namn; poster utanför mappen avvisas; felmeddelandet).
+- **Product-check:** Claude granskade själv. Inget blockerande. Uppackningen går att avbryta som förut.
+
 ## 2026-11-17 – 2.4.33: Nyheter och versionskontrollen fungerar också när GitHubs API säger nej
 - **Område:** drift / GUI
 - **Vad som hände (ägaren):** "jag får inte upp att en ny version finns samt jag kan inte läsa nyheter. varför?", med en skärmbild av rutan "Nyheterna gick inte att hämta. Kontrollera att datorn har internet".

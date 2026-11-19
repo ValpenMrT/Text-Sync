@@ -161,6 +161,31 @@ namespace TextSync
             File.WriteAllBytes(path, Cat(header, El(0x18538067, body.ToArray())));
         }
 
+        // ---------------- tar-skrivare (för test)
+        static byte[] TarEntry(string name, char type, byte[] data)
+        {
+            var h = new byte[512];
+            Action<int, string> put = (off, s) => { var b = Encoding.UTF8.GetBytes(s); Array.Copy(b, 0, h, off, b.Length); };
+            put(0, name); put(100, "0000644"); put(108, "0000000"); put(116, "0000000");
+            put(124, Convert.ToString(data.Length, 8).PadLeft(11, '0')); put(136, "00000000000");
+            for (int i = 148; i < 156; i++) h[i] = 32;
+            h[156] = (byte)type;
+            put(257, "ustar"); h[263] = (byte)'0'; h[264] = (byte)'0';
+            put(148, Convert.ToString(h.Sum(b => (int)b), 8).PadLeft(6, '0')); h[154] = 0;
+            return Cat(h, data, new byte[(512 - data.Length % 512) % 512]);
+        }
+        // en pax-post: "<längd> nyckel=värde\n", där längden räknar med sina egna siffror
+        static byte[] PaxRecord(string key, string value)
+        {
+            int body = Encoding.UTF8.GetByteCount(" " + key + "=" + value + "\n"), n = body + 1;
+            while (n != body + n.ToString().Length) n = body + n.ToString().Length;
+            return Encoding.UTF8.GetBytes(n + " " + key + "=" + value + "\n");
+        }
+        static bool Invalid(Action a) { try { a(); } catch (InvalidDataException) { return true; } return false; }
+
+        // Ett litet .tar.bz2-arkiv gjort med tar.exe i Windows 11 (bzip2 nivå 1, så att block.txt på 349 kB blir flera block).
+        const string TarBz2Fixture = "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";
+
         static int Main(string[] args)
         {
             Console.OutputEncoding = Encoding.UTF8;
@@ -1664,6 +1689,69 @@ namespace TextSync
                     var er = Meaning.Apply(mref, sr, (a, b) => { }, System.Threading.CancellationToken.None);
                     Check("Betydelse: utan verktyg lämnas synken som den var och felet står i rapporten", er.Error != null && sr.Meaning == er && sr.Output.Zip(off, (x, y) => x.Start == y.Start).All(x => x) && er.Summary().Contains("som vanligt"));
                 }
+            }
+
+            {   // .tar.bz2 packas upp med egen kod: tar.exe i Windows 10 och tidiga Windows 11 kan inte bzip2
+                var none = System.Threading.CancellationToken.None;
+                byte[] arc = Convert.FromBase64String(TarBz2Fixture);
+                string tdir = Path.Combine(dir, "tarbz2");
+                if (Directory.Exists(tdir)) Directory.Delete(tdir, true);
+                string arcFile = Path.Combine(dir, "t.tar.bz2");
+                File.WriteAllBytes(arcFile, arc);
+                int lastPct = -1; bool pctOk = true;
+                TarBz2.Extract(arcFile, tdir, none, pc => { if (pc < lastPct || pc > 100) pctOk = false; lastPct = pc; });
+                Func<string, string> sha = f => { using (var s = System.Security.Cryptography.SHA256.Create()) return BitConverter.ToString(s.ComputeHash(File.ReadAllBytes(f))).Replace("-", "").Substring(0, 16); };
+                var want = new[]
+                {
+                    "block.txt|348950|B0562F2BF1FE4ECD", "hej.txt|13|C7A232087372876E", "slump.bin|3000|AECE4827583546E5", "tom.bin|0|E3B0C44298FC1C14",
+                    "under\\" + new string('n', 116) + ".txt|1|2D711642B726B044", "under\\djup\\runs.bin|1536|53BE7EEBBFB87FFA"
+                };
+                Check("tar.bz2: filerna packas upp med rätt innehåll (flera block, löplängder, tom fil, långt filnamn, undermappar)", want.All(w =>
+                {
+                    var q = w.Split('|'); string f = Path.Combine(tdir, q[0]);
+                    return File.Exists(f) && new FileInfo(f).Length == long.Parse(q[1]) && sha(f) == q[2];
+                }));
+                Check("tar.bz2: en tom mapp skapas, och inget annat än arkivets sex filer packas upp",
+                    Directory.Exists(Path.Combine(tdir, "tommapp")) && Directory.GetFiles(tdir, "*", SearchOption.AllDirectories).Length == 6);
+                Check("tar.bz2: förloppet slutar på 100 och backar aldrig", pctOk && lastPct == 100);
+
+                Func<byte[], long> unpackAll = b => { long tot = 0; int got; var chunk = new byte[4096]; using (var z = new BZip2Stream(new MemoryStream(b))) while ((got = z.Read(chunk, 0, chunk.Length)) > 0) tot += got; return tot; };
+                var flipped = (byte[])arc.Clone(); flipped[arc.Length / 2] ^= 0x10;
+                Check("bzip2: ett arkiv med en ändrad byte avvisas", Invalid(() => unpackAll(flipped)));
+                Check("bzip2: ett avkortat arkiv avvisas", Invalid(() => unpackAll(arc.Take(arc.Length / 2).ToArray())) && Invalid(() => unpackAll(arc.Take(arc.Length - 3).ToArray())));
+                Check("bzip2: en fil som inte är bzip2 avvisas", Invalid(() => unpackAll(Encoding.ASCII.GetBytes("PK\u0003\u0004 det här är en zip-fil"))));
+                Check("bzip2: två strömmar efter varandra läses som en fil", unpackAll(Cat(arc, arc)) == 2 * unpackAll(arc));
+
+                // tar: långa namn (pax och GNU), länkar och poster som pekar utanför mappen
+                var utf = new UTF8Encoding(false);
+                string xdir = Path.Combine(dir, "tarx");
+                if (Directory.Exists(xdir)) Directory.Delete(xdir, true);
+                string gnuName = "gnu/" + new string('g', 150) + ".txt";
+                var tar = Cat(
+                    TarEntry("PaxHeader/x", 'x', PaxRecord("path", "pax/åäö och blanksteg.txt")), TarEntry("kort1", '0', utf.GetBytes("A")),
+                    TarEntry("././@LongLink", 'L', utf.GetBytes(gnuName + "\0")), TarEntry("kort2", '0', utf.GetBytes("BB")),
+                    TarEntry("lank", '2', new byte[0]), TarEntry("vanlig.txt", '0', utf.GetBytes("CCC")), new byte[1024]);
+                TarBz2.ExtractTar(new MemoryStream(tar), xdir, none);
+                Check("tar: långa namn enligt pax och GNU används, och bara för posten närmast efter",
+                    File.Exists(Path.Combine(xdir, "pax\\åäö och blanksteg.txt")) && File.ReadAllText(Path.Combine(xdir, gnuName.Replace('/', '\\'))) == "BB" &&
+                    File.ReadAllText(Path.Combine(xdir, "vanlig.txt")) == "CCC" && !File.Exists(Path.Combine(xdir, "kort1")) && !File.Exists(Path.Combine(xdir, "kort2")));
+                Check("tar: en länk hoppas över", !File.Exists(Path.Combine(xdir, "lank")) && Directory.GetFiles(xdir, "*", SearchOption.AllDirectories).Length == 3);
+                bool outside = true;
+                foreach (string evil in new[] { "../ute.txt", "under/../../ute.txt", "/ute.txt", "C:/ute.txt", "..\\ute.txt" })
+                    outside &= Invalid(() => TarBz2.ExtractTar(new MemoryStream(Cat(TarEntry(evil, '0', utf.GetBytes("X")), new byte[1024])), xdir, none));
+                Check("tar: en fil som pekar utanför mappen avvisas och skrivs inte", outside && !File.Exists(Path.Combine(dir, "ute.txt")));
+                var badSum = TarEntry("fil.txt", '0', utf.GetBytes("X")); badSum[3] ^= 1;
+                Check("tar: ett huvud med fel kontrollsumma och ett arkiv som tar slut mitt i en fil avvisas",
+                    Invalid(() => TarBz2.ExtractTar(new MemoryStream(badSum), xdir, none)) &&
+                    Invalid(() => TarBz2.ExtractTar(new MemoryStream(TarEntry("stor.bin", '0', new byte[2000]).Take(1000).ToArray()), xdir, none)));
+
+                // meddelandet säger vad som hände: full disk, oläsligt arkiv eller låsta filer
+                string full = Tools.UnpackMessage(Tools.SherpaOnnx, new IOException("x", unchecked((int)0x80070070)));
+                string bad = Tools.UnpackMessage(Tools.SherpaOnnx, new InvalidDataException("Arkivet är trasigt (test)."));
+                string locked = Tools.UnpackMessage(Tools.SherpaOnnx, new UnauthorizedAccessException("nekad"));
+                Check("Verktyg: meddelandet om uppackning skyller bara på disken när den är full",
+                    full.Contains("utrymme") && !bad.Contains("utrymme") && !locked.Contains("utrymme") && bad.Contains("loggen") && locked.Contains("låst") &&
+                    new[] { full, bad, locked }.All(m => m.Contains(Tools.SherpaOnnx.Name)));
             }
 
             Console.WriteLine();

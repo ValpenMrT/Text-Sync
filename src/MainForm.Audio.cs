@@ -152,7 +152,8 @@ namespace TextSync
             {
                 var pkg = p; long before = doneBefore;
                 await Task.Run(() => Tools.Download(pkg, (d, t) => prog((int)(100 * (before + d) / Math.Max(1, total)),
-                    "Laddar ner " + pkg.Name + "… " + Fmt((before + d) / 1048576.0, "0") + " av " + Fmt(total / 1048576.0, "0") + " MB"), token));
+                    "Laddar ner " + pkg.Name + "… " + Fmt((before + d) / 1048576.0, "0") + " av " + Fmt(total / 1048576.0, "0") + " MB"), token,
+                    pct => prog((int)(100 * (before + pkg.Size) / Math.Max(1, total)), "Packar upp " + pkg.Name + "… " + pct + " %")));
                 doneBefore += p.Size;
             }
             // ffprobe finns först nu: läs ljudspåren i en film som inte är MKV, så att rätt spår väljs redan första gången
